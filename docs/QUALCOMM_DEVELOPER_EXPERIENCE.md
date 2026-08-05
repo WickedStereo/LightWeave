@@ -1,144 +1,191 @@
 # Qualcomm Developer Experience Log
 
-This public engineering log records how Qualcomm hardware, developer tools, runtimes, documentation, samples, and workflows help or hinder LightWeave. It is evidence-oriented: documentation claims and direct observations are kept separate, failures are recorded as useful results, and credentials or confidential material are never included.
+This public engineering log records how Qualcomm hardware, tools, runtimes,
+documentation, and samples help or hinder LightWeave. Documentation claims and
+direct observations are separated. Failures are useful evidence. Credentials,
+private endpoints, and confidential material must never appear here.
 
 ## Entry template
 
 | Field | Required content |
 | --- | --- |
 | Date and ID | Stable observation ID and date |
-| Objective | What LightWeave work was attempted |
-| Environment | Device, OS, process architecture, and relevant versions |
+| Objective | LightWeave task attempted |
+| Environment | Device, OS, architecture, and exact relevant versions |
 | Tool/source | Product, package, SDK, sample, or documentation |
-| Intended workflow | What the resource was expected to enable |
-| Actual result and evidence | What happened and how it was verified |
-| Usefulness | Concrete value to the project |
-| Friction | Missing, confusing, broken, or inefficient behavior |
-| Workaround | Safe path used or proposed |
-| Suggested improvement | Actionable Qualcomm developer-experience feedback |
-| Classification | Qualcomm-controlled, third-party, mixed, or unverified |
+| Intended workflow | Expected developer path |
+| Actual result and evidence | Observed result and verification |
+| Usefulness | Concrete project value |
+| Friction and owner | Problem plus Qualcomm/documentation/third-party classification |
+| Workaround | Safe tested path |
+| Suggested improvement | Actionable developer-experience feedback |
 
 ## Resource register
 
 | Resource | Classification | LightWeave use | Current status |
 | --- | --- | --- | --- |
-| [Qualcomm Developer](https://www.qualcomm.com/developer) | Active tooling gateway | Discover current SDKs, Windows on Snapdragon guidance, samples, and support | Available |
-| [Windows on Snapdragon AI development](https://docs.qualcomm.com/bundle/publicresource/topics/80-62010-1/ai-app-development.html?product=1601111740057789) | Active documentation | Native ARM64 setup and Snapdragon application guidance | Available; JavaScript-heavy |
-| Supplied external QUAD client | Active development infrastructure | Hardware detection, conversion, profiling, orchestration, and generated integration guidance | Checkout available; local virtual environment currently broken |
-| [Qualcomm AI Hub](https://aihub.qualcomm.com/get-started) | Active model workflow | Conversion, quantization, hosted-device validation, profiling, and artifact preparation | Account/token required; runtime must not depend on it |
-| [QAIRT Visualizer](https://docs.qualcomm.com/bundle/publicresource/topics/80-87189-1/overview.html?product=1601111740009302) | Active analysis tool | Inspect converted graph, operators, partitioning, quantization, memory, and performance | Not yet installed or exercised locally |
-| [ONNX Runtime QNN plugin](https://github.com/microsoft/onnxruntime-qnn) | Active runtime | Strict Hexagon NPU inference from native ARM64 Python | Environment not yet installed |
-| [Whisper + AI Hub sample](https://github.com/thatrandomfrenchdude/simple-whisper-transcription) | Implementation reference | Model asset layout, offline/standalone split, QNN session patterns, and Windows build lessons | Reviewed; older provider API must be updated before reuse |
-| [HRNet pose sample](https://github.com/quic/Pose-Detection-with-HRPoseNet) | Implementation reference | Model manifests, Windows on Snapdragon setup, CPU/NPU selection, tests | Reviewed |
-| [Local Agent](https://github.com/thatrandomfrenchdude/local-agent) | Reference only | Modular CLI/config/test conventions | Not a runtime dependency |
-| [AnythingLLM NPU chatbot](https://github.com/thatrandomfrenchdude/simple-npu-chatbot) | Reference only | ARM64-vs-x64 troubleshooting and local-NPU demo patterns | Not a runtime dependency |
-| Scaler Chatbot | Unavailable reference | Potential additional local-chat sample | No unambiguous public link was supplied |
-| [Awesome Qualcomm Developer](https://qualcomm.github.io/awesome-qualcomm-developer/) | Discovery reference | Find comparable open-source Qualcomm projects and submission conventions | Available; listed projects require independent review |
-| Provided `qualcomm/edge-ai-labs-arduino` RPC link | Later hardware reference | Future PC/UNO transport adapter | Link currently returns 404 |
-| [Arduino MessagePack RPC router](https://github.com/arduino/arduino-router) | Later hardware reference | Maintained UNO Q Linux/MCU RPC alternative | Available; deferred with the hardware layer |
+| [Qualcomm Developer](https://www.qualcomm.com/developer) | Active gateway | SDK, Windows on Snapdragon, and sample discovery | Available |
+| [Windows on Snapdragon AI development](https://docs.qualcomm.com/bundle/publicresource/topics/80-62010-1/ai-app-development.html?product=1601111740057789) | Active documentation | Native ARM64 environment/runtime guidance | Available; JavaScript-heavy |
+| Supplied external QUAD client 0.2.0 | Active tooling | Hardware detection, diagnostics, and server workflow guidance | Local detect/doctor exercised; server not exercised |
+| [Qualcomm AI Hub](https://aihub.qualcomm.com/get-started) | Setup-time tooling | Hosted conversion, validation, and profiling | Not exercised; no project account/token in scope |
+| [QAIRT Visualizer](https://docs.qualcomm.com/bundle/publicresource/topics/80-87189-1/overview.html?product=1601111740009302) | Setup-time tooling | Graph partition, quantization, memory, and profile inspection | Unavailable locally; SDK not installed |
+| [ONNX Runtime QNN plugin](https://github.com/onnxruntime/onnxruntime-qnn) | Active runtime | Native ARM64 strict HTP inference | Exercised successfully at 2.4.0 with ORT 1.24.4 |
+| [ONNX Runtime QNN EP docs](https://onnxruntime.ai/docs/execution-providers/QNN-ExecutionProvider.html) | Active reference | QDQ configuration and no-fallback session contract | Used for both media graphs |
+| [Whisper + AI Hub sample](https://github.com/thatrandomfrenchdude/simple-whisper-transcription) | Implementation reference | Model assets and Windows QNN flow | Reference only; provider examples require current API review |
+| [HRNet pose sample](https://github.com/quic/Pose-Detection-with-HRPoseNet) | Implementation reference | Model manifests and device setup | Reference only |
+| [Local Agent](https://github.com/thatrandomfrenchdude/local-agent) | Later reference | Modular local agent patterns | Not a runtime dependency |
+| [AnythingLLM NPU chatbot](https://github.com/thatrandomfrenchdude/simple-npu-chatbot) | Later reference | Local NPU demo structure | Not a runtime dependency |
+| Scaler Chatbot | Unavailable reference | Potential local chatbot sample | No unambiguous public link supplied |
+| [Awesome Qualcomm Developer](https://qualcomm.github.io/awesome-qualcomm-developer/) | Discovery reference | Comparable projects and samples | Available |
+| Provided `qualcomm/edge-ai-labs-arduino` RPC path | Later hardware reference | Future UNO Q byte adapter | Stale/404 |
+| [Arduino MessagePack RPC router](https://github.com/arduino/arduino-router) | Later hardware reference | Maintained UNO Q RPC alternative | Available; hardware phase deferred |
 
 ## Observation log
 
-### DX-001 — QUAD maps the intended Qualcomm workflow clearly
+### DX-001 - QUAD provides useful local Snapdragon discovery
 
 | Field | Observation |
 | --- | --- |
-| Date and objective | 2026-08-05; understand where QUAD fits in LightWeave |
-| Environment | Supplied local QUAD checkout; runtime not invoked |
-| Intended workflow | `hardware_detect -> convert_model -> profile_workload -> orchestrate_workload -> generate_code`, with AI Hub model selection as an additional path |
-| Actual result and evidence | The checkout documentation and client source expose these operations and distinguish hosted conversion/profiling from local application work |
-| Usefulness | Gives LightWeave a repeatable sequence for proving hardware, preparing the decoder, comparing backends, and generating reviewed starter integration code |
-| Friction | “Orchestration” can be confused with multi-device application orchestration; hosted SDK capability can also be mistaken for local runtime readiness |
-| Workaround | Keep QUAD, application orchestration, and the optical transport as separately named layers in project documentation |
-| Suggested improvement | Surface a short generated report that separates server capabilities, client capabilities, and verified target-device capabilities |
-| Classification | Qualcomm-controlled workflow; direct documentation inspection |
+| Date and objective | 2026-08-05; detect and diagnose the LightWeave development laptop |
+| Environment | Windows 11 Pro ARM64; QUAD client 0.2.0; Python 3.11.9 ARM64 |
+| Tool/source | Supplied external QUAD checkout; `quad-client detect --local-only` and `quad-client doctor` |
+| Intended workflow | Establish authoritative hardware/runtime facts before model integration |
+| Actual result and evidence | Detected Snapdragon X Elite X1E80100, 12 ARM64 CPU cores, Adreno X1-85, Hexagon v73 at 45 TOPS, 31.6 GB RAM, and CPU/NPU runtimes. Doctor confirmed ARM64 Python and warned that no QAIRT SDK environment is configured. |
+| Usefulness | Replaced assumptions with a reproducible device inventory and identified missing optional SDK tooling early |
+| Friction and owner | The supplied QUAD venv initially depended on a removed base interpreter; standard Windows venv portability issue. Doctor also found plain `onnxruntime` and `onnxruntime-qnn` installed together in that environment; environment provisioning issue. |
+| Workaround | Restore a supported ARM64 Python for QUAD; keep LightWeave's QNN worker in a separate clean ARM64 environment |
+| Suggested improvement | Make QUAD's installer/doctor detect a missing venv base interpreter and conflicting ORT packages before normal commands run, then print a one-command repair path |
 
-### DX-002 — The supplied QUAD environment is not portable after its base Python disappears
-
-| Field | Observation |
-| --- | --- |
-| Date and objective | 2026-08-05; run QUAD diagnostics on the supplied Snapdragon PC |
-| Environment | Native ARM64 Windows host; supplied checkout contains `.venv`, but no system Python is discoverable |
-| Intended workflow | Invoke the existing virtual environment and run QUAD diagnostics without reinstalling the client |
-| Actual result and evidence | The virtual-environment launcher references a Python interpreter that is no longer present, so both interpreter and `pip` invocation fail before QUAD starts |
-| Usefulness | Confirms that environment repair must precede QUAD, QNN, or model work |
-| Friction | A copied or retained virtual environment looks complete but is unusable because Windows venvs depend on the original base interpreter path |
-| Workaround | Reinstall a supported interpreter and recreate the environment from the checkout’s declared dependencies; do not copy the checkout into LightWeave |
-| Suggested improvement | Have the installer and `doctor` wrapper detect a missing base interpreter before invoking the venv and print a one-command repair path |
-| Classification | Mixed Qualcomm workflow and standard Python venv behavior; directly observed |
-
-### DX-003 — Current QNN plugin usage differs from common sample code
+### DX-002 - QUAD is a client/orchestrator, not the local inference runtime
 
 | Field | Observation |
 | --- | --- |
-| Date and objective | 2026-08-05; design a defensible no-fallback NPU session |
-| Environment | Documentation review; runtime installation pending |
-| Intended workflow | Load a QNN model on the Hexagon NPU and prove that the requested device executed it |
-| Actual result and evidence | Current plugin documentation describes registering the provider library, enumerating EP devices, and selecting the NPU device; several older samples instantiate `QNNExecutionProvider` through a provider-name list |
-| Usefulness | The current API exposes concrete device selection required for LightWeave evidence |
-| Friction | Older samples can appear successful while using a different integration contract or allowing fallback |
-| Workaround | Centralize session construction, disable CPU fallback, require an NPU device, and capture profiling/provider evidence |
-| Suggested improvement | Add a prominent migration table to all Qualcomm sample READMEs and fail loudly when old provider-list examples are used with the plugin distribution |
-| Classification | Qualcomm/Microsoft runtime integration; documentation and sample comparison |
+| Date and objective | 2026-08-05; determine where QUAD belongs in LightWeave |
+| Environment | QUAD client checkout and bundled documentation; local commands only |
+| Tool/source | QUAD SDK and skill documentation |
+| Intended workflow | `hardware_detect -> convert_model -> profile_workload -> orchestrate_workload -> generate_code`, with AI Hub selection as another server-backed route |
+| Actual result and evidence | Local detect/doctor are self-contained. Conversion, profiling, orchestration, and code generation are MCP server workflows and are not required by the LightWeave runtime. No unverified configured server was contacted. |
+| Usefulness | Gives a clear optional preparation workflow while keeping the air-gapped runtime independent |
+| Friction and owner | The term "orchestration" can be confused with LightWeave's media/device orchestration; documentation naming issue |
+| Workaround | Name QUAD server orchestration, LightWeave application orchestration, and optical transport as separate layers |
+| Suggested improvement | Generate a capability report that separately marks local client, configured server, hosted service, and target-device facts as detected, documented, or unverified |
 
-### DX-004 — Windows on Snapdragon currently needs two Python architectures for this codec
-
-| Field | Observation |
-| --- | --- |
-| Date and objective | 2026-08-05; reconcile CompressAI/PyTorch with native QNN execution |
-| Environment | Snapdragon Windows ARM64; package availability research |
-| Intended workflow | Encode, entropy-decode, and reconstruct in one native ARM64 Python environment |
-| Actual result and evidence | QNN NPU execution requires native ARM64 Python, while the required PyTorch/CompressAI Windows workflow does not have a dependable matching native ARM64 wheel path |
-| Usefulness | Native ARM64 QNN remains available for the compute-heavy synthesis transform |
-| Friction | Developers must manage an emulated x64 codec environment and a native ARM64 inference environment on one machine |
-| Workaround | Use a neutral tensor handoff and provide setup scripts plus explicit architecture diagnostics |
-| Suggested improvement | Publish a supported end-to-end Python matrix and native Windows ARM64 wheels for common model-preparation dependencies |
-| Classification | Mixed Qualcomm platform and third-party packaging limitation |
-
-### DX-005 — QNN constraints improve the model contract but require early feasibility proof
+### DX-003 - Current QNN plugin can prove full image-decoder NPU assignment
 
 | Field | Observation |
 | --- | --- |
-| Date and objective | 2026-08-05; assess CompressAI and EnCodec decoder feasibility |
-| Environment | ONNX Runtime QNN and model-architecture documentation review |
-| Intended workflow | Export one decoder graph per media type and run it entirely on HTP |
-| Actual result and evidence | The selected QNN path requires fixed shapes and quantized deployment for HTP; the image synthesis graph is convolutional, while EnCodec includes recurrent layers not exposed by the selected ONNX Runtime QNN operator path |
-| Usefulness | Forces stable profiles and makes image `g_s` the lower-risk first milestone |
-| Friction | Dynamic-axis examples and whole-decoder audio claims are incompatible with this route |
-| Workaround | Use fixed image and one-second audio profiles; require full image NPU assignment and use the approved hybrid audio split |
-| Suggested improvement | Provide an operator-compatibility preflight that accepts ONNX and reports supported partitions before developers invest in application integration |
-| Classification | Qualcomm/Microsoft runtime constraint plus third-party model architecture |
+| Date and objective | 2026-08-05; run complete CompressAI `g_s` on Hexagon without CPU fallback |
+| Environment | Snapdragon X Elite; Windows ARM64 Python 3.11.9; ONNX Runtime 1.24.4; `onnxruntime-qnn` 2.4.0 |
+| Tool/source | ONNX Runtime QNN plugin and QNN HTP backend |
+| Intended workflow | Register the plugin library, enumerate EP devices, select only the NPU, compile a static QDQ graph, and reject fallback |
+| Actual result and evidence | Complete `[1,192,16,16] -> [1,3,256,256]` graph ran with `session.disable_cpu_ep_fallback=1`. Profile events list only `QNNExecutionProvider` and zero CPU nodes. NPU/image-reference parity was at least 56.99 dB over the acceptance set. |
+| Usefulness | Provides defensible on-device AI evidence rather than inferring NPU use from a successful call |
+| Friction and owner | Many older provider-list examples do not show plugin registration or concrete NPU-device selection; documentation/sample versioning issue |
+| Workaround | Centralize current plugin registration, exact NPU selection, fallback disabling, and profile validation in the ARM64 worker |
+| Suggested improvement | Publish a migration table and a minimal "strict NPU or fail" sample alongside every older provider-list example |
 
-### DX-006 — AI Hub is valuable during preparation but must not leak into the offline runtime
+### DX-004 - Generative decoders need graph-specific precision choices
 
 | Field | Observation |
 | --- | --- |
-| Date and objective | 2026-08-05; place AI Hub in an air-gapped project workflow |
-| Environment | AI Hub public documentation review; account use pending |
-| Intended workflow | Convert, quantize, validate, and profile a custom decoder on hosted Qualcomm devices |
-| Actual result and evidence | AI Hub Workbench supports custom-model conversion, quantization, inference, and profiling, but requires an account and API token |
-| Usefulness | Reduces local SDK burden and can provide target-device evidence before deployment |
-| Friction | Authentication and hosted processing can be mistaken for a runtime dependency or violate data-handling expectations if inputs are not chosen carefully |
-| Workaround | Use only public/non-confidential calibration inputs; cache verified artifacts for offline use; keep credentials outside Git |
-| Suggested improvement | Generate a downloadable offline-runtime manifest containing tool versions, target, hashes, quantization settings, and minimal integration code |
-| Classification | Qualcomm-controlled service; documentation review |
+| Date and objective | 2026-08-05; quantize the CompressAI image synthesis graph without violating fidelity |
+| Environment | x64 ONNX Runtime 1.24.4 quantizer; native QNN HTP execution |
+| Tool/source | `qnn_preprocess_model`, `get_qnn_qdq_config`, and QDQ quantization |
+| Intended workflow | Apply the documented unsigned 16-bit activation / unsigned 8-bit weight recipe |
+| Actual result and evidence | The common recipe reached only 30.32 dB minimum parity. Unsigned 16-bit activations and weights reached 65.09 dB minimum CPU QDQ parity and passed strict HTP assignment. |
+| Usefulness | Demonstrates that QNN supports a high-fidelity full generative image decoder when precision is tuned |
+| Friction and owner | Classification-centric defaults are easy to overgeneralize to reconstruction models; tooling guidance issue |
+| Workaround | Calibrate on representative latent tensors and gate each precision choice with CPU and NPU reconstruction parity |
+| Suggested improvement | Add generative-codec examples and an automated mixed-precision search report to the QNN quantization workflow |
 
-### DX-007 — The provided Arduino RPC resource is stale
+### DX-005 - Windows on Snapdragon benefits from an explicit two-architecture workflow
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-05; combine PyTorch/CompressAI preparation with native QNN inference |
+| Environment | Python 3.11.9 x64 and ARM64 on the same Snapdragon Windows PC |
+| Tool/source | Windows Python, PyTorch 2.13.0, CompressAI 1.2.8, ORT/QNN plugin |
+| Intended workflow | Use one reproducible environment for codec and NPU work |
+| Actual result and evidence | CompressAI built from source in x64 with Visual Studio C++ tools; native ARM64 QNN inference worked in a separate environment. A neutral `.npy` handoff preserved the tensor contract. |
+| Usefulness | Keeps the heavy synthesis/reconstruction subgraphs native on Hexagon while retaining mature x64 model tooling |
+| Friction and owner | No dependable matching native Windows ARM64 PyTorch/CompressAI path for this stack; third-party packaging limitation. Managing two environments is extra Windows on Snapdragon friction. |
+| Workaround | Pin both environments, never mix plain/QNN ORT in ARM64, verify architecture explicitly, and provide one setup script |
+| Suggested improvement | Publish a tested Windows on Snapdragon package matrix and native ARM64 wheels for common model-preparation dependencies |
+
+### DX-006 - Full HTP assignment does not by itself prove audio semantics
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-05; accelerate the EnCodec convolutional reconstruction tail |
+| Environment | Same QNN versions and Snapdragon device as DX-003; EnCodec 0.1.1 |
+| Tool/source | QNN HTP with fixed 1-second ONNX/QDQ graphs |
+| Intended workflow | Run decoder layers 2-15 after CPU codebook/initial-convolution/LSTM stages |
+| Actual result and evidence | Native 1D operators were rejected. Semantics-preserving height/width-1 2D rewrites passed PyTorch and CPU ONNX/QDQ parity and were fully assigned to HTP, yet HTP output was uncorrelated with CPU output (about 8-10 dB parity). Narrowing the NPU graph to regular-convolution layers 13-15 produced 48.80 dB NPU parity with zero CPU profile nodes. |
+| Usefulness | Establishes a truthful passing hybrid and shows why provider assignment must be paired with numerical validation |
+| Friction and owner | Layout/operator validation accepted larger graphs whose runtime semantics were unusable; Qualcomm/Microsoft runtime issue or undocumented restriction |
+| Workaround | Keep upsampling/larger tail on CPU, use a QDQ final regular-convolution block on HTP, and retain the failure evidence |
+| Suggested improvement | Add post-compilation numerical validation to QAIRT/QNN tooling and flag height/width-1 transpose-convolution patterns with known accuracy risk |
+
+### DX-007 - Audio-tail quantization exposed useful bias-range feedback
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-05; quantize the supported final EnCodec block |
+| Environment | x64 ORT QNN quantizer; native HTP execution |
+| Tool/source | QNN QDQ utilities |
+| Intended workflow | Preserve the final audio block at high precision |
+| Actual result and evidence | Unsigned 16-bit weights triggered explicit int32 bias-range warnings and failed fidelity. Unsigned 16-bit activations with unsigned 8-bit weights reached 47.92 dB minimum CPU QDQ parity and 48.80 dB NPU parity. |
+| Usefulness | The warning identified the correct direction for precision tuning and produced a passing graph |
+| Friction and owner | Warning messages name affected nodes but do not propose a precision override or estimate resulting output error; tooling UX issue |
+| Workaround | Make weight precision configurable, test both supported types, and require numerical gates |
+| Suggested improvement | Have the quantizer recommend per-node or global precision changes when bias quantization exceeds int32 range |
+
+### DX-008 - Meta EnCodec audio I/O packaging is the Windows blocker, not the neural model
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-05; install EnCodec without destabilizing the image stack |
+| Environment | Windows x64 Python 3.11; PyTorch 2.13.0; EnCodec 0.1.1 |
+| Tool/source | Meta EnCodec and PyTorch audio packages |
+| Intended workflow | Install EnCodec plus its declared `torchaudio` dependency |
+| Actual result and evidence | No torchaudio 2.13 release was available. EnCodec imports torchaudio for optional file utilities, while its neural model runs with PyTorch alone. LightWeave's PCM WAV I/O plus a narrow import shim produced valid 24 kHz, two-codebook payloads. |
+| Usefulness | Preserves the official EnCodec model and avoids downgrading/rebuilding the proven image environment |
+| Friction and owner | Third-party package dependency is broader than the model core and does not match the current PyTorch release cadence on Windows |
+| Workaround | Install EnCodec without dependencies, install `einops`, and use tested local PCM WAV I/O only |
+| Suggested improvement | Make EnCodec file I/O an optional extra and avoid importing torchaudio at model-module import time |
+
+### DX-009 - AI Hub and QAIRT Visualizer must remain explicitly unverified
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-05; evaluate hosted and SDK-based Qualcomm model workflows |
+| Environment | QUAD doctor and public documentation; no local QAIRT SDK configuration |
+| Tool/source | Qualcomm AI Hub and QAIRT Visualizer |
+| Intended workflow | Hosted conversion/profile plus local graph/partition inspection |
+| Actual result and evidence | QUAD reports no QAIRT/QNN SDK root or tools. No AI Hub account/token was placed in project scope. Neither workflow was exercised, and no claim depends on them. |
+| Usefulness | Direct QNN plugin integration still produced strict device and profile evidence; hosted/Visualizer paths remain valuable comparisons later |
+| Friction and owner | Resource lists describe the products but do not provide a credential-free local readiness check or offline sample artifact; access/onboarding issue |
+| Workaround | Keep setup/runtime independent, use only non-confidential calibration data if access is later granted, and document the unverified state |
+| Suggested improvement | Provide a no-login compatibility preflight and a downloadable sample profile that developers can open in Visualizer before SDK/account setup |
+
+### DX-010 - The provided Arduino RPC link is stale
 
 | Field | Observation |
 | --- | --- |
 | Date and objective | 2026-08-05; classify the supplied later-phase Arduino communication resource |
 | Environment | Public link validation |
-| Intended workflow | Reuse a Qualcomm/Arduino RPC example when connecting the future byte stream to UNO Q |
-| Actual result and evidence | The provided repository/path returns 404; Arduino’s maintained router documents a MessagePack RPC bridge with serial routing |
-| Usefulness | A maintained later-phase alternative exists |
-| Friction | Hackathon resource lists can become stale without a redirect or archive |
-| Workaround | Defer hardware work and revalidate the maintained Arduino router when that milestone begins |
-| Suggested improvement | Run automated link checks against published resource lists and retain redirects for renamed sample repositories |
-| Classification | Qualcomm resource-list maintenance; directly observed |
+| Tool/source | Supplied `qualcomm/edge-ai-labs-arduino` path and Arduino router repository |
+| Intended workflow | Reuse an RPC example for the future UNO Q byte transport |
+| Actual result and evidence | The supplied path returns 404. Arduino's maintained router documents a MessagePack RPC bridge. |
+| Usefulness | A later-phase alternative exists without blocking software payload work |
+| Friction and owner | Published hackathon resource is stale; resource-list maintenance issue |
+| Workaround | Defer hardware and revalidate the maintained router when that milestone begins |
+| Suggested improvement | Run automated link checks and retain redirects or archived references for renamed samples |
 
 ## Change log
 
 | Date | Change |
 | --- | --- |
-| 2026-08-05 | Created the public resource register and seeded evidence-based observations for QUAD, QNN, Windows ARM64 Python, model constraints, AI Hub, and Arduino RPC resources. |
+| 2026-08-05 | Created the resource register and initial planning observations. |
+| 2026-08-05 | Replaced planning assumptions with exercised QUAD 0.2.0, ORT/QNN 1.24.4/2.4.0, full image HTP, precision tuning, dual-architecture setup, EnCodec hybrid, failure evidence, unavailable AI Hub/QAIRT paths, and actionable improvement notes. |
+| 2026-08-05 | Recorded the automation boundary: portable lint/unit checks run in CI, while QNN assignment and profiling remain native Snapdragon acceptance gates. |

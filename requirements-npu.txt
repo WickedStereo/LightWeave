@@ -1,0 +1,4 @@
+# Native Windows ARM64 / Python 3.11 NPU worker environment
+numpy==1.26.4
+onnxruntime==1.24.4
+onnxruntime-qnn==2.4.0

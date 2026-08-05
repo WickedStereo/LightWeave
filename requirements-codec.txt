@@ -1,0 +1,15 @@
+# Windows x64 / Python 3.11 codec environment
+# Meta EnCodec 0.1.1 is installed with --no-deps by setup_windows.ps1 because
+# its published dependency pins do not match this validated PyTorch stack.
+numpy==1.26.4
+Pillow==11.3.0
+torch==2.13.0
+torchvision==0.28.0
+compressai==1.2.8
+pytorch-msssim==1.0.0
+onnx==1.19.0
+onnxruntime==1.24.4
+einops==0.8.1
+fastapi==0.116.1
+uvicorn==0.35.0
+python-multipart==0.0.20

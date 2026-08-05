@@ -1,0 +1,63 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lightweave"
+version = "0.1.0"
+description = "Offline-first AI-compressed media transport for low-bandwidth byte links"
+readme = "README.md"
+requires-python = ">=3.11,<3.15"
+license = { file = "LICENSE" }
+authors = [{ name = "LightWeave contributors" }]
+dependencies = [
+  "numpy>=1.26.4,<2",
+  "Pillow>=11,<12",
+]
+
+[project.optional-dependencies]
+codec = [
+  "compressai==1.2.8",
+  "onnx==1.19.0",
+  "onnxruntime==1.24.4",
+  "pytorch-msssim==1.0.0",
+  "torch==2.13.0",
+  "torchvision==0.28.0",
+]
+dashboard = [
+  "fastapi==0.116.1",
+  "python-multipart==0.0.20",
+  "uvicorn==0.35.0",
+]
+audio = [
+  "einops==0.8.1",
+]
+dev = [
+  "httpx==0.28.1",
+  "pytest==8.4.1",
+  "pytest-cov==6.2.1",
+  "ruff==0.12.8",
+]
+
+[project.scripts]
+lightweave = "lightweave.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+lightweave = ["static/*.html", "static/*.css", "static/*.js"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

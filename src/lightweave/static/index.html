@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>LightWeave · Optical payload workbench</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <main>
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Snapdragon optical payload workbench</p>
+          <h1>Light<span>Weave</span></h1>
+          <p class="lede">Compress an image into a self-validating <code>.lwv</code>
+            byte stream, simulate the transfer, and reconstruct it on Hexagon.</p>
+        </div>
+        <div class="status" id="runtime-status">Checking local runtime…</div>
+      </header>
+
+      <section class="control-panel">
+        <form id="roundtrip-form">
+          <label class="drop-zone" for="image-input">
+            <strong>Choose an image</strong>
+            <span>PNG, JPEG, or another Pillow-compatible format · 20 MiB max</span>
+            <input id="image-input" name="file" type="file" accept="image/*" required>
+          </label>
+          <label>
+            Reconstruction backend
+            <select id="backend" name="backend">
+              <option value="qnn">Qualcomm NPU · strict</option>
+              <option value="cpu">CPU reference · development only</option>
+            </select>
+          </label>
+          <label class="check">
+            <input type="checkbox" name="allow_oversize" value="true">
+            Permit payloads above 2,048 bytes for analysis
+          </label>
+          <button type="submit">Run optical loopback</button>
+        </form>
+        <div class="activity" id="activity" hidden>
+          <span></span> Encoding, transferring, and reconstructing…
+        </div>
+        <div class="error" id="error" hidden></div>
+      </section>
+
+      <section class="results" id="results" hidden>
+        <div class="image-grid">
+          <figure><img id="input-preview" alt="Input image"><figcaption>Input</figcaption></figure>
+          <div class="beam"><span>LWV1</span></div>
+          <figure><img id="output-preview" alt="Reconstructed image"><figcaption>Reconstructed</figcaption></figure>
+        </div>
+        <div class="metrics" id="metrics"></div>
+        <details>
+          <summary>QNN execution evidence</summary>
+          <pre id="evidence"></pre>
+        </details>
+      </section>
+
+      <section class="audio-panel">
+        <div class="section-heading">
+          <p class="eyebrow">Extension - EnCodec 1.5 kbps</p>
+          <h2>Audio through the same byte pipe</h2>
+          <p>Two packed 10-bit codebooks reconstruct through a labeled CPU/QNN hybrid.</p>
+        </div>
+        <form id="audio-form">
+          <label class="drop-zone" for="audio-input">
+            <strong>Choose a PCM WAV</strong>
+            <span>Mono or stereo; resampled to 24 kHz mono; 20 MiB max</span>
+            <input id="audio-input" name="file" type="file" accept="audio/wav,.wav" required>
+          </label>
+          <label>
+            Reconstruction backend
+            <select name="backend">
+              <option value="hybrid-qnn">CPU + Qualcomm NPU tail</option>
+              <option value="cpu">CPU reference</option>
+            </select>
+          </label>
+          <button type="submit">Run audio loopback</button>
+        </form>
+        <div class="activity" id="audio-activity" hidden>
+          <span></span> Encoding and reconstructing audio...
+        </div>
+        <div class="error" id="audio-error" hidden></div>
+        <div id="audio-results" hidden>
+          <audio id="audio-output" controls></audio>
+          <div class="metrics" id="audio-metrics"></div>
+          <details>
+            <summary>Hybrid execution evidence</summary>
+            <pre id="audio-evidence"></pre>
+          </details>
+        </div>
+      </section>
+    </main>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>

@@ -21,7 +21,9 @@
 - Application source code, tests, portable setup scripts, and development configuration may be created within that plan.
 - The current milestone assumes a reliable ordered byte pipe and excludes optical hardware, Arduino firmware, modulation, analog circuitry, Galaxy S25 runtime work, and Cloud AI runtime work.
 - The complete image synthesis transform must not silently fall back to CPU. If strict QNN HTP execution cannot be proven, preserve the failure evidence and stop before weakening the claim.
-- Start the audio extension only after the image feasibility gate passes.
+- The image feasibility gate passed locally on 2026-08-05; the audio extension is authorized and implemented.
+- Describe the audio decoder accurately: layers 0-12 run on CPU, fixed layers 13-15 run on QNN HTP, and a labeled CPU boundary de-click follows. Do not restore the failed larger-tail claim without new numerical evidence.
+- A successful QNN assignment is not enough by itself. Preserve CPU/ONNX/NPU numerical parity gates and profile evidence for every generated graph.
 
 ## Repository hygiene
 

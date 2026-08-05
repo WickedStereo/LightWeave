@@ -1,234 +1,259 @@
 # LightWeave Project Context
 
-> Living source of truth for project intent, decisions, architecture, progress, risks, and open questions.
+> Living source of truth for project intent, decisions, architecture, progress,
+> evidence, risks, and open questions.
 
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | Implementation authorized; environment and image feasibility gate |
+| Phase | Software MVP implemented; local image and audio acceptance passed |
 | Primary milestone | Air-gapped optical image-network software path |
-| Secondary milestone | EnCodec audio extension after the image gate passes |
+| Secondary milestone | EnCodec audio extension with an honest CPU/NPU split |
 | Last updated | 2026-08-05 |
 | Approval gate | Application implementation explicitly approved on 2026-08-05 |
 
 ## Required maintenance
 
 1. Read this document before substantive project work.
-2. Update it in the same change whenever work changes scope, architecture, requirements, assumptions, decisions, risks, plan, or progress.
-3. Update `Last updated`, append a change-log entry, and add a decision-log entry when a decision is made or reversed.
-4. Keep confirmed facts, working assumptions, proposals, and unresolved questions distinct.
-5. Update `docs/QUALCOMM_DEVELOPER_EXPERIENCE.md` whenever Qualcomm hardware, SDKs, runtimes, tools, samples, documentation, or workflows are exercised.
-6. Never record credentials, personal information, or confidential source material.
+2. Update it whenever work changes scope, requirements, architecture, evidence,
+   decisions, risks, plan, progress, hardware facts, or open questions.
+3. Update `Last updated`, append a change-log entry, and add a decision entry
+   when a decision is made or reversed.
+4. Keep confirmed facts, assumptions, proposals, and unresolved questions
+   distinct.
+5. Update `docs/QUALCOMM_DEVELOPER_EXPERIENCE.md` whenever Qualcomm hardware,
+   tools, runtimes, SDKs, samples, or documentation are exercised.
+6. Never record credentials, personal information, or confidential content.
 
 Repository enforcement lives in `AGENTS.md`.
 
-## Approved objective
+## Objective and scope
 
-LightWeave is a transport-agnostic, offline-first software system that converts media into compact bytes suitable for a very low-bandwidth optical link and reconstructs that media on a Snapdragon PC.
+LightWeave is an offline-first, transport-agnostic software system that turns
+media into compact bytes for a very low-bandwidth optical link and reconstructs
+the media on a Snapdragon PC.
 
-The current milestone ignores the physical optical implementation. It assumes a reliable, ordered byte pipe and focuses on:
+The implemented milestone assumes a reliable ordered byte pipe and includes:
 
-1. Converting an image into a compact, self-validating `.lwv` byte stream.
-2. Transferring those bytes through a file, standard stream, or loopback simulation.
-3. Validating and entropy-decoding the stream on the receiver.
-4. Reconstructing the image with the complete neural synthesis transform on the Snapdragon Hexagon NPU through QNN HTP.
-5. Proving the selected execution device and rejecting silent CPU fallback.
-6. Presenting payload, transfer, quality, latency, and provider evidence through a CLI and offline local dashboard.
+- Image encode/decode with CompressAI `bmshj2018_factorized`, quality 1.
+- EXIF correction, RGB conversion, aspect-preserving resize, and symmetric
+  padding to 256 by 256.
+- A versioned `.lwv` binary envelope with typed metadata, model fingerprint,
+  payload length, and SHA-256 integrity.
+- A strict 2,048-byte complete image-envelope ceiling by default.
+- EnCodec 24 kHz mono audio with two 1,024-entry codebooks packed at exactly
+  10 bits per code.
+- Separate transmitter, inspect, receiver, and round-trip CLI commands.
+- Strict native ARM64 QNN workers with explicit NPU device selection, CPU
+  fallback disabled, and profile evidence.
+- A localhost-only offline dashboard for images and playable audio.
+- An optional runtime guard that blocks DNS and non-loopback networking.
 
-After the image path passes its feasibility and acceptance gates, the same envelope and application surfaces will be extended to neural audio compression.
+The following remain out of scope:
 
-## Confirmed scope
+- Laser/LED, photodiode, analog circuitry, modulation, clock recovery, Arduino
+  firmware, and serial framing.
+- Galaxy S25, WebSockets, and Cloud AI in the runtime path.
+- Medical, regulatory, safety, or absolute-security claims.
+- A packaged EXE/MSIX.
 
-### In scope now
+## Confirmed architecture
 
-- Image encode/decode using CompressAI `bmshj2018_factorized`, quality 1.
-- EXIF correction, RGB conversion, aspect-preserving resize, and symmetric padding to 256 by 256.
-- A compact versioned `.lwv` binary envelope with typed metadata, payload length, model fingerprint, and SHA-256 integrity.
-- A 2,048-byte complete-envelope target for the curated image demo set.
-- Separate transmitter and receiver commands, initially exercised on one PC.
-- Two receiver processes/environments when required: x64 codec/entropy work and native ARM64 QNN inference.
-- Fixed-shape `g_s` export, quantization/conversion, QNN HTP execution, profiling, and no-fallback enforcement.
-- Offline runtime after dependencies, weights, and generated model artifacts have been prepared.
-- A CLI and localhost-only dashboard.
-- Reproducible source setup rather than a packaged executable.
-- QUAD, Qualcomm AI Hub, QAIRT Visualizer, and direct QNN integration as development workflows.
-- EnCodec 24 kHz mono audio as a later extension using an explicitly labeled hybrid CPU/NPU decoder.
+### `.lwv` envelope
 
-### Out of scope for the current milestone
+The common little-endian header contains magic `LWV1`, format version, media
+type, codec profile, flags, metadata length, payload length, and SHA-256 of the
+payload. Typed metadata includes the exact model-weight SHA-256.
 
-- Laser, LED, photodiode, analog front end, optical modulation, clock recovery, or Arduino firmware.
-- Serial packet framing, retransmission, or error correction below the `.lwv` media envelope.
-- Galaxy S25 and Cloud AI in the runtime data path.
-- WebSockets or any RF-based runtime dependency.
-- Medical, safety, regulatory, or absolute-security claims.
-- A Windows EXE/MSIX deliverable.
+- Image profile `0x0101`: original/content dimensions, padding, latent shape,
+  quality, color space, and one raw CompressAI entropy string.
+- Audio profile `0x0201`: sample rate, original samples, padding, frame count,
+  channels, codebooks, bits/code, chunk frames, and packed EnCodec indices.
 
-### Assumptions
+Parsers reject unsupported versions/profiles/flags, invalid dimensions,
+impossible metadata, truncation, trailing bytes, hash failure, payload-length
+mismatch, and model mismatch before reconstruction.
 
-- The later hardware layer transfers every `.lwv` byte in order without changing the media format.
-- Internet access is available during setup/model preparation but not required during encode, decode, loopback, inspection, or dashboard use.
-- A second Snapdragon PC will be used for cross-device validation when available; it is not required for initial loopback development.
-- Model weights and generated artifacts may be redistributed only if their licenses allow it; otherwise setup will acquire them locally and verify their hashes.
+### Image path
 
-## Approved architecture
+1. Correct EXIF orientation, convert to RGB, resize the longest edge to 256,
+   and black-pad symmetrically.
+2. Run the official CompressAI `compress()` API and wrap its entropy string in
+   `.lwv`.
+3. Validate the envelope and entropy-decode `[1,192,16,16]` on x64 CPU.
+4. Send the latent through a neutral `.npy` handoff to native ARM64 Python.
+5. Run the complete QDQ `g_s` graph on QNN HTP. The worker selects only the
+   QNN NPU device and sets `session.disable_cpu_ep_fallback=1`.
+6. Crop recorded padding and save atomically.
 
-### `.lwv` media envelope
+Image QDQ uses unsigned 16-bit activations and weights. The common 16-bit
+activation/8-bit-weight recipe missed the image fidelity gate; 16-bit weights
+passed and are supported by this graph/device combination.
 
-The common little-endian header contains:
+### Audio path
 
-- Magic `LWV1`.
-- Format version, media type, codec profile, and flags.
-- Metadata length and payload length.
-- SHA-256 of the payload.
+1. Read uncompressed PCM WAV, mix to mono, resample to 24 kHz when needed, and
+   zero-pad to complete seconds.
+2. Run EnCodec 24 kHz at 1.5 kbps. Pack `[batch,2,frames]` indices frame-major
+   at 10 bits each, producing exactly 1,500 code bits/sec.
+3. On receive, unpack indices and run codebook reconstruction plus EnCodec
+   decoder layers 0-12 on CPU.
+4. Split the resulting `[1,32,time]` tensor into static
+   `[1,32,24000]` one-second inputs.
+5. Run decoder layers 13-15 (final residual and output block) on a mixed-precision
+   QDQ QNN HTP graph with fallback disabled.
+6. Apply a labeled 480-sample CPU de-click correction at independent NPU chunk
+   boundaries, trim padding, and save exact-length PCM WAV atomically.
 
-Typed metadata includes a SHA-256 model fingerprint. Image profile `0x0101` stores input dimensions, resized content dimensions, padding, latent shape, quality, color space, and one CompressAI entropy string. Audio profile `0x0201` stores sample rate, original sample count, channels, codebook count, bits per code, frame count, chunk size, padding, and packed code indices.
-
-Parsers must reject unsupported versions, unknown profiles, impossible lengths, truncation, trailing bytes, hash failure, and model mismatch before reconstruction.
-
-### Image transmitter
-
-1. Correct EXIF orientation and convert the input to RGB.
-2. Preserve aspect ratio, resize the longest edge to 256, and symmetrically black-pad to 256 by 256.
-3. Run the official CompressAI `compress()` path for `bmshj2018_factorized`, quality 1.
-4. Wrap the entropy string and metadata in `.lwv`.
-5. Reject complete envelopes over 2,048 bytes by default; an explicit analysis override may write them.
-
-### Image receiver
-
-1. Verify the envelope, profile, lengths, digest, and model fingerprint.
-2. Use the pinned x64 codec environment for CompressAI entropy decompression and recover `y_hat`.
-3. Transfer the tensor through a neutral local artifact/interface to the native ARM64 worker.
-4. Run the complete fixed-shape synthesis transform `g_s` on QNN HTP with CPU fallback disabled.
-5. Remove padding and save the visible reconstructed region.
-
-The expected latent shape for the selected 256 by 256 quality-1 profile is `[1, 192, 16, 16]`; implementation must verify this from the loaded model before treating it as final.
+The originally proposed larger NPU tail (layers 2-15) was not retained. Its 1D
+operators were rejected, and semantics-preserving 2D rewrites were fully
+assigned to HTP but produced uncorrelated output despite strong CPU ONNX/QDQ
+parity. Narrowing the NPU block to regular convolutions produced 48.80 dB NPU
+parity and is the truthful supported hybrid.
 
 ### Runtime environments
 
-- **Codec environment:** Windows x64 Python 3.11 for PyTorch, CompressAI, entropy coding, orchestration, dashboard, and most tests.
-- **NPU environment:** native Windows ARM64 Python 3.11 containing ONNX Runtime plus the QNN plugin runtime required for Hexagon NPU inference.
-- Never install mutually conflicting plain and QNN ONNX Runtime distributions into the same environment.
-- Generated models, weights, QNN contexts, calibration data, profiles, and offline bundles remain outside Git; tracked manifests record versions and hashes.
+- Windows x64 Python 3.11: PyTorch, CompressAI, EnCodec, entropy/codebook work,
+  model preparation, orchestration, dashboard, and tests.
+- Native Windows ARM64 Python 3.11: ONNX Runtime 1.24.4 and QNN plugin 2.4.0.
+- Plain and QNN ONNX Runtime distributions are kept out of the same ARM64
+  environment.
+- Weights, ONNX/QDQ graphs, calibration data, QNN profiles, reports, and caches
+  are ignored. `models/manifest.json` tracks sources, licenses, hashes, shapes,
+  tool versions, conversion intent, and expected artifact paths.
 
-### Public commands
+## Public interfaces
 
-- `lightweave image encode INPUT --output PAYLOAD`
-- `lightweave inspect PAYLOAD`
-- `lightweave image decode PAYLOAD --output IMAGE --require-npu`
-- `lightweave image roundtrip INPUT --work-dir DIR`
-- `lightweave dashboard`
+```text
+lightweave image encode INPUT --output PAYLOAD
+lightweave image decode PAYLOAD --output IMAGE --require-npu
+lightweave image roundtrip INPUT --work-dir DIR
+lightweave audio encode INPUT.wav --output PAYLOAD
+lightweave audio decode PAYLOAD --output OUTPUT.wav
+lightweave audio roundtrip INPUT.wav --work-dir DIR
+lightweave inspect PAYLOAD
+lightweave dashboard
+```
 
-Core media functions operate on binary streams so a future serial/Arduino adapter does not require a new media format.
+Core encode/decode functions operate on bytes and files so a future serial
+adapter can carry `.lwv` unchanged.
 
-### Audio extension
-
-- EnCodec 24 kHz mono at 1.5 kbps.
-- Two 1,024-entry codebooks packed at 10 bits per code.
-- Fixed 75-frame, one-second chunks rather than dynamic QNN sequence dimensions.
-- Codebook reconstruction, initial convolution, and stateful LSTM prefix on CPU.
-- Fixed-shape convolutional reconstruction tail on QNN HTP with fallback disabled for that tail.
-- Carry state and handle chunk boundaries explicitly; report CPU and NPU stages separately.
-
-## Qualcomm development workflow
-
-1. Inspect the actual Snapdragon hardware and development environment.
-2. Use the external QUAD checkout for diagnostics and evaluate `hardware_detect -> convert_model -> profile_workload -> orchestrate_workload -> generate_code` where available.
-3. Export and numerically validate a fixed-shape ONNX decoder before conversion.
-4. Use AI Hub Workbench with non-confidential calibration data to convert, quantize, validate, and profile when credentials and a suitable hosted target are available.
-5. Use QAIRT Visualizer to inspect operators, graph assignment, quantization, memory, and performance evidence.
-6. Integrate the current QNN plugin API directly and confirm the selected NPU device. Do not infer NPU use merely because inference completed.
-7. Compare direct integration with QUAD and AI Hub guidance and record gaps in the developer-experience log.
-
-## Feasibility and acceptance gates
-
-### Image NPU gate
-
-- Export static `g_s` and compare PyTorch with CPU ONNX output.
-- Convert/quantize for QNN HTP.
-- Disable CPU fallback.
-- Require the complete image decoder graph to be accepted by QNN HTP.
-- Capture provider/device and profiling evidence.
-- If semantic-preserving export changes cannot achieve full assignment, stop and report the evidence before weakening the claim.
+## Verified evidence
 
 ### Image acceptance
 
-- Every complete envelope in the curated demo set is at most 2,048 bytes.
-- Average reconstruction quality is at least 26 dB PSNR and 0.90 MS-SSIM against the resized visible source region.
-- Transfer estimate is no more than 16.384 seconds at 1 kbps and 8.192 seconds at 2 kbps.
-- NPU output is at least 35 dB PSNR relative to the unquantized CPU decoder output.
-- Runtime encode, inspect, decode, loopback, and dashboard smoke tests pass without network access.
+| Check | Result |
+| --- | --- |
+| Public acceptance images | 3 |
+| Maximum complete envelope | 1,444 bytes |
+| Mean PSNR | 27.67 dB |
+| Mean MS-SSIM | 0.973 |
+| Transfer limits at 1/2 kbps | Pass |
+| Strict full-decoder QNN profile | `QNNExecutionProvider` only; 0 CPU nodes |
+| CPU/NPU parity | Minimum 56.99 dB |
+| Oversize stress case | 2,148 bytes; rejected by default |
 
 ### Audio acceptance
 
-- Exact output sample length and finite samples.
-- Code payload approximately matches 1.5 kbps before envelope overhead.
-- No obvious chunk-boundary spikes.
-- The declared NPU tail has no CPU fallback and is compared against the reference PyTorch tail.
+| Check | Result |
+| --- | --- |
+| Input/output duration | 2 seconds / exact 48,000 samples |
+| Code payload | 375 bytes / exactly 1,500 bits/sec |
+| Complete envelope | 478 bytes |
+| Finite output | Pass |
+| Conditioned boundary jump | 0.0 in the deterministic sample |
+| Strict QNN tail profile | `QNNExecutionProvider` only; 0 CPU nodes |
+| NPU-tail parity | 48.80 dB |
+| Full CPU to hybrid output parity | 44.95 dB |
 
-## Current environment facts
+Focused unit tests currently report 23 passing tests. Generated acceptance and
+offline-smoke reports remain ignored and reproducible.
 
-- The development host reports native ARM64 and a Qualcomm ARMv8 processor.
-- No system Python interpreter is currently available through `python` or the Python launcher.
-- The supplied QUAD checkout exists, but its virtual environment currently references a missing Python interpreter and cannot run.
-- No local QAIRT/QNN installation has yet been confirmed.
-- The repository contains no application source code at the start of implementation.
+## Qualcomm workflow evidence
+
+- QUAD client 0.2.0 runs under native ARM64 Python 3.11.9.
+- QUAD local detection identifies Snapdragon X Elite X1E80100, 12 ARM64 CPU
+  cores, Adreno X1-85, Hexagon v73 (45 TOPS), 31.6 GB RAM, and Windows 11 Pro.
+- QUAD doctor confirms ARM64 architecture but reports no QAIRT/QNN SDK
+  environment and detects conflicting plain/QNN ONNX Runtime packages inside
+  the supplied QUAD venv.
+- Direct LightWeave QNN plugin integration succeeds without a local QAIRT SDK.
+- QAIRT Visualizer is not installed and has not been exercised.
+- AI Hub hosted conversion/profiling is not exercised because no project
+  account/token was placed in scope. Runtime does not depend on it.
+- Server-backed QUAD conversion/profile/code-generation remains a setup-time
+  workflow; local detection and doctor were exercised without disclosing local
+  artifacts to an unverified endpoint.
 
 ## Progress tracker
 
 | Work item | Status | Evidence / next action |
 | --- | --- | --- |
-| Initial proposal and repository review | Complete | Historical draft and constraints were reviewed during planning. |
-| Final software scope and architecture | Approved | Project owner explicitly requested implementation of the image-first plan. |
-| Repository hygiene and living documents | In progress | Preparing the required documentation-only baseline commit. |
-| Host/runtime inventory | In progress | ARM64 host confirmed; Python and QUAD runtime repair required. |
-| `.lwv` envelope and image core | Not started | Begins after the baseline commit. |
-| Image model export and CPU parity | Not started | Requires codec environment and model weights. |
-| Strict QNN image inference | Not started | Requires native ARM64 environment and converted model. |
-| CLI and dashboard | Not started | Follows the shared core and NPU worker. |
-| Audio extension | Gated | Starts only after the image NPU gate passes. |
-| Arduino/optical adapter | Deferred | Outside the current milestone. |
+| Planning/repository baseline | Complete locally | Commit `7d4b91d`; push blocked by GitHub repository permission |
+| `.lwv` envelope and image core | Complete | Unit and real-model acceptance tests pass |
+| Image export/QDQ/strict QNN | Complete | Full graph, no fallback, 0 CPU profile nodes |
+| CLI and offline dashboard | Complete | Image and audio APIs implemented; localhost assets only |
+| Audio extension | Complete locally | Truthful narrowed hybrid passes acceptance |
+| Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
+| QUAD local workflow | Complete | Detect and doctor exercised |
+| GitHub Actions unit CI | Complete | Windows Python 3.11 workflow runs Ruff and hardware-independent tests |
+| Second Snapdragon PC | Pending external device | Transfer the same `.lwv` plus generated artifacts and verify |
+| AI Hub/QAIRT Visualizer | Pending access/install | Compare only when account/SDK are available |
+| Arduino/optical adapter | Deferred | Must not change `.lwv` media format |
+| GitHub push | Blocked externally | Owner must grant repository Contents write permission |
 
 ## Risks and mitigations
 
-| Risk | Impact | Mitigation |
-| --- | --- | --- |
-| CompressAI/PyTorch Windows ARM64 packaging gap | High | Use a pinned x64 codec environment and neutral handoff to native ARM64 inference. |
-| QNN rejects part of `g_s` or silently falls back | High | Fixed shapes, QDQ conversion, fallback disabled, provider/device checks, and profile evidence. |
-| CompressAI entropy streams are not portable across builds | High | Pin exact versions and weights; use golden payloads and cross-device tests. |
-| The 2,048-byte ceiling is missed on complex images | Medium | Curate and report the acceptance set; fail oversize by default rather than hiding it. |
-| Quantization reduces reconstruction quality | Medium | Compare PyTorch, CPU ONNX, and NPU outputs and enforce quality gates. |
-| AI Hub/QUAD credentials or service access fail | Medium | Keep export, local CPU validation, `.lwv`, CLI, and dashboard independent of hosted services. |
-| Two Python architectures make setup fragile | High | Provide explicit setup scripts, manifests, diagnostics, and actionable error messages. |
-| EnCodec LSTM cannot use the selected ONNX Runtime QNN path | Medium | Use the approved hybrid split and label it accurately. |
-| Third-party model-weight redistribution is unclear | High | Verify licenses before committing or bundling weights. |
+| Risk | Status / mitigation |
+| --- | --- |
+| Two Python architectures | Mitigated with pinned requirements, setup script, neutral handoff, and diagnostics |
+| Silent CPU fallback | Mitigated with explicit NPU device selection, disabled fallback, and profile checks |
+| Weight/artifact mismatch | Mitigated with tracked hashes and runtime fingerprints |
+| Complex images exceed 2,048 bytes | Fail closed; documented stress image proves rejection |
+| EnCodec/torchaudio package mismatch | LightWeave uses tested PCM WAV I/O; EnCodec neural model remains upstream |
+| Larger EnCodec NPU tail has incorrect HTP semantics | Do not claim it; supported split ends at layers 13-15 and records failed experiments |
+| Audio chunk clicks | Labeled CPU de-click correction; raw and conditioned jumps reported |
+| Model-weight redistribution terms | Weights remain ignored; verify upstream terms before distribution |
+| AI Hub/QAIRT unavailable | Direct QNN path and reproducible local evidence do not depend on them |
+| GitHub credentials/permission | Never store tokens; push only after correct repository-scoped write access exists |
 
 ## Open questions
 
-- Which exact Python, PyTorch, CompressAI, ONNX Runtime, and QNN plugin versions form a working tested matrix on this machine?
-- Can `g_s` be quantized without violating the image quality gates?
-- Does AI Hub expose a compatible Snapdragon X target and conversion route for this graph under the available account?
-- Can QUAD be repaired and connected without modifying or vendoring its checkout?
-- Which redistributable images will form the public calibration and acceptance manifests?
-- Is direct QAIRT capable of accelerating more of EnCodec than the selected ONNX Runtime hybrid path, and would that complexity be worthwhile later?
+- Will the same generated artifacts and `.lwv` payloads pass on the second
+  Snapdragon PC?
+- Can QAIRT Visualizer provide per-layer evidence that explains the rejected
+  larger audio-tail semantics?
+- Can AI Hub or a newer QNN release run more of EnCodec accurately without the
+  narrowed split?
+- Should future work add QNN context caching to reduce the audio tail's session
+  preparation time?
+- Which serial reliability/framing adapter will carry `.lwv` over the physical
+  optical link without altering the media format?
 
 ## Decision log
 
 | ID | Date | Decision | Status / rationale |
 | --- | --- | --- | --- |
-| D-001 | 2026-08-05 | Treat the original multiverse proposal as a draft rather than the final specification. | Confirmed by project owner. |
-| D-002 | 2026-08-05 | Maintain this file as the living project source of truth. | Confirmed by project owner. |
-| D-003 | 2026-08-05 | Keep confidential material, credentials, local environments, and generated model/profile artifacts out of Git. | Required repository hygiene. |
-| D-004 | 2026-08-05 | Ignore the physical optical layer for the current software milestone and assume an ordered byte pipe. | Approved final scope. |
-| D-005 | 2026-08-05 | Implement images first and audio second. | Reduces model/runtime risk and preserves a shared architecture. |
-| D-006 | 2026-08-05 | Use fixed 256 by 256 quality-1 CompressAI input with aspect-preserving padding. | Approved image profile. |
-| D-007 | 2026-08-05 | Require complete `g_s` execution on QNN HTP without CPU fallback. | Provides defensible NPU evidence. |
-| D-008 | 2026-08-05 | Enforce a 2,048-byte complete image-envelope target for the curated demo set. | Approved low-bandwidth target. |
-| D-009 | 2026-08-05 | Start with one-PC loopback but keep transmitter and receiver independently runnable. | Enables development without blocking two-PC deployment. |
-| D-010 | 2026-08-05 | Runtime must be offline; setup may use the network. | Matches the air-gapped demonstration story. |
-| D-011 | 2026-08-05 | Retain EnCodec with a clearly labeled CPU/NPU hybrid decoder. | Preserves the audio idea while respecting QNN operator constraints. |
-| D-012 | 2026-08-05 | Deliver source and setup instructions; no packaged executable is required. | Confirmed by project owner. |
-| D-013 | 2026-08-05 | Use evidence-based gates rather than a fixed implementation window. | Confirmed by project owner. |
-| D-014 | 2026-08-05 | Application implementation is authorized. | Explicit approval received in the implementation request. |
+| D-001 | 2026-08-05 | Treat the original multiverse proposal as a draft. | Confirmed by owner. |
+| D-002 | 2026-08-05 | Maintain this living source of truth. | Confirmed by owner. |
+| D-003 | 2026-08-05 | Keep credentials, local environments, weights, and generated artifacts out of Git. | Required hygiene. |
+| D-004 | 2026-08-05 | Assume an ordered byte pipe and defer physical optics. | Approved scope. |
+| D-005 | 2026-08-05 | Implement images before audio. | Reduced model/runtime risk. |
+| D-006 | 2026-08-05 | Use fixed padded 256 by 256 quality-1 images. | Approved profile. |
+| D-007 | 2026-08-05 | Require complete image `g_s` on QNN HTP without fallback. | Defensible NPU claim. |
+| D-008 | 2026-08-05 | Enforce a 2,048-byte complete image-envelope ceiling. | Approved target. |
+| D-009 | 2026-08-05 | Start with one-PC loopback and independent commands. | Preserves two-PC compatibility. |
+| D-010 | 2026-08-05 | Allow network during setup; require offline runtime. | Air-gapped story. |
+| D-011 | 2026-08-05 | Use an honestly labeled audio hybrid. | Respects recurrent/operator constraints. |
+| D-012 | 2026-08-05 | Deliver source and setup instructions, not a packaged executable. | Confirmed by owner. |
+| D-013 | 2026-08-05 | Use evidence gates rather than a fixed schedule. | Confirmed by owner. |
+| D-014 | 2026-08-05 | Application implementation is authorized. | Explicit owner approval. |
+| D-015 | 2026-08-05 | Use `QUInt16` image activations and weights. | `QUInt8` weights missed fidelity; 16-bit passed full HTP. |
+| D-016 | 2026-08-05 | Install separate x64 codec and ARM64 QNN environments. | Tested solution to Windows package/runtime constraints. |
+| D-017 | 2026-08-05 | Narrow the audio NPU block to decoder layers 13-15. | Larger tails were fully assigned but semantically incorrect on HTP. |
+| D-018 | 2026-08-05 | Use `QUInt16` audio activations and `QUInt8` weights. | Passed CPU and NPU fidelity; 16-bit weights overflowed bias ranges. |
+| D-019 | 2026-08-05 | Apply and disclose a 480-sample CPU boundary de-click. | Removes independent fixed-chunk DC steps without changing length. |
+| D-020 | 2026-08-05 | Use LightWeave PCM WAV I/O instead of torchaudio. | Avoids an unavailable PyTorch 2.13 companion wheel on Windows. |
 
 ## Public references
 
@@ -236,9 +261,9 @@ Core media functions operate on binary streams so a future serial/Arduino adapte
 - Windows on Snapdragon AI development: <https://docs.qualcomm.com/bundle/publicresource/topics/80-62010-1/ai-app-development.html?product=1601111740057789>
 - Qualcomm AI Hub: <https://aihub.qualcomm.com/get-started>
 - QAIRT Visualizer: <https://docs.qualcomm.com/bundle/publicresource/topics/80-87189-1/overview.html?product=1601111740009302>
-- CompressAI model implementation: <https://interdigitalinc.github.io/CompressAI/_modules/compressai/models/google.html>
-- ONNX Runtime QNN Execution Provider: <https://onnxruntime.ai/docs/execution-providers/QNN-ExecutionProvider.html>
-- ONNX Runtime QNN plugin: <https://github.com/microsoft/onnxruntime-qnn>
+- ONNX Runtime QNN EP: <https://onnxruntime.ai/docs/execution-providers/QNN-ExecutionProvider.html>
+- ONNX Runtime QNN plugin: <https://github.com/onnxruntime/onnxruntime-qnn>
+- CompressAI: <https://github.com/InterDigitalInc/CompressAI>
 - Meta EnCodec: <https://github.com/facebookresearch/encodec>
 - Arduino MessagePack RPC router: <https://github.com/arduino/arduino-router>
 
@@ -246,5 +271,8 @@ Core media functions operate on binary streams so a future serial/Arduino adapte
 
 | Date | Change |
 | --- | --- |
-| 2026-08-05 | Created the living context and recorded the original planning gate and draft concept. |
-| 2026-08-05 | Replaced the draft architecture with the approved image-first software scope; recorded implementation approval, `.lwv`, strict QNN image gate, offline runtime, two-environment design, later hybrid audio extension, current environment facts, risks, resources, and acceptance criteria. |
+| 2026-08-05 | Created the living context and recorded the draft proposal and planning gate. |
+| 2026-08-05 | Replaced the draft with the approved image-first architecture, `.lwv`, strict QNN gate, offline runtime, and later audio extension. |
+| 2026-08-05 | Recorded the completed image path, QDQ/full-HTP evidence, CLI, dashboard, acceptance set, and corrected Windows environment facts. |
+| 2026-08-05 | Recorded the implemented EnCodec payload, failed larger NPU-tail experiments, narrowed passing hybrid, boundary conditioning, audio acceptance, QUAD evidence, remaining external validations, and GitHub permission blocker. |
+| 2026-08-05 | Added Windows unit CI while keeping model conversion and QNN hardware acceptance as explicit local gates. |
