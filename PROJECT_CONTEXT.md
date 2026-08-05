@@ -200,19 +200,19 @@ offline-smoke reports remain ignored and reproducible.
 
 | Work item | Status | Evidence / next action |
 | --- | --- | --- |
-| Planning/repository baseline | Corrected locally | Rewritten commit `2d8c2e6`; original repository root preserved |
-| Software MVP repository handoff | Corrected locally | Rewritten implementation commit `5dc4e8b`; file trees and timestamps preserved |
+| Planning/repository baseline | Published with corrected attribution | Commit `2d8c2e6`; original repository root preserved |
+| Software MVP repository handoff | Published with corrected attribution | Implementation commit `5dc4e8b`; file trees and timestamps preserved |
 | `.lwv` envelope and image core | Complete | Unit and real-model acceptance tests pass |
 | Image export/QDQ/strict QNN | Complete | Full graph, no fallback, 0 CPU profile nodes |
 | CLI and offline dashboard | Complete | Image and audio APIs implemented; localhost assets only |
 | Audio extension | Complete locally | Truthful narrowed hybrid passes acceptance |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
-| GitHub Actions unit CI | Pending corrected-history push | Content-equivalent Windows Python 3.11 runs passed; QNN gates stay local |
+| GitHub Actions unit CI | Complete | Corrected-history Windows Python 3.11 run `31034723025` passed; QNN gates stay local |
 | Second Snapdragon PC | Pending external device | Transfer the same `.lwv` plus generated artifacts and verify |
 | AI Hub/QAIRT Visualizer | Pending access/install | Compare only when account/SDK are available |
 | Arduino/optical adapter | Deferred | Must not change `.lwv` media format |
-| GitHub push | Pending guarded history replacement | Corrected local history will replace `origin/main` with an exact force-with-lease |
+| GitHub push | Complete | Corrected history replaced `origin/main` with an exact force-with-lease and verified owner attribution |
 
 ## Risks and mitigations
 
@@ -295,3 +295,4 @@ offline-smoke reports remain ignored and reproducible.
 | 2026-08-05 | Published the implementation to `origin/main` and split CI dependencies from the heavyweight codec/model-preparation environment after observing redundant installation work. |
 | 2026-08-05 | Confirmed optimized GitHub Actions run `30996830347` passed and replaced the obsolete push blocker with the published repository state. |
 | 2026-08-05 | Corrected author and committer attribution for the six assistant-created commits, preserved the original repository root and content, configured repository-local identity, and removed the stale GitHub credential. |
+| 2026-08-05 | Published the corrected history, verified every GitHub commit maps to the repository owner, and confirmed corrected-head CI run `31034723025` passed. |
