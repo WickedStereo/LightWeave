@@ -6,7 +6,7 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | Multi-size raw image dashboard complete and validated locally |
+| Phase | Multi-size raw image dashboard published and validated locally plus in CI |
 | Primary milestone | Header-free image/audio payload generation and receiver dashboard |
 | Secondary milestone | EnCodec audio extension with an honest CPU/NPU split |
 | Last updated | 2026-08-05 |
@@ -268,6 +268,7 @@ offline-smoke reports remain ignored and reproducible.
 | Raw 64 by 64 strict QNN decoder | Complete locally | QUInt16 QDQ, no fallback, 0 CPU nodes, 59.92 dB minimum NPU/CPU parity |
 | Raw 128 by 128 strict QNN decoder | Complete locally | QUInt16 QDQ, 66.74 dB minimum CPU parity, no fallback, 0 CPU nodes, 51.29 dB minimum NPU/CPU parity |
 | Raw milestone publication | Complete | Commit `140f9ae`; GitHub Actions run `31047777514` passed |
+| Multi-size dashboard publication | Complete | Commit `9aee230`; GitHub Actions run `31057418505` passed |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
 | GitHub Actions unit CI | Complete | Corrected-history Windows Python 3.11 run `31034723025` passed; QNN gates stay local |
@@ -370,3 +371,4 @@ offline-smoke reports remain ignored and reproducible.
 | 2026-08-05 | Implemented and locally validated the header-free raw image/audio contracts, 64 by 64 strict-QNN decoder, raw CLI, future adapter interfaces, and `/transmit`/`/receive`/`/loopback` dashboard; preserved `.lwv` and recorded the intentionally missing wire protections. |
 | 2026-08-05 | Published raw-mode commit `140f9ae` to `origin/main` and confirmed hardware-independent GitHub Actions run `31047777514` passed. |
 | 2026-08-05 | Added explicit tiny/balanced/quality raw image profiles, a strict 128 by 128 QNN graph, local sample patterns, and a monochrome responsive dashboard; validated all profile budgets and strict NPU assignment and made balanced the UI default. |
+| 2026-08-05 | Published multi-size dashboard commit `9aee230` to `origin/main` and confirmed Windows GitHub Actions run `31057418505` passed lint and all hardware-independent tests. |

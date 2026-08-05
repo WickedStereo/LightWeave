@@ -223,3 +223,4 @@ private endpoints, and confidential material must never appear here.
 | 2026-08-05 | Added the raw 64 by 64 CompressAI decoder evidence: 71.75 dB minimum CPU QDQ parity, 59.92 dB minimum NPU/CPU parity, complete HTP assignment, zero CPU nodes, and the separate-static-artifact/session-startup tradeoff. |
 | 2026-08-05 | Published the raw transmitter/receiver milestone and confirmed its hardware-independent Windows CI run passed; strict Snapdragon QNN evidence remains a reproducible local gate. |
 | 2026-08-05 | Added and profiled the 128 by 128 raw decoder: 66.74 dB minimum CPU QDQ parity, at least 51.29 dB NPU/CPU parity, complete QNN HTP assignment, zero CPU nodes, and explicit multi-shape artifact/startup guidance. |
+| 2026-08-05 | Published the multi-size dashboard and confirmed GitHub Actions run `31057418505` passed its portable Windows lint/unit gate; Snapdragon QNN proof remains the separately reproduced native-device gate recorded in DX-015. |
