@@ -15,7 +15,8 @@ from .errors import LightWeaveError
 from .image import encode_image, write_bytes_atomic
 from .metrics import transfer_estimates
 from .raw import (
-    RAW_IMAGE_MAX_BYTES,
+    RAW_IMAGE_PRESET,
+    RAW_IMAGE_PRESETS,
     decode_raw_audio,
     decode_raw_image,
     encode_raw_audio,
@@ -144,18 +145,21 @@ def command_audio_roundtrip(args: argparse.Namespace) -> None:
 
 
 def command_raw_image_encode(args: argparse.Namespace) -> None:
-    encoded = encode_raw_image(Path(args.input))
+    encoded = encode_raw_image(Path(args.input), preset_code=args.preset)
     _write_artifact(encoded.payload, args.output)
     if args.output != "-":
         _print_json(
             {
                 "preset_code": encoded.preset_code,
                 "raw_bytes": len(encoded.payload),
-                "maximum_bytes": RAW_IMAGE_MAX_BYTES,
-                "within_budget": len(encoded.payload) <= RAW_IMAGE_MAX_BYTES,
+                "maximum_bytes": encoded.maximum_bytes,
+                "within_budget": len(encoded.payload) <= encoded.maximum_bytes,
+                "output_size": [encoded.output_size, encoded.output_size],
                 "effective_detail": encoded.effective_detail,
                 "fallback": encoded.fallback,
-                "bits_per_pixel": len(encoded.payload) * 8 / (64 * 64),
+                "bits_per_pixel": (
+                    len(encoded.payload) * 8 / (encoded.output_size**2)
+                ),
                 "encode_seconds": encoded.encode_seconds,
                 **transfer_estimates(len(encoded.payload)),
                 "output": str(Path(args.output).resolve()),
@@ -305,7 +309,7 @@ def parser() -> argparse.ArgumentParser:
     )
     raw_media = raw_parser.add_subparsers(dest="raw_media", required=True)
 
-    raw_image = raw_media.add_parser("image", help="Raw I64-Q1 image operations")
+    raw_image = raw_media.add_parser("image", help="Raw image preset operations")
     raw_image_commands = raw_image.add_subparsers(
         dest="raw_image_command", required=True
     )
@@ -314,9 +318,15 @@ def parser() -> argparse.ArgumentParser:
     )
     raw_image_encode.add_argument("input")
     raw_image_encode.add_argument("--output", "-o", required=True)
+    raw_image_encode.add_argument(
+        "--preset",
+        choices=(RAW_IMAGE_PRESET, *(item.code for item in RAW_IMAGE_PRESETS)),
+        default=RAW_IMAGE_PRESET,
+        help="Raw image profile (legacy default: I64-Q1).",
+    )
     raw_image_encode.set_defaults(handler=command_raw_image_encode)
     raw_image_decode = raw_image_commands.add_parser(
-        "decode", help="Decode raw I64-Q1 entropy bytes"
+        "decode", help="Decode raw image entropy bytes"
     )
     raw_image_decode.add_argument("payload", help="Payload path, or - for stdin")
     raw_image_decode.add_argument("--preset", required=True)

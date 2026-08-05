@@ -4,68 +4,80 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="dark">
-    <title>Transmit · LightWeave</title>
+    <title>Transmit / LightWeave</title>
     <link rel="stylesheet" href="/static/styles.css">
   </head>
   <body>
     <main>
       <nav class="nav" aria-label="LightWeave workflows">
-        <a class="brand" href="/transmit">Light<span>Weave</span></a>
+        <a class="brand" href="/transmit">[lightweave]</a>
         <div>
-          <a class="active" href="/transmit">Transmit</a>
-          <a href="/receive">Receive</a>
+          <a class="active" href="/transmit">transmit</a>
+          <a href="/receive">receive</a>
           <a href="/loopback">.lwv workbench</a>
         </div>
       </nav>
 
       <header class="page-hero">
         <div>
-          <p class="eyebrow">Raw optical transmitter</p>
-          <h1>Media in.<br><span>Bytes out.</span></h1>
-          <p class="lede">Create the exact header-free payload that a future optical
-            adapter will send. The settings code travels separately.</p>
+          <p class="eyebrow">TX / RAW BYTE PIPE</p>
+          <h1>Transmit</h1>
+          <p class="lede">Turn an image or WAV into the exact bytes sent by the future optical adapter. Keep the printed settings code with the payload.</p>
         </div>
-        <div class="status" id="runtime-status">Checking local runtime…</div>
+        <div class="status" id="runtime-status">checking local runtime...</div>
       </header>
 
       <aside class="wire-warning">
-        <strong>Thin-wire mode</strong>
-        <span>No hash, length, version, or model fingerprint is embedded in
-          <code>payload.bin</code>. Exact delivery and matching pinned models are required.</span>
+        <strong>RAW MODE</strong>
+        <span><code>payload.bin</code> has no hash, length, version, or model identifier. Delivery must be exact and both machines must use matching model artifacts.</span>
       </aside>
 
       <div class="workflow-grid">
         <section class="workflow-card">
           <div class="card-heading">
-            <span class="media-tag">I64-Q1</span>
-            <h2>Image · 128 bytes max</h2>
-            <p>A fixed 64×64 reconstruction with adaptive effective detail.</p>
+            <span class="media-tag">IMAGE / COMPRESSAI Q1</span>
+            <h2>Image payload</h2>
+            <p>Choose the byte budget. Larger profiles preserve more detail but take longer over a 1-2 kbps link.</p>
           </div>
           <form id="image-transmit-form" class="stack-form">
+            <label for="image-preset">Size profile
+              <select id="image-preset" name="preset_code">
+                <option value="I64-Q1-B128">64 x 64 / max 128 B / tiny</option>
+                <option value="I128-Q1-B768" selected>128 x 128 / max 768 B / balanced</option>
+                <option value="I256-Q1-B2048">256 x 256 / max 2,048 B / quality</option>
+              </select>
+              <span class="field-note" id="image-preset-note">Worst case: 6.144 s at 1 kbps or 3.072 s at 2 kbps.</span>
+            </label>
             <label class="drop-zone" for="image-input">
               <strong>Select an image</strong>
-              <span>EXIF-corrected, RGB, aspect-preserved · 20 MiB max</span>
+              <span>EXIF corrected, RGB, aspect preserved. 20 MiB upload limit.</span>
               <input id="image-input" name="file" type="file" accept="image/*" required>
             </label>
+            <div class="sample-row">
+              <span>local test patterns:</span>
+              <button class="sample-button" data-sample="gradient" type="button">gradient</button>
+              <button class="sample-button" data-sample="blocks" type="button">blocks</button>
+              <button class="sample-button" data-sample="rings" type="button">rings</button>
+            </div>
             <img class="media-preview" id="image-preview" alt="Selected image preview" hidden>
-            <button type="submit">Generate image payload</button>
+            <button type="submit">generate image payload</button>
           </form>
-          <div class="activity" id="image-activity" hidden><span></span> Compressing candidates…</div>
+          <div class="activity" id="image-activity" hidden><span></span>compressing candidates...</div>
           <div class="error" id="image-error" hidden></div>
           <div id="image-result" hidden>
             <div class="code-row">
-              <div><small>Settings code</small><code id="image-code"></code></div>
-              <button class="secondary" id="image-copy" type="button">Copy code</button>
+              <div><small>settings code</small><code id="image-code"></code></div>
+              <button class="secondary" id="image-copy" type="button">copy</button>
             </div>
             <div class="metrics compact" id="image-metrics"></div>
             <div class="action-row">
-              <a class="download-button" id="image-download" download="payload.bin">Download payload.bin</a>
-              <button class="secondary" id="image-verify" type="button">Verify locally on NPU</button>
+              <a class="download-button" id="image-download" download="payload.bin">download payload.bin</a>
+              <button class="secondary" id="image-verify" type="button">verify locally / NPU</button>
             </div>
             <div id="image-verification" hidden>
               <div class="comparison">
-                <figure><img id="image-reference" alt="64 by 64 encoded reference"><figcaption>64×64 encoded target</figcaption></figure>
-                <figure><img id="image-reconstructed" class="pixelated" alt="64 by 64 reconstructed image"><figcaption>NPU reconstruction</figcaption></figure>
+                <figure><img id="image-reference" alt="Encoded image target"><figcaption id="image-reference-caption">encoded target</figcaption></figure>
+                <figure><img id="image-reconstructed" class="pixelated" alt="NPU reconstructed image"><figcaption>NPU reconstruction</figcaption></figure>
               </div>
               <div class="metrics compact" id="image-verify-metrics"></div>
               <details><summary>QNN execution evidence</summary><pre id="image-evidence"></pre></details>
@@ -75,35 +87,35 @@
 
         <section class="workflow-card">
           <div class="card-heading">
-            <span class="media-tag">A1-E15-S&lt;n&gt;</span>
-            <h2>Audio · 188 bytes / second</h2>
-            <p>24 kHz mono EnCodec indices in independently packed one-second chunks.</p>
+            <span class="media-tag">AUDIO / A1-E15-S&lt;n&gt;</span>
+            <h2>Audio payload</h2>
+            <p>24 kHz mono EnCodec indices. Each started second adds exactly 188 bytes.</p>
           </div>
           <form id="audio-transmit-form" class="stack-form">
             <label class="drop-zone" for="audio-input">
               <strong>Select a PCM WAV</strong>
-              <span>Mono or stereo, resampled to 24 kHz · 20 MiB max</span>
+              <span>Mono or stereo, resampled to 24 kHz. 20 MiB upload limit.</span>
               <input id="audio-input" name="file" type="file" accept="audio/wav,.wav" required>
             </label>
             <audio id="audio-preview" controls hidden></audio>
-            <button type="submit">Generate audio payload</button>
+            <button type="submit">generate audio payload</button>
           </form>
-          <div class="activity" id="audio-activity" hidden><span></span> Encoding audio…</div>
+          <div class="activity" id="audio-activity" hidden><span></span>encoding audio...</div>
           <div class="error" id="audio-error" hidden></div>
           <div id="audio-result" hidden>
             <div class="code-row">
-              <div><small>Settings code</small><code id="audio-code"></code></div>
-              <button class="secondary" id="audio-copy" type="button">Copy code</button>
+              <div><small>settings code</small><code id="audio-code"></code></div>
+              <button class="secondary" id="audio-copy" type="button">copy</button>
             </div>
             <div class="metrics compact" id="audio-metrics"></div>
             <div class="action-row">
-              <a class="download-button" id="audio-download" download="payload.bin">Download payload.bin</a>
-              <button class="secondary" id="audio-verify" type="button">Verify locally on hybrid NPU</button>
+              <a class="download-button" id="audio-download" download="payload.bin">download payload.bin</a>
+              <button class="secondary" id="audio-verify" type="button">verify locally / hybrid</button>
             </div>
             <div id="audio-verification" hidden>
               <audio id="audio-reconstructed" controls></audio>
               <div class="metrics compact" id="audio-verify-metrics"></div>
-              <details><summary>Hybrid execution evidence</summary><pre id="audio-evidence"></pre></details>
+              <details><summary>hybrid execution evidence</summary><pre id="audio-evidence"></pre></details>
             </div>
           </div>
         </section>

@@ -1,4 +1,4 @@
-"""Quantize the fixed I64-Q1 decoder for strict QNN HTP execution."""
+"""Quantize a fixed raw-image decoder for strict QNN HTP execution."""
 
 from __future__ import annotations
 
@@ -27,7 +27,13 @@ if str(SRC) not in sys.path:
 from lightweave.image import load_image_model  # noqa: E402
 from lightweave.metrics import array_psnr  # noqa: E402
 from lightweave.paths import generated_artifact_dir  # noqa: E402
-from lightweave.raw import RAW_IMAGE_DETAIL_LEVELS, raw_image_candidate  # noqa: E402
+from lightweave.raw import (  # noqa: E402
+    RAW_IMAGE_PRESET,
+    RAW_IMAGE_PRESETS,
+    RawImagePreset,
+    parse_raw_image_preset,
+    raw_image_candidate,
+)
 
 
 def file_sha256(path: Path) -> str:
@@ -51,7 +57,9 @@ class LatentReader(CalibrationDataReader):
         self._iterator = iter({"latent": value} for value in self.values)
 
 
-def calibration_latents(image_paths: list[Path]) -> list[np.ndarray]:
+def calibration_latents(
+    image_paths: list[Path], preset: RawImagePreset
+) -> list[np.ndarray]:
     from PIL import Image, ImageOps
 
     model, _, _ = load_image_model()
@@ -60,8 +68,8 @@ def calibration_latents(image_paths: list[Path]) -> list[np.ndarray]:
         for image_path in image_paths:
             with Image.open(image_path) as source:
                 image = ImageOps.exif_transpose(source).convert("RGB")
-            for detail in RAW_IMAGE_DETAIL_LEVELS:
-                candidate = raw_image_candidate(image, detail)
+            for detail in preset.detail_levels:
+                candidate = raw_image_candidate(image, detail, preset)
                 array = np.asarray(candidate, dtype=np.float32) / 255.0
                 tensor = (
                     torch.from_numpy(array)
@@ -96,8 +104,9 @@ def quantize_decoder(
     preprocessed: Path,
     manifest_path: Path,
     image_paths: list[Path],
+    preset: RawImagePreset,
 ) -> dict[str, object]:
-    values = calibration_latents(image_paths)
+    values = calibration_latents(image_paths, preset)
     reader = LatentReader(values)
     preprocessed.parent.mkdir(parents=True, exist_ok=True)
     model_changed = qnn_preprocess_model(source, preprocessed)
@@ -125,8 +134,8 @@ def quantize_decoder(
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest.update(
         {
-            "preset_code": "I64-Q1",
-            "raw_payload_max_bytes": 128,
+            "preset_code": preset.code,
+            "raw_payload_max_bytes": preset.maximum_bytes,
             "quantized_onnx_path": str(output.resolve()),
             "quantized_onnx_sha256": file_sha256(output),
             "quantization": {
@@ -135,7 +144,7 @@ def quantize_decoder(
                 "weight_type": "QUInt16",
                 "calibration_method": "MinMax",
                 "calibration_images": [path.name for path in image_paths],
-                "calibration_detail_levels": list(RAW_IMAGE_DETAIL_LEVELS),
+                "calibration_detail_levels": list(preset.detail_levels),
                 "preprocessed_model_changed": model_changed,
             },
             "cpu_quantized_parity": {
@@ -179,13 +188,20 @@ def main() -> None:
         type=Path,
         default=PROJECT_ROOT / "data/generated/demo-images",
     )
+    parser.add_argument(
+        "--preset",
+        choices=(RAW_IMAGE_PRESET, *(item.code for item in RAW_IMAGE_PRESETS)),
+        default=RAW_IMAGE_PRESET,
+    )
     args = parser.parse_args()
+    preset = parse_raw_image_preset(args.preset)
     result = quantize_decoder(
         args.source.resolve(),
         args.output.resolve(),
         args.preprocessed.resolve(),
         args.local_manifest.resolve(),
         load_acceptance_images(args.demo_manifest, args.image_dir),
+        preset,
     )
     print(json.dumps(result, indent=2))
 

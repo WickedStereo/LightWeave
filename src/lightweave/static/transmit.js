@@ -37,7 +37,7 @@ async function loadStatus() {
     const status = await responseBody(await fetch("/api/status"));
     const ready = status.weights_ready && status.raw_decoder_ready &&
       status.audio_weights_ready && status.audio_tail_ready && status.arm64_worker_ready;
-    box.textContent = ready ? "Raw runtime ready · offline" : "Setup incomplete · inspect status";
+    box.textContent = ready ? "raw runtime ready / offline" : "setup incomplete / inspect status";
     box.classList.toggle("ready", ready);
     box.title = JSON.stringify(status, null, 2);
   } catch {
@@ -64,7 +64,7 @@ document.querySelector("#image-transmit-form").addEventListener("submit", async 
   activity.hidden = false;
   error.hidden = true;
   result.hidden = true;
-  form.querySelector("button").disabled = true;
+  form.querySelector("button[type=submit]").disabled = true;
   try {
     const body = await responseBody(await fetch("/api/transmit/image", {
       method: "POST", body: new FormData(form),
@@ -77,22 +77,24 @@ document.querySelector("#image-transmit-form").addEventListener("submit", async 
     document.querySelector("#image-code").textContent = body.preset_code;
     document.querySelector("#image-reference").src = body.encoded_reference;
     renderMetrics(document.querySelector("#image-metrics"), [
-      ["Raw payload", `${body.raw_bytes} / 128 bytes`],
-      ["Effective detail", body.effective_detail ? `${body.effective_detail}×${body.effective_detail}` : body.fallback],
+      ["Raw payload", `${body.raw_bytes} / ${body.maximum_bytes} bytes`],
+      ["Output", `${body.output_size} x ${body.output_size}`],
+      ["Effective detail", body.effective_detail ? `${body.effective_detail} x ${body.effective_detail}` : body.fallback],
       ["Fallback", body.fallback],
       ["Bits / output pixel", Number(body.bits_per_pixel).toFixed(3)],
-      ["Transfer · 1 kbps", formatSeconds(body.at_1_kbps_seconds)],
-      ["Transfer · 2 kbps", formatSeconds(body.at_2_kbps_seconds)],
+      ["Transfer / 1 kbps", formatSeconds(body.at_1_kbps_seconds)],
+      ["Transfer / 2 kbps", formatSeconds(body.at_2_kbps_seconds)],
       ["Encode", formatSeconds(body.encode_seconds)],
     ]);
     document.querySelector("#image-verification").hidden = true;
+    document.querySelector("#image-reference-caption").textContent = `${body.output_size} x ${body.output_size} encoded target`;
     result.hidden = false;
   } catch (caught) {
     error.textContent = caught.message;
     error.hidden = false;
   } finally {
     activity.hidden = true;
-    form.querySelector("button").disabled = false;
+    form.querySelector("button[type=submit]").disabled = false;
   }
 });
 
@@ -111,7 +113,7 @@ document.querySelector("#image-verify").addEventListener("click", async (event) 
     const body = await responseBody(await fetch("/api/receive/image", { method: "POST", body: form }));
     document.querySelector("#image-reconstructed").src = body.reconstructed_image;
     renderMetrics(document.querySelector("#image-verify-metrics"), [
-      ["Output", `${body.output_width}×${body.output_height}`],
+      ["Output", `${body.output_width} x ${body.output_height}`],
       ["Entropy decode", formatSeconds(body.entropy_decode_seconds)],
       ["NPU reconstruction", formatSeconds(body.reconstruction_seconds)],
       ["PSNR", `${Number(body.psnr_db).toFixed(2)} dB`],
@@ -136,7 +138,7 @@ document.querySelector("#audio-transmit-form").addEventListener("submit", async 
   activity.hidden = false;
   error.hidden = true;
   result.hidden = true;
-  form.querySelector("button").disabled = true;
+  form.querySelector("button[type=submit]").disabled = true;
   try {
     const body = await responseBody(await fetch("/api/transmit/audio", {
       method: "POST", body: new FormData(form),
@@ -149,11 +151,11 @@ document.querySelector("#audio-transmit-form").addEventListener("submit", async 
     document.querySelector("#audio-code").textContent = body.preset_code;
     renderMetrics(document.querySelector("#audio-metrics"), [
       ["Raw payload", `${body.raw_bytes} bytes`],
-      ["Chunks", `${body.chunk_count} × 188 bytes`],
+      ["Chunks", `${body.chunk_count} x 188 bytes`],
       ["Duration", `${Number(body.duration_seconds).toFixed(3)} s`],
       ["Payload rate", `${Number(body.code_payload_bps).toFixed(0)} bps`],
-      ["Transfer · 1 kbps", formatSeconds(body.at_1_kbps_seconds)],
-      ["Transfer · 2 kbps", formatSeconds(body.at_2_kbps_seconds)],
+      ["Transfer / 1 kbps", formatSeconds(body.at_1_kbps_seconds)],
+      ["Transfer / 2 kbps", formatSeconds(body.at_2_kbps_seconds)],
       ["Encode", formatSeconds(body.encode_seconds)],
     ]);
     document.querySelector("#audio-verification").hidden = true;
@@ -163,7 +165,7 @@ document.querySelector("#audio-transmit-form").addEventListener("submit", async 
     error.hidden = false;
   } finally {
     activity.hidden = true;
-    form.querySelector("button").disabled = false;
+    form.querySelector("button[type=submit]").disabled = false;
   }
 });
 
@@ -198,4 +200,34 @@ document.querySelector("#audio-verify").addEventListener("click", async (event) 
 
 bindPreview("#image-input", "#image-preview");
 bindPreview("#audio-input", "#audio-preview");
+
+const presetNotes = {
+  "I64-Q1-B128": "Worst case: 1.024 s at 1 kbps or 0.512 s at 2 kbps.",
+  "I128-Q1-B768": "Worst case: 6.144 s at 1 kbps or 3.072 s at 2 kbps.",
+  "I256-Q1-B2048": "Worst case: 16.384 s at 1 kbps or 8.192 s at 2 kbps.",
+};
+document.querySelector("#image-preset").addEventListener("change", (event) => {
+  document.querySelector("#image-preset-note").textContent = presetNotes[event.target.value];
+});
+
+for (const button of document.querySelectorAll("[data-sample]")) {
+  button.addEventListener("click", async () => {
+    const error = document.querySelector("#image-error");
+    error.hidden = true;
+    try {
+      const response = await fetch(`/api/samples/image/${button.dataset.sample}`);
+      if (!response.ok) throw new Error("Could not load the local test pattern.");
+      const blob = await response.blob();
+      const file = new File([blob], `${button.dataset.sample}.png`, { type: "image/png" });
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      const input = document.querySelector("#image-input");
+      input.files = transfer.files;
+      input.dispatchEvent(new Event("change"));
+    } catch (caught) {
+      error.textContent = caught.message;
+      error.hidden = false;
+    }
+  });
+}
 loadStatus();

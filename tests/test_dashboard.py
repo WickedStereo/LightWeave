@@ -22,6 +22,7 @@ def test_dashboard_serves_only_local_assets() -> None:
         assert page.status_code == 200
         assert 'href="/static/styles.css"' in page.text
         assert 'src="/static/transmit.js"' in page.text
+        assert "I128-Q1-B768" in page.text
         assert "https://" not in page.text
         receive = client.get("/receive")
         assert receive.status_code == 200
@@ -30,6 +31,16 @@ def test_dashboard_serves_only_local_assets() -> None:
         assert loopback.status_code == 200
         assert 'src="/static/app.js"' in loopback.text
         assert client.get("/static/styles.css").status_code == 200
+
+
+def test_dashboard_serves_small_local_test_patterns() -> None:
+    with TestClient(create_app()) as client:
+        for name in ("gradient", "blocks", "rings"):
+            sample = client.get(f"/api/samples/image/{name}")
+            assert sample.status_code == 200
+            assert sample.headers["content-type"] == "image/png"
+            assert sample.content.startswith(b"\x89PNG")
+        assert client.get("/api/samples/image/unknown").status_code == 404
 
 
 def test_raw_receive_contract_errors_precede_model_loading() -> None:

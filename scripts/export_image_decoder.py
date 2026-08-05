@@ -42,8 +42,8 @@ def file_sha256(path: Path) -> str:
 def export_decoder(
     output: Path, weights: Path | None, latent_size: int
 ) -> dict[str, object]:
-    if latent_size not in (4, 16):
-        raise ValueError("LightWeave image decoder latent size must be 4 or 16.")
+    if latent_size not in (4, 8, 16):
+        raise ValueError("LightWeave image decoder latent size must be 4, 8, or 16.")
     model, weight_path, weight_hash = load_image_model(weights)
     wrapper = SynthesisWrapper(model.g_s).eval()
     generator = torch.Generator().manual_seed(20260805)
@@ -116,9 +116,9 @@ def main() -> None:
     parser.add_argument(
         "--latent-size",
         type=int,
-        choices=(4, 16),
+        choices=(4, 8, 16),
         default=16,
-        help="Use 4 for the I64-Q1 raw decoder or 16 for the 256px .lwv decoder.",
+        help="Use 4, 8, or 16 for 64px, 128px, or 256px output.",
     )
     args = parser.parse_args()
 

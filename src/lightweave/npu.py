@@ -39,11 +39,32 @@ def default_decoder_model() -> Path:
     return generated_artifact_dir() / "image_decoder_qdq.onnx"
 
 
-def default_raw_decoder_model() -> Path:
-    configured = os.environ.get("LIGHTWEAVE_RAW_IMAGE_DECODER_ONNX")
+def default_raw_decoder_model(output_size: int = 64) -> Path:
+    if output_size == 64:
+        configured = os.environ.get("LIGHTWEAVE_RAW_IMAGE_DECODER_ONNX")
+        filename = "raw_image_decoder_qdq.onnx"
+    elif output_size == 128:
+        configured = os.environ.get("LIGHTWEAVE_RAW_IMAGE_128_DECODER_ONNX")
+        filename = "raw_image_128_decoder_qdq.onnx"
+    elif output_size == 256:
+        return default_decoder_model()
+    else:
+        raise ValueError(f"Unsupported raw image decoder size: {output_size}.")
     if configured:
         return Path(configured).expanduser().resolve()
-    return generated_artifact_dir() / "raw_image_decoder_qdq.onnx"
+    return generated_artifact_dir() / filename
+
+
+def default_raw_decoder_manifest(output_size: int = 64) -> Path:
+    if output_size == 64:
+        filename = "raw_image_decoder.manifest.json"
+    elif output_size == 128:
+        filename = "raw_image_128_decoder.manifest.json"
+    elif output_size == 256:
+        filename = "image_decoder.manifest.json"
+    else:
+        raise ValueError(f"Unsupported raw image decoder size: {output_size}.")
+    return generated_artifact_dir() / filename
 
 
 def _sha256(path: Path) -> str:

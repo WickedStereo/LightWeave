@@ -16,6 +16,7 @@ from lightweave.audio import roundtrip_audio  # noqa: E402
 from lightweave.image import write_bytes_atomic  # noqa: E402
 from lightweave.offline import install_offline_guard  # noqa: E402
 from lightweave.raw import (  # noqa: E402
+    DEFAULT_RAW_IMAGE_PRESET,
     decode_raw_audio,
     decode_raw_image,
     encode_raw_audio,
@@ -42,7 +43,8 @@ def main() -> None:
         output_path=output_dir / "audio.wav",
     )
     raw_image_encoded = encode_raw_image(
-        PROJECT_ROOT / "data/generated/demo-images/gradient-landscape.png"
+        PROJECT_ROOT / "data/generated/demo-images/gradient-landscape.png",
+        preset_code=DEFAULT_RAW_IMAGE_PRESET,
     )
     write_bytes_atomic(raw_image_encoded.payload, output_dir / "raw-image.bin")
     raw_image = decode_raw_image(

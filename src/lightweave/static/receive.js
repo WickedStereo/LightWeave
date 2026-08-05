@@ -25,7 +25,7 @@ async function loadStatus() {
     const status = await responseBody(await fetch("/api/status"));
     const ready = status.weights_ready && status.raw_decoder_ready &&
       status.audio_weights_ready && status.audio_tail_ready && status.arm64_worker_ready;
-    box.textContent = ready ? "Receiver ready · offline" : "Setup incomplete · inspect status";
+    box.textContent = ready ? "receiver ready / offline" : "setup incomplete / inspect status";
     box.classList.toggle("ready", ready);
     box.title = JSON.stringify(status, null, 2);
   } catch {
@@ -51,7 +51,7 @@ document.querySelector("#image-receive-form").addEventListener("submit", async (
     document.querySelector("#image-save").href = body.reconstructed_image;
     renderMetrics(document.querySelector("#image-metrics"), [
       ["Raw payload", `${body.raw_bytes} bytes`],
-      ["Output", `${body.output_width}×${body.output_height}`],
+      ["Output", `${body.output_width} x ${body.output_height}`],
       ["Entropy decode", formatSeconds(body.entropy_decode_seconds)],
       ["NPU reconstruction", formatSeconds(body.reconstruction_seconds)],
     ]);
@@ -84,7 +84,7 @@ document.querySelector("#audio-receive-form").addEventListener("submit", async (
     document.querySelector("#audio-save").href = body.reconstructed_audio;
     renderMetrics(document.querySelector("#audio-metrics"), [
       ["Raw payload", `${body.raw_bytes} bytes`],
-      ["Chunks", `${body.chunk_count} × 188 bytes`],
+      ["Chunks", `${body.chunk_count} x 188 bytes`],
       ["Restored samples", Number(body.restored_samples).toLocaleString()],
       ["Codebook", formatSeconds(body.codebook_decode_seconds)],
       ["CPU prefix", formatSeconds(body.cpu_prefix_seconds)],

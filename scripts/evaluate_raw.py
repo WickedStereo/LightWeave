@@ -16,8 +16,9 @@ if str(SRC) not in sys.path:
 
 from lightweave.metrics import ms_ssim, psnr, transfer_estimates  # noqa: E402
 from lightweave.raw import (  # noqa: E402
+    DEFAULT_RAW_IMAGE_PRESET,
     RAW_AUDIO_CHUNK_BYTES,
-    RAW_IMAGE_MAX_BYTES,
+    RAW_IMAGE_PRESETS,
     decode_raw_audio,
     decode_raw_image,
     encode_raw_audio,
@@ -41,12 +42,14 @@ def acceptance_images(manifest_path: Path, image_dir: Path) -> list[Path]:
     return paths
 
 
-def evaluate_image(path: Path, backend: str) -> dict[str, object]:
-    first = encode_raw_image(path)
-    second = encode_raw_image(path)
+def evaluate_image(
+    path: Path, backend: str, preset_code: str
+) -> dict[str, object]:
+    first = encode_raw_image(path, preset_code=preset_code)
+    second = encode_raw_image(path, preset_code=preset_code)
     if first.payload != second.payload:
         raise RuntimeError(f"Raw image encoding is not deterministic for {path.name}.")
-    if len(first.payload) > RAW_IMAGE_MAX_BYTES:
+    if len(first.payload) > first.maximum_bytes:
         raise RuntimeError(f"Raw image budget failed for {path.name}.")
 
     cpu = decode_raw_image(
@@ -59,7 +62,8 @@ def evaluate_image(path: Path, backend: str) -> dict[str, object]:
             first.payload, preset_code=first.preset_code, backend="qnn"
         )
     )
-    if selected.image.size != (64, 64):
+    expected_size = (first.output_size, first.output_size)
+    if selected.image.size != expected_size:
         raise RuntimeError(f"Raw image output size failed for {path.name}.")
     parity = psnr(cpu.image, selected.image)
     if backend == "qnn":
@@ -75,6 +79,9 @@ def evaluate_image(path: Path, backend: str) -> dict[str, object]:
 
     return {
         "name": path.name,
+        "preset_code": first.preset_code,
+        "output_size": first.output_size,
+        "maximum_bytes": first.maximum_bytes,
         "raw_bytes": len(first.payload),
         "deterministic": True,
         "effective_detail": first.effective_detail,
@@ -127,6 +134,11 @@ def main() -> None:
         default=PROJECT_ROOT / "data/generated/demo-images",
     )
     parser.add_argument("--image-backend", choices=("cpu", "qnn"), default="cpu")
+    parser.add_argument(
+        "--image-preset",
+        choices=tuple(item.code for item in RAW_IMAGE_PRESETS),
+        default=DEFAULT_RAW_IMAGE_PRESET,
+    )
     parser.add_argument("--audio", type=Path)
     parser.add_argument(
         "--audio-backend", choices=("cpu", "hybrid-qnn"), default="cpu"
@@ -135,14 +147,15 @@ def main() -> None:
     args = parser.parse_args()
 
     images = [
-        evaluate_image(path, args.image_backend)
+        evaluate_image(path, args.image_backend, args.image_preset)
         for path in acceptance_images(args.demo_manifest, args.image_dir)
     ]
     result: dict[str, object] = {
         "image_backend": args.image_backend,
+        "image_preset": args.image_preset,
         "images": images,
-        "all_images_within_128_bytes": all(
-            entry["raw_bytes"] <= RAW_IMAGE_MAX_BYTES for entry in images
+        "all_images_within_profile_budget": all(
+            entry["raw_bytes"] <= entry["maximum_bytes"] for entry in images
         ),
     }
     if args.audio:

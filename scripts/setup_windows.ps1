@@ -37,6 +37,16 @@ try {
         --output artifacts\generated\raw_image_decoder_fp32.onnx `
         --manifest artifacts\generated\raw_image_decoder.manifest.json
     & .\.venv-x64\Scripts\python.exe scripts\quantize_raw_image_decoder.py
+    & .\.venv-x64\Scripts\python.exe scripts\export_image_decoder.py `
+        --latent-size 8 `
+        --output artifacts\generated\raw_image_128_decoder_fp32.onnx `
+        --manifest artifacts\generated\raw_image_128_decoder.manifest.json
+    & .\.venv-x64\Scripts\python.exe scripts\quantize_raw_image_decoder.py `
+        --preset I128-Q1-B768 `
+        --source artifacts\generated\raw_image_128_decoder_fp32.onnx `
+        --output artifacts\generated\raw_image_128_decoder_qdq.onnx `
+        --preprocessed artifacts\generated\raw_image_128_decoder_preprocessed.onnx `
+        --local-manifest artifacts\generated\raw_image_128_decoder.manifest.json
     & .\.venv-x64\Scripts\python.exe scripts\export_audio_tail.py
     & .\.venv-x64\Scripts\python.exe scripts\quantize_audio_tail.py
 

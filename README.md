@@ -10,9 +10,10 @@ receiver.
 
 Two wire formats coexist:
 
-- Raw optical mode sends only codec bytes. `I64-Q1` images are at most 128
-  bytes and reconstruct to exactly 64×64. `A1-E15-S<n>` audio uses exactly 188
-  bytes per started second. The preset code travels separately.
+- Raw optical mode sends only codec bytes. Image presets reconstruct at
+  64 x 64 / 128 bytes, 128 x 128 / 768 bytes, or 256 x 256 / 2,048 bytes.
+  `A1-E15-S<n>` audio uses exactly 188 bytes per started second. The preset
+  code travels separately.
 - `.lwv` remains the self-validating archival and debugging format with typed
   metadata, length, model fingerprint, and SHA-256 integrity.
 
@@ -38,9 +39,10 @@ CPU de-click correction removes independent one-second chunk-edge steps.
   zero conditioned boundary jump, and 48.80 dB NPU-tail parity.
 - Audio tail profile: `QNNExecutionProvider` only, zero CPU nodes.
 - Runtime smoke-tested with non-loopback networking blocked in both workers.
-- Raw image set: 4/4 payloads at or below 128 bytes, deterministic output,
-  strict full-decoder QNN profiles with zero CPU nodes, and at least 59.92 dB
-  NPU/CPU parity. Reconstruction quality is informational at this wire budget.
+- Raw image set: 4/4 deterministic payloads fit every profile. Tiny measured
+  76-124 bytes, balanced 216-664 bytes, and quality 716-2,044 bytes. All three
+  fixed decoders ran strictly on QNN with zero CPU nodes; balanced NPU/CPU
+  parity was at least 51.29 dB.
 - Raw audio sample: exactly 376 bytes for two seconds, 48,000 samples restored,
   and a strict zero-CPU-node QNN tail profile.
 
@@ -81,8 +83,8 @@ lightweave audio decode audio.lwv --output reconstructed.wav
 lightweave audio roundtrip input.wav --work-dir out\audio
 
 # Header-free raw optical payloads
-lightweave raw image encode input.png --output payload.bin
-lightweave raw image decode payload.bin --preset I64-Q1 --output image.png --require-npu
+lightweave raw image encode input.png --preset I128-Q1-B768 --output payload.bin
+lightweave raw image decode payload.bin --preset I128-Q1-B768 --output image.png --require-npu
 lightweave raw audio encode input.wav --output payload.bin
 lightweave raw audio decode payload.bin --preset A1-E15-S48000 --output audio.wav
 
@@ -93,9 +95,10 @@ lightweave dashboard
 The dashboard binds only to `127.0.0.1` and loads no remote assets. `/transmit`
 generates and downloads the exact raw `payload.bin`, `/receive` reconstructs an
 uploaded payload using its out-of-band settings code, and `/loopback` preserves
-the `.lwv` development workbench. The pages show transfer estimates,
-quality/latency metrics, playable media, QNN device selection, and strict
-provider evidence.
+the `.lwv` development workbench. The monochrome text-first UI defaults to the
+balanced 128 x 128 profile, includes tiny and quality alternatives plus three
+local test patterns, and shows transfer estimates, quality/latency metrics,
+playable media, QNN device selection, and strict provider evidence.
 
 Raw mode intentionally has no integrity or model-negotiation bytes. Corruption,
 wrong message boundaries, or mismatched pinned artifacts may fail decoding or

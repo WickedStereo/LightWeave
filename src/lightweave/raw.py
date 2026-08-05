@@ -27,16 +27,57 @@ from .audio import (
 from .image import load_image_model, save_image_atomic, tensor_to_padded_image
 
 RAW_IMAGE_PRESET = "I64-Q1"
-RAW_IMAGE_SIZE = 64
-RAW_IMAGE_LATENT_SHAPE = (1, 192, 4, 4)
-RAW_IMAGE_MAX_BYTES = 128
-RAW_IMAGE_DETAIL_LEVELS = (64, 56, 48, 40, 32, 24, 16, 8)
+RAW_IMAGE_TINY_PRESET = "I64-Q1-B128"
+RAW_IMAGE_BALANCED_PRESET = "I128-Q1-B768"
+RAW_IMAGE_QUALITY_PRESET = "I256-Q1-B2048"
+DEFAULT_RAW_IMAGE_PRESET = RAW_IMAGE_BALANCED_PRESET
 
 RAW_AUDIO_PRESET_PREFIX = "A1-E15-S"
 RAW_AUDIO_CHUNK_BYTES = 188
 
 ImageBackend = Literal["cpu", "qnn"]
 AudioBackend = Literal["cpu", "hybrid-qnn"]
+
+
+@dataclass(frozen=True, slots=True)
+class RawImagePreset:
+    code: str
+    output_size: int
+    maximum_bytes: int
+    detail_levels: tuple[int, ...]
+
+    @property
+    def latent_size(self) -> int:
+        return self.output_size // 16
+
+    @property
+    def latent_shape(self) -> tuple[int, int, int, int]:
+        return (1, 192, self.latent_size, self.latent_size)
+
+
+RAW_IMAGE_PRESETS = (
+    RawImagePreset(
+        RAW_IMAGE_TINY_PRESET,
+        64,
+        128,
+        (64, 56, 48, 40, 32, 24, 16, 8),
+    ),
+    RawImagePreset(
+        RAW_IMAGE_BALANCED_PRESET,
+        128,
+        768,
+        (128, 112, 96, 80, 64, 48, 32, 16),
+    ),
+    RawImagePreset(
+        RAW_IMAGE_QUALITY_PRESET,
+        256,
+        2_048,
+        (256, 224, 192, 160, 128, 96, 64, 32),
+    ),
+)
+RAW_IMAGE_PRESET_BY_CODE = {preset.code: preset for preset in RAW_IMAGE_PRESETS}
+RAW_IMAGE_PRESET_BY_CODE[RAW_IMAGE_PRESET] = RAW_IMAGE_PRESETS[0]
+RAW_IMAGE_MAX_BYTES = max(preset.maximum_bytes for preset in RAW_IMAGE_PRESETS)
 
 
 @dataclass(slots=True)
@@ -48,6 +89,8 @@ class EncodedRawImage:
     effective_detail: int
     fallback: str
     encode_seconds: float
+    output_size: int
+    maximum_bytes: int
 
 
 @dataclass(slots=True)
@@ -78,12 +121,14 @@ class DecodedRawAudio:
     evidence: dict[str, Any]
 
 
-def parse_raw_image_preset(code: str) -> str:
-    if code != RAW_IMAGE_PRESET:
+def parse_raw_image_preset(code: str) -> RawImagePreset:
+    try:
+        return RAW_IMAGE_PRESET_BY_CODE[code]
+    except KeyError as exc:
+        supported = ", ".join(preset.code for preset in RAW_IMAGE_PRESETS)
         raise ValueError(
-            f"Unsupported raw image preset {code!r}; expected {RAW_IMAGE_PRESET}."
-        )
-    return code
+            f"Unsupported raw image preset {code!r}; expected one of {supported}."
+        ) from exc
 
 
 def raw_audio_preset(original_samples: int) -> str:
@@ -120,13 +165,20 @@ def _letterbox(image: Image.Image, size: int) -> Image.Image:
     return canvas
 
 
-def raw_image_candidate(image: Image.Image, detail: int) -> Image.Image:
-    if detail not in RAW_IMAGE_DETAIL_LEVELS:
+def raw_image_candidate(
+    image: Image.Image,
+    detail: int,
+    preset: RawImagePreset | str = RAW_IMAGE_PRESET,
+) -> Image.Image:
+    selected = (
+        parse_raw_image_preset(preset) if isinstance(preset, str) else preset
+    )
+    if detail not in selected.detail_levels:
         raise ValueError(f"Unsupported raw image detail level: {detail}.")
     candidate = _letterbox(image, detail)
-    if detail != RAW_IMAGE_SIZE:
+    if detail != selected.output_size:
         candidate = candidate.resize(
-            (RAW_IMAGE_SIZE, RAW_IMAGE_SIZE), Image.Resampling.NEAREST
+            (selected.output_size, selected.output_size), Image.Resampling.NEAREST
         )
     return candidate
 
@@ -138,7 +190,9 @@ def _image_tensor(image: Image.Image) -> Any:
     return torch.from_numpy(array).permute(2, 0, 1).unsqueeze(0).contiguous()
 
 
-def _compress_raw_image(model: Any, image: Image.Image) -> bytes:
+def _compress_raw_image(
+    model: Any, image: Image.Image, preset: RawImagePreset
+) -> bytes:
     import torch
 
     with torch.inference_mode():
@@ -153,31 +207,40 @@ def _compress_raw_image(model: Any, image: Image.Image) -> bytes:
         or not isinstance(strings[0][0], bytes)
     ):
         raise RuntimeError("Raw image compression did not return one entropy string.")
-    if tuple(int(value) for value in shape) != (4, 4):
-        raise RuntimeError(f"Raw image latent shape must be [4,4], got {shape!r}.")
+    expected_shape = (preset.latent_size, preset.latent_size)
+    if tuple(int(value) for value in shape) != expected_shape:
+        raise RuntimeError(
+            f"Raw image latent shape must be {expected_shape}, got {shape!r}."
+        )
     if int(model.entropy_bottleneck.channels) != 192:
         raise RuntimeError("Raw image model must expose 192 entropy channels.")
     return strings[0][0]
 
 
 def encode_raw_image(
-    input_path: Path | BinaryIO, *, weights_path: Path | None = None
+    input_path: Path | BinaryIO,
+    *,
+    preset_code: str = RAW_IMAGE_PRESET,
+    weights_path: Path | None = None,
 ) -> EncodedRawImage:
+    preset = parse_raw_image_preset(preset_code)
     image = _open_raw_image(input_path)
     model, _, _ = load_image_model(weights_path)
     started = time.perf_counter()
-    for detail in RAW_IMAGE_DETAIL_LEVELS:
-        candidate = raw_image_candidate(image, detail)
-        payload = _compress_raw_image(model, candidate)
-        if len(payload) <= RAW_IMAGE_MAX_BYTES:
+    for detail in preset.detail_levels:
+        candidate = raw_image_candidate(image, detail, preset)
+        payload = _compress_raw_image(model, candidate, preset)
+        if len(payload) <= preset.maximum_bytes:
             return EncodedRawImage(
                 payload,
-                RAW_IMAGE_PRESET,
+                preset.code,
                 candidate,
                 image,
                 detail,
                 "none",
                 time.perf_counter() - started,
+                preset.output_size,
+                preset.maximum_bytes,
             )
 
     mean = tuple(
@@ -185,20 +248,25 @@ def encode_raw_image(
         for value in np.asarray(image, dtype=np.float32).mean(axis=(0, 1))
     )
     for fallback, color in (("mean-color", mean), ("black", (0, 0, 0))):
-        candidate = Image.new("RGB", (RAW_IMAGE_SIZE, RAW_IMAGE_SIZE), color)
-        payload = _compress_raw_image(model, candidate)
-        if len(payload) <= RAW_IMAGE_MAX_BYTES:
+        candidate = Image.new(
+            "RGB", (preset.output_size, preset.output_size), color
+        )
+        payload = _compress_raw_image(model, candidate, preset)
+        if len(payload) <= preset.maximum_bytes:
             return EncodedRawImage(
                 payload,
-                RAW_IMAGE_PRESET,
+                preset.code,
                 candidate,
                 image,
                 0,
                 fallback,
                 time.perf_counter() - started,
+                preset.output_size,
+                preset.maximum_bytes,
             )
     raise RuntimeError(
-        "The deterministic black fallback exceeded the 128-byte raw image contract."
+        "The deterministic black fallback exceeded the raw image profile budget "
+        f"of {preset.maximum_bytes} bytes."
     )
 
 
@@ -214,25 +282,28 @@ def decode_raw_image(
 ) -> DecodedRawImage:
     import torch
 
-    parse_raw_image_preset(preset_code)
+    preset = parse_raw_image_preset(preset_code)
     if not payload:
         raise ValueError("Raw image payload is empty.")
-    if len(payload) > RAW_IMAGE_MAX_BYTES:
+    if len(payload) > preset.maximum_bytes:
         raise ValueError(
-            f"Raw image payload is {len(payload)} bytes; maximum is 128 bytes."
+            f"Raw image payload is {len(payload)} bytes; maximum for "
+            f"{preset.code} is {preset.maximum_bytes} bytes."
         )
     model, _, fingerprint = load_image_model(weights_path)
     started = time.perf_counter()
     try:
         with torch.inference_mode():
-            latent = model.entropy_bottleneck.decompress([payload], (4, 4))
+            latent = model.entropy_bottleneck.decompress(
+                [payload], (preset.latent_size, preset.latent_size)
+            )
     except Exception as exc:
         raise ValueError("Raw image entropy stream could not be decoded.") from exc
     entropy_seconds = time.perf_counter() - started
-    if tuple(latent.shape) != RAW_IMAGE_LATENT_SHAPE:
+    if tuple(latent.shape) != preset.latent_shape:
         raise RuntimeError(
             f"Raw image latent shape {tuple(latent.shape)} != "
-            f"{RAW_IMAGE_LATENT_SHAPE}."
+            f"{preset.latent_shape}."
         )
 
     if backend == "cpu":
@@ -247,16 +318,20 @@ def decode_raw_image(
             "output_shape": list(reconstructed.shape),
         }
     elif backend == "qnn":
-        from .npu import default_raw_decoder_model, reconstruct_on_npu
+        from .npu import (
+            default_raw_decoder_manifest,
+            default_raw_decoder_model,
+            reconstruct_on_npu,
+        )
 
         started = time.perf_counter()
         result = reconstruct_on_npu(
             latent,
             source_model_hash=fingerprint,
             arm64_python=arm64_python,
-            model_path=decoder_model or default_raw_decoder_model(),
-            manifest_path=None,
-            raw_image=True,
+            model_path=decoder_model
+            or default_raw_decoder_model(preset.output_size),
+            manifest_path=default_raw_decoder_manifest(preset.output_size),
         )
         reconstruction_seconds = time.perf_counter() - started
         reconstructed = torch.from_numpy(result.output).clamp_(0, 1)
@@ -265,7 +340,8 @@ def decode_raw_image(
     else:
         raise ValueError(f"Unsupported raw image backend: {backend}.")
 
-    if tuple(reconstructed.shape) != (1, 3, RAW_IMAGE_SIZE, RAW_IMAGE_SIZE):
+    expected_output = (1, 3, preset.output_size, preset.output_size)
+    if tuple(reconstructed.shape) != expected_output:
         raise RuntimeError(
             f"Raw image reconstruction has unexpected shape {reconstructed.shape}."
         )

@@ -73,6 +73,16 @@ Run these manually when iterating on a graph:
   --output artifacts\generated\raw_image_decoder_fp32.onnx `
   --manifest artifacts\generated\raw_image_decoder.manifest.json
 .\.venv-x64\Scripts\python.exe scripts\quantize_raw_image_decoder.py
+.\.venv-x64\Scripts\python.exe scripts\export_image_decoder.py `
+  --latent-size 8 `
+  --output artifacts\generated\raw_image_128_decoder_fp32.onnx `
+  --manifest artifacts\generated\raw_image_128_decoder.manifest.json
+.\.venv-x64\Scripts\python.exe scripts\quantize_raw_image_decoder.py `
+  --preset I128-Q1-B768 `
+  --source artifacts\generated\raw_image_128_decoder_fp32.onnx `
+  --output artifacts\generated\raw_image_128_decoder_qdq.onnx `
+  --preprocessed artifacts\generated\raw_image_128_decoder_preprocessed.onnx `
+  --local-manifest artifacts\generated\raw_image_128_decoder.manifest.json
 
 .\.venv-x64\Scripts\python.exe scripts\export_audio_tail.py
 .\.venv-x64\Scripts\python.exe scripts\quantize_audio_tail.py
@@ -100,7 +110,9 @@ python -m pytest -q
 python -m ruff check .
 python scripts\evaluate_image_set.py --backend qnn
 python scripts\evaluate_audio.py
-python scripts\evaluate_raw.py --image-backend qnn `
+python scripts\evaluate_raw.py --image-backend qnn --image-preset I64-Q1-B128
+python scripts\evaluate_raw.py --image-backend qnn --image-preset I256-Q1-B2048
+python scripts\evaluate_raw.py --image-backend qnn --image-preset I128-Q1-B768 `
   --audio data\generated\demo-audio\chirp-and-tones.wav `
   --audio-backend hybrid-qnn
 python scripts\offline_smoke.py
@@ -119,7 +131,8 @@ Loopback remains available for the dashboard.
 | `LIGHTWEAVE_AUDIO_WEIGHTS` | Explicit EnCodec checkpoint path |
 | `LIGHTWEAVE_ARM64_PYTHON` | Native ARM64 worker interpreter |
 | `LIGHTWEAVE_IMAGE_DECODER_ONNX` | Generated image QDQ graph |
-| `LIGHTWEAVE_RAW_IMAGE_DECODER_ONNX` | Generated 64×64 raw-image QDQ graph |
+| `LIGHTWEAVE_RAW_IMAGE_DECODER_ONNX` | Generated 64 x 64 raw-image QDQ graph |
+| `LIGHTWEAVE_RAW_IMAGE_128_DECODER_ONNX` | Generated 128 x 128 raw-image QDQ graph |
 | `LIGHTWEAVE_AUDIO_TAIL_ONNX` | Generated audio-tail QDQ graph |
 | `LIGHTWEAVE_ENFORCE_OFFLINE` | Set to `1` to reject non-loopback networking |
 

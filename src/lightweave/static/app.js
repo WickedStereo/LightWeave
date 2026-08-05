@@ -13,7 +13,7 @@ async function loadStatus() {
     const response = await fetch("/api/status");
     const status = await response.json();
     const ready = status.weights_ready && status.decoder_ready && status.audio_weights_ready && status.audio_tail_ready && status.arm64_worker_ready;
-    statusBox.textContent = ready ? "NPU runtime ready · offline" : "Setup incomplete · inspect status";
+    statusBox.textContent = ready ? "NPU runtime ready / offline" : "setup incomplete / inspect status";
     statusBox.classList.toggle("ready", ready);
     statusBox.title = JSON.stringify(status, null, 2);
   } catch {
@@ -40,8 +40,8 @@ form.addEventListener("submit", async (event) => {
     document.querySelector("#metrics").innerHTML = [
       metric("Complete payload", `${value.envelope_bytes.toLocaleString()} bytes`),
       metric("Bits / visible pixel", Number(value.bits_per_pixel).toFixed(3)),
-      metric("Transfer · 1 kbps", formatSeconds(value.at_1_kbps_seconds)),
-      metric("Transfer · 2 kbps", formatSeconds(value.at_2_kbps_seconds)),
+      metric("Transfer / 1 kbps", formatSeconds(value.at_1_kbps_seconds)),
+      metric("Transfer / 2 kbps", formatSeconds(value.at_2_kbps_seconds)),
       metric("Encode", formatSeconds(value.encode_seconds)),
       metric("Entropy decode", formatSeconds(value.entropy_decode_seconds)),
       metric("NPU reconstruction", formatSeconds(value.reconstruction_seconds)),

@@ -11,7 +11,10 @@ from PIL import Image
 from lightweave.audio import LoadedAudio
 from lightweave.raw import (
     RAW_AUDIO_CHUNK_BYTES,
+    RAW_IMAGE_BALANCED_PRESET,
     RAW_IMAGE_PRESET,
+    RAW_IMAGE_QUALITY_PRESET,
+    RAW_IMAGE_TINY_PRESET,
     decode_raw_audio,
     decode_raw_image,
     encode_raw_audio,
@@ -26,7 +29,9 @@ from lightweave.transport import MemoryRawPipe, RawByteSink, RawByteSource
 
 
 def test_raw_preset_parsing_is_strict() -> None:
-    assert parse_raw_image_preset("I64-Q1") == RAW_IMAGE_PRESET
+    assert parse_raw_image_preset("I64-Q1").code == RAW_IMAGE_TINY_PRESET
+    assert parse_raw_image_preset(RAW_IMAGE_BALANCED_PRESET).output_size == 128
+    assert parse_raw_image_preset(RAW_IMAGE_QUALITY_PRESET).maximum_bytes == 2_048
     assert raw_audio_preset(48_000) == "A1-E15-S48000"
     assert parse_raw_audio_preset("A1-E15-S48000") == 48_000
     with pytest.raises(ValueError, match="Unsupported raw image preset"):
@@ -112,7 +117,7 @@ def test_raw_image_selects_highest_detail_that_fits(
     )
     monkeypatch.setattr(
         "lightweave.raw._compress_raw_image",
-        lambda model, image: bytes(next(sizes)),
+        lambda model, image, preset: bytes(next(sizes)),
     )
     encoded = encode_raw_image(source)
     assert encoded.effective_detail == 56
@@ -133,7 +138,7 @@ def test_raw_image_encoder_accepts_binary_streams(
     )
     monkeypatch.setattr(
         "lightweave.raw._compress_raw_image",
-        lambda model, image: bytes(64),
+        lambda model, image, preset: bytes(64),
     )
     encoded = encode_raw_image(stream)
     assert len(encoded.payload) == 64
@@ -152,7 +157,7 @@ def test_raw_image_uses_mean_color_before_black_fallback(
     )
     monkeypatch.setattr(
         "lightweave.raw._compress_raw_image",
-        lambda model, image: bytes(next(sizes)),
+        lambda model, image, preset: bytes(next(sizes)),
     )
     encoded = encode_raw_image(source)
     assert encoded.effective_detail == 0
@@ -172,7 +177,7 @@ def test_raw_image_uses_deterministic_black_as_final_fallback(
     )
     monkeypatch.setattr(
         "lightweave.raw._compress_raw_image",
-        lambda model, image: bytes(next(sizes)),
+        lambda model, image, preset: bytes(next(sizes)),
     )
     encoded = encode_raw_image(source)
     assert encoded.fallback == "black"
@@ -191,17 +196,49 @@ def test_raw_image_fails_if_black_fallback_breaks_budget(
     )
     monkeypatch.setattr(
         "lightweave.raw._compress_raw_image",
-        lambda model, image: bytes(129),
+        lambda model, image, preset: bytes(129),
     )
     with pytest.raises(RuntimeError, match="black fallback"):
         encode_raw_image(source)
 
 
 def test_raw_image_rejects_payload_above_wire_limit() -> None:
-    with pytest.raises(ValueError, match="maximum is 128"):
+    with pytest.raises(ValueError, match="is 128 bytes"):
         decode_raw_image(
             bytes(129), preset_code=RAW_IMAGE_PRESET, backend="cpu"
         )
+
+
+@pytest.mark.parametrize(
+    ("preset_code", "output_size", "maximum_bytes"),
+    (
+        (RAW_IMAGE_TINY_PRESET, 64, 128),
+        (RAW_IMAGE_BALANCED_PRESET, 128, 768),
+        (RAW_IMAGE_QUALITY_PRESET, 256, 2_048),
+    ),
+)
+def test_raw_image_profiles_enforce_output_and_budget(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    preset_code: str,
+    output_size: int,
+    maximum_bytes: int,
+) -> None:
+    source = tmp_path / "input.png"
+    Image.new("RGB", (40, 20), (60, 90, 120)).save(source)
+    monkeypatch.setattr(
+        "lightweave.raw.load_image_model",
+        lambda weights_path=None: (object(), Path("weights"), bytes(32)),
+    )
+    monkeypatch.setattr(
+        "lightweave.raw._compress_raw_image",
+        lambda model, image, preset: bytes(preset.maximum_bytes),
+    )
+    encoded = encode_raw_image(source, preset_code=preset_code)
+    assert encoded.preset_code == preset_code
+    assert encoded.reference.size == (output_size, output_size)
+    assert len(encoded.payload) == maximum_bytes
+    assert encoded.maximum_bytes == maximum_bytes
 
 
 def test_memory_raw_pipe_implements_adapter_contracts() -> None:

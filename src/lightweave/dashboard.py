@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageOps, UnidentifiedImageError
 
@@ -25,12 +25,15 @@ from .npu import (
     default_raw_decoder_model,
 )
 from .raw import (
+    DEFAULT_RAW_IMAGE_PRESET,
     RAW_AUDIO_CHUNK_BYTES,
     RAW_IMAGE_MAX_BYTES,
+    RAW_IMAGE_PRESETS,
     decode_raw_audio,
     decode_raw_image,
     encode_raw_audio,
     encode_raw_image,
+    parse_raw_image_preset,
 )
 from .service import roundtrip_image
 
@@ -79,7 +82,10 @@ def _runtime_status() -> dict[str, object]:
         weights_ready = False
     arm64_python = default_arm64_python()
     decoder = default_decoder_model()
-    raw_decoder = default_raw_decoder_model()
+    raw_decoders = {
+        preset.code: default_raw_decoder_model(preset.output_size)
+        for preset in RAW_IMAGE_PRESETS
+    }
     try:
         audio_weights = resolve_audio_weights()
         audio_weights_ready = True
@@ -94,8 +100,11 @@ def _runtime_status() -> dict[str, object]:
         "weights_path": str(weights) if weights else None,
         "decoder_ready": decoder.is_file(),
         "decoder_path": str(decoder),
-        "raw_decoder_ready": raw_decoder.is_file(),
-        "raw_decoder_path": str(raw_decoder),
+        "raw_decoder_ready": all(path.is_file() for path in raw_decoders.values()),
+        "raw_decoders": {
+            code: {"ready": path.is_file(), "path": str(path)}
+            for code, path in raw_decoders.items()
+        },
         "arm64_worker_ready": arm64_python.is_file(),
         "arm64_python": str(arm64_python),
         "audio_weights_ready": audio_weights_ready,
@@ -140,9 +149,38 @@ def create_app() -> FastAPI:
     def status() -> dict[str, object]:
         return _runtime_status()
 
+    @app.get("/api/samples/image/{sample_name}")
+    def sample_image(sample_name: str) -> Response:
+        size = 128
+        image = Image.new("RGB", (size, size), "white")
+        pixels = image.load()
+        if sample_name == "blocks":
+            colors = ((0, 0, 0), (235, 235, 235), (80, 80, 80), (170, 170, 170))
+            for y in range(size):
+                for x in range(size):
+                    pixels[x, y] = colors[(x // 32 + y // 32) % len(colors)]
+        elif sample_name == "gradient":
+            for y in range(size):
+                for x in range(size):
+                    value = round(255 * (x + y) / (2 * (size - 1)))
+                    pixels[x, y] = (value, value, value)
+        elif sample_name == "rings":
+            center = (size - 1) / 2
+            for y in range(size):
+                for x in range(size):
+                    radius = ((x - center) ** 2 + (y - center) ** 2) ** 0.5
+                    value = 24 if int(radius / 8) % 2 else 232
+                    pixels[x, y] = (value, value, value)
+        else:
+            raise HTTPException(status_code=404, detail="Unknown sample image.")
+        stream = io.BytesIO()
+        image.save(stream, format="PNG", optimize=True)
+        return Response(stream.getvalue(), media_type="image/png")
+
     @app.post("/api/transmit/image")
     def transmit_image(
         file: Annotated[UploadFile, File()],
+        preset_code: Annotated[str, Form()] = DEFAULT_RAW_IMAGE_PRESET,
     ) -> dict[str, object]:
         value = file.file.read(MAX_UPLOAD_BYTES + 1)
         if len(value) > MAX_UPLOAD_BYTES:
@@ -153,17 +191,18 @@ def create_app() -> FastAPI:
             with tempfile.TemporaryDirectory(prefix="lightweave-raw-image-tx-") as temp:
                 input_path = Path(temp) / "input-image"
                 input_path.write_bytes(value)
-                encoded = encode_raw_image(input_path)
+                encoded = encode_raw_image(input_path, preset_code=preset_code)
                 raw_bytes = len(encoded.payload)
                 return {
                     "preset_code": encoded.preset_code,
                     "payload_base64": base64.b64encode(encoded.payload).decode("ascii"),
                     "raw_bytes": raw_bytes,
-                    "maximum_bytes": RAW_IMAGE_MAX_BYTES,
-                    "within_budget": raw_bytes <= RAW_IMAGE_MAX_BYTES,
+                    "maximum_bytes": encoded.maximum_bytes,
+                    "within_budget": raw_bytes <= encoded.maximum_bytes,
+                    "output_size": encoded.output_size,
                     "effective_detail": encoded.effective_detail,
                     "fallback": encoded.fallback,
-                    "bits_per_pixel": raw_bytes * 8 / (64 * 64),
+                    "bits_per_pixel": raw_bytes * 8 / (encoded.output_size**2),
                     "encode_seconds": encoded.encode_seconds,
                     **transfer_estimates(raw_bytes),
                     "input_image": _image_data_url(encoded.original_preview),
@@ -232,6 +271,7 @@ def create_app() -> FastAPI:
             reference.file.read(MAX_UPLOAD_BYTES + 1) if reference else None
         )
         try:
+            preset = parse_raw_image_preset(preset_code)
             with tempfile.TemporaryDirectory(prefix="lightweave-raw-image-rx-") as temp:
                 output_path = Path(temp) / "reconstructed.png"
                 decoded = decode_raw_image(
@@ -244,9 +284,11 @@ def create_app() -> FastAPI:
                 if reference_value:
                     with Image.open(io.BytesIO(reference_value)) as source:
                         reference_image = source.convert("RGB")
-                    if reference_image.size != (64, 64):
+                    expected_size = (preset.output_size, preset.output_size)
+                    if reference_image.size != expected_size:
                         raise ValueError(
-                            "Verification reference must be exactly 64×64."
+                            "Verification reference must be exactly "
+                            f"{preset.output_size}x{preset.output_size}."
                         )
                     quality = {
                         "psnr_db": psnr(reference_image, decoded.image),

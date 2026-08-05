@@ -4,59 +4,61 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="dark">
-    <title>Receive · LightWeave</title>
+    <title>Receive / LightWeave</title>
     <link rel="stylesheet" href="/static/styles.css">
   </head>
   <body>
     <main>
       <nav class="nav" aria-label="LightWeave workflows">
-        <a class="brand" href="/transmit">Light<span>Weave</span></a>
+        <a class="brand" href="/transmit">[lightweave]</a>
         <div>
-          <a href="/transmit">Transmit</a>
-          <a class="active" href="/receive">Receive</a>
+          <a href="/transmit">transmit</a>
+          <a class="active" href="/receive">receive</a>
           <a href="/loopback">.lwv workbench</a>
         </div>
       </nav>
 
-      <header class="page-hero compact-hero">
+      <header class="page-hero">
         <div>
-          <p class="eyebrow">Raw optical receiver</p>
-          <h1>Bytes in.<br><span>Media out.</span></h1>
-          <p class="lede">Upload the exact received bytes and enter the trusted
-            out-of-band settings code. Invalid contracts fail before inference.</p>
+          <p class="eyebrow">RX / RAW BYTE PIPE</p>
+          <h1>Receive</h1>
+          <p class="lede">Load the received bytes, select the matching out-of-band profile, and reconstruct the media locally.</p>
         </div>
-        <div class="status" id="runtime-status">Checking local runtime…</div>
+        <div class="status" id="runtime-status">checking local runtime...</div>
       </header>
 
-      <aside class="wire-warning danger">
-        <strong>Configuration is part of the link</strong>
-        <span>Raw bytes cannot identify their media type or codec. A wrong settings
-          code may fail or reconstruct incorrect media.</span>
+      <aside class="wire-warning">
+        <strong>PROFILE REQUIRED</strong>
+        <span>Raw bytes cannot identify their codec. The selected profile must match the transmitter exactly.</span>
       </aside>
 
       <div class="workflow-grid">
         <section class="workflow-card">
           <div class="card-heading">
-            <span class="media-tag">Strict QNN image</span>
-            <h2>Receive I64-Q1</h2>
-            <p>Maximum 128 bytes. Output is exactly 64×64.</p>
+            <span class="media-tag">IMAGE / STRICT QNN</span>
+            <h2>Reconstruct image</h2>
+            <p>The selected profile determines payload limit, latent shape, and output dimensions.</p>
           </div>
           <form id="image-receive-form" class="stack-form">
-            <label>Settings code
-              <input name="preset_code" value="I64-Q1" required pattern="I64-Q1">
+            <label for="image-preset">Settings code
+              <select id="image-preset" name="preset_code">
+                <option value="I64-Q1-B128">I64-Q1-B128 / 64 x 64 / 128 B</option>
+                <option value="I128-Q1-B768" selected>I128-Q1-B768 / 128 x 128 / 768 B</option>
+                <option value="I256-Q1-B2048">I256-Q1-B2048 / 256 x 256 / 2,048 B</option>
+              </select>
             </label>
             <label class="drop-zone" for="image-payload">
               <strong>Select payload.bin</strong>
-              <span>Raw CompressAI entropy bytes · 128 bytes max</span>
+              <span>Raw CompressAI entropy bytes.</span>
               <input id="image-payload" name="file" type="file" accept=".bin,application/octet-stream" required>
             </label>
-            <button type="submit">Reconstruct image on NPU</button>
+            <button type="submit">reconstruct image / NPU</button>
           </form>
-          <div class="activity" id="image-activity" hidden><span></span> Entropy decode and NPU reconstruction…</div>
+          <div class="activity" id="image-activity" hidden><span></span>entropy decode and NPU reconstruction...</div>
           <div class="error" id="image-error" hidden></div>
           <div id="image-result" hidden>
-            <figure class="single-output"><img id="image-output" class="pixelated" alt="Reconstructed 64 by 64 image"><figcaption>64×64 reconstruction</figcaption></figure>
-            <a class="download-link" id="image-save" download="reconstructed.png">Save reconstructed image</a>
+            <div class="single-output"><img id="image-output" class="pixelated" alt="Reconstructed image"></div>
+            <a class="download-link" id="image-save" download="reconstructed.png">save reconstructed PNG</a>
             <div class="metrics compact" id="image-metrics"></div>
             <details><summary>QNN execution evidence</summary><pre id="image-evidence"></pre></details>
           </div>
@@ -64,28 +66,28 @@
 
         <section class="workflow-card">
           <div class="card-heading">
-            <span class="media-tag">CPU / NPU hybrid</span>
-            <h2>Receive A1-E15-S&lt;n&gt;</h2>
-            <p>Payload size must be a whole number of 188-byte chunks.</p>
+            <span class="media-tag">AUDIO / HYBRID QNN</span>
+            <h2>Reconstruct audio</h2>
+            <p>The sample count in the settings code restores exact duration after decoding.</p>
           </div>
           <form id="audio-receive-form" class="stack-form">
-            <label>Settings code
-              <input name="preset_code" placeholder="A1-E15-S48000" required pattern="A1-E15-S[1-9][0-9]*">
+            <label for="audio-preset">Settings code
+              <input id="audio-preset" name="preset_code" placeholder="A1-E15-S48000" required pattern="A1-E15-S[1-9][0-9]*">
             </label>
             <label class="drop-zone" for="audio-payload">
               <strong>Select payload.bin</strong>
-              <span>Raw packed EnCodec indices · 188 bytes per started second</span>
+              <span>Raw EnCodec indices. Size must be divisible by 188 bytes.</span>
               <input id="audio-payload" name="file" type="file" accept=".bin,application/octet-stream" required>
             </label>
-            <button type="submit">Reconstruct audio</button>
+            <button type="submit">reconstruct audio / hybrid</button>
           </form>
-          <div class="activity" id="audio-activity" hidden><span></span> Codebook, CPU prefix, and NPU tail…</div>
+          <div class="activity" id="audio-activity" hidden><span></span>codebook, CPU prefix, and NPU tail...</div>
           <div class="error" id="audio-error" hidden></div>
           <div id="audio-result" hidden>
             <audio id="audio-output" controls></audio>
-            <a class="download-link" id="audio-save" download="reconstructed.wav">Save reconstructed WAV</a>
+            <a class="download-link" id="audio-save" download="reconstructed.wav">save reconstructed WAV</a>
             <div class="metrics compact" id="audio-metrics"></div>
-            <details><summary>Hybrid execution evidence</summary><pre id="audio-evidence"></pre></details>
+            <details><summary>hybrid execution evidence</summary><pre id="audio-evidence"></pre></details>
           </div>
         </section>
       </div>

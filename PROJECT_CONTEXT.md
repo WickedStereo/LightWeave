@@ -6,7 +6,7 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | Raw transmitter/receiver milestone implemented, published, and validated locally plus in CI |
+| Phase | Multi-size raw image dashboard complete and validated locally |
 | Primary milestone | Header-free image/audio payload generation and receiver dashboard |
 | Secondary milestone | EnCodec audio extension with an honest CPU/NPU split |
 | Last updated | 2026-08-05 |
@@ -49,7 +49,8 @@ The implemented milestone assumes a reliable ordered byte pipe and includes:
 - A localhost-only offline dashboard for images and playable audio.
 - An optional runtime guard that blocks DNS and non-loopback networking.
 - A header-free raw mode that preserves `.lwv` while sending only codec bytes.
-- Raw `I64-Q1` images with a hard 128-byte ceiling and fixed 64 by 64 output.
+- Three raw image profiles: 64 by 64 at 128 bytes, 128 by 128 at 768 bytes,
+  and 256 by 256 at 2,048 bytes, with the balanced profile as the UI default.
 - Raw `A1-E15-S<n>` audio with exact 188-byte independently packed chunks and
   an out-of-band exact sample count.
 - Separate `/transmit`, `/receive`, and `/loopback` dashboard pages plus
@@ -89,12 +90,15 @@ model fingerprint. The short settings code is trusted out-of-band
 configuration and is not counted toward payload size. `.lwv` remains the safer
 format for archival, diagnosis, integrity checking, and model negotiation.
 
-- Image preset `I64-Q1` tries effective-detail levels 64, 56, 48, 40, 32, 24,
-  16, and 8 on a fixed 64 by 64 letterboxed canvas. It selects the highest
-  detail whose CompressAI entropy string is no more than 128 bytes, then tries
-  deterministic mean-color and black fallbacks. The only wire bytes are the
-  entropy string. Entropy decode restores `[1,192,4,4]`; the complete static
-  synthesis graph runs on strict QNN HTP and outputs `[1,3,64,64]`.
+- Raw image presets are `I64-Q1-B128`, `I128-Q1-B768`, and
+  `I256-Q1-B2048`. They reconstruct to fixed 64, 128, and 256 pixel square
+  outputs with hard entropy-string ceilings of 128, 768, and 2,048 bytes.
+  Each profile tries a descending effective-detail schedule, then deterministic
+  mean-color and black fallbacks. The legacy `I64-Q1` code remains a decode
+  alias for `I64-Q1-B128`; new encodes print the explicit budgeted code. The
+  dashboard defaults to balanced `I128-Q1-B768`. Static synthesis graphs use
+  latent shapes `[1,192,4,4]`, `[1,192,8,8]`, or `[1,192,16,16]` and run
+  completely on strict QNN HTP.
 - Audio preset `A1-E15-S<n>` resamples to 24 kHz mono and discloses the exact
   pre-padding sample count as `n`. Each 75-frame, two-codebook second contains
   1,500 valid bits plus four zero pad bits, exactly 188 bytes. The receiver
@@ -158,8 +162,8 @@ lightweave image roundtrip INPUT --work-dir DIR
 lightweave audio encode INPUT.wav --output PAYLOAD
 lightweave audio decode PAYLOAD --output OUTPUT.wav
 lightweave audio roundtrip INPUT.wav --work-dir DIR
-lightweave raw image encode INPUT --output payload.bin
-lightweave raw image decode payload.bin --preset I64-Q1 --output IMAGE --require-npu
+lightweave raw image encode INPUT --preset I128-Q1-B768 --output payload.bin
+lightweave raw image decode payload.bin --preset I128-Q1-B768 --output IMAGE --require-npu
 lightweave raw audio encode INPUT.wav --output payload.bin
 lightweave raw audio decode payload.bin --preset A1-E15-S48000 --output AUDIO.wav
 lightweave inspect PAYLOAD
@@ -203,18 +207,19 @@ and a later serial adapter can implement the same contract.
 
 | Check | Result |
 | --- | --- |
-| Image corpus | 4/4 deterministic payloads at or below 128 bytes |
-| Measured image payloads | 76, 80, 120, and 124 bytes |
-| Image output | Exactly 64 by 64 for every case |
-| Raw image CPU QDQ parity | 71.75 dB minimum |
-| Raw image strict QNN profile | `QNNExecutionProvider` only; 0 CPU nodes |
-| Raw image NPU/CPU parity | 59.92 dB minimum across four cases |
-| Image quality | 13.16-27.67 dB PSNR and 0.646-0.954 MS-SSIM; informational at the hard 128-byte budget |
+| Image corpus | 4/4 deterministic payloads within every selected profile budget |
+| Tiny measured payloads | 76-124 bytes; exactly 64 by 64 output |
+| Balanced measured payloads | 216-664 bytes; exactly 128 by 128 output |
+| Quality measured payloads | 716-2,044 bytes; exactly 256 by 256 output |
+| Balanced CPU QDQ parity | 66.74 dB minimum |
+| Raw image strict QNN profile | All three static graphs list `QNNExecutionProvider` only and 0 CPU nodes |
+| Raw image NPU/CPU parity | At least 51.29 dB balanced, 56.51 dB quality, and 59.92 dB tiny |
+| Image quality | Balanced 17.64-31.16 dB PSNR / 0.890-0.978 MS-SSIM; quality 23.43-35.02 dB / 0.970-0.988; informational |
 | Audio payload | 188 bytes/started second; two-second sample is 376 bytes / 1,504 bps including byte padding |
 | Audio reconstruction | Exact 48,000 samples; finite output; conditioned boundary jump 0.0 |
 | Audio strict QNN tail | `QNNExecutionProvider` only; 0 CPU nodes |
 
-Focused unit tests currently report 40 passing tests. Generated acceptance and
+Focused unit tests currently report 44 passing tests. Generated acceptance and
 offline-smoke reports remain ignored and reproducible.
 
 ### Product surface and packaging
@@ -227,7 +232,9 @@ offline-smoke reports remain ignored and reproducible.
 | Rendered localhost dashboard audio workflow | Pass; playback result metrics and hybrid evidence displayed |
 | Raw `/transmit` image/audio workflows | Pass; codes, exact bytes, download links, metrics, and local verification displayed |
 | Raw `/receive` workflow | Pass; strict image reconstruction, save link, and oversize error state displayed |
-| Raw disconnected-runtime smoke | Pass for strict image QNN and audio hybrid; 80/376 raw bytes and exact outputs |
+| Monochrome dashboard refresh | Pass; text-first square layout, no gradients/shadows, responsive at 390 px without horizontal overflow |
+| Multi-size browser workflow | Pass; balanced sample transmit/verify and separate receiver upload both reconstructed 128 by 128 with 0 CPU profile nodes |
+| Raw disconnected-runtime smoke | Pass for balanced strict image QNN and audio hybrid; 216/376 raw bytes and exact outputs |
 | Dashboard browser console | No errors |
 | Built wheel contents | Pass; CLI modules and all local HTML/CSS/JavaScript assets included |
 
@@ -257,8 +264,9 @@ offline-smoke reports remain ignored and reproducible.
 | Image export/QDQ/strict QNN | Complete | Full graph, no fallback, 0 CPU profile nodes |
 | CLI and offline dashboard | Complete | Image and audio APIs implemented; localhost assets only |
 | Audio extension | Complete locally | Truthful narrowed hybrid passes acceptance |
-| Raw optical mode | Complete locally | `I64-Q1` and `A1-E15-S<n>` byte contracts, CLI, adapters, and three-page dashboard pass local acceptance |
+| Raw optical mode | Complete locally | Three image budgets plus `A1-E15-S<n>` audio, CLI, adapters, and three-page dashboard pass local acceptance |
 | Raw 64 by 64 strict QNN decoder | Complete locally | QUInt16 QDQ, no fallback, 0 CPU nodes, 59.92 dB minimum NPU/CPU parity |
+| Raw 128 by 128 strict QNN decoder | Complete locally | QUInt16 QDQ, 66.74 dB minimum CPU parity, no fallback, 0 CPU nodes, 51.29 dB minimum NPU/CPU parity |
 | Raw milestone publication | Complete | Commit `140f9ae`; GitHub Actions run `31047777514` passed |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
@@ -285,7 +293,7 @@ offline-smoke reports remain ignored and reproducible.
 | GitHub credentials/permission | Resolved with Git Credential Manager; never store tokens in source, remotes, or documentation |
 | Git commit attribution | Corrected commits use the verified repository-owner GitHub no-reply identity; original root is unchanged |
 | Raw payload has no integrity/model negotiation | Intentional tradeoff; UI warns, preset validation fails early where possible, and `.lwv` remains available |
-| 128-byte image quality varies sharply | Hard size gate wins; report effective detail/fallback and quality without claiming original-resolution recovery |
+| Image quality and transfer time trade off sharply | UI exposes explicit 128/768/2,048-byte profiles, output resolution, measured bytes, and 1/2 kbps estimates; no original-resolution claim |
 
 ## Open questions
 
@@ -329,6 +337,8 @@ offline-smoke reports remain ignored and reproducible.
 | D-023 | 2026-08-05 | Treat preset codes as trusted out-of-band configuration. | Keeps hashes, headers, lengths, and fingerprints out of the optical payload. |
 | D-024 | 2026-08-05 | Fix raw image output at 64 by 64 and enforce 128 bytes with adaptive detail and deterministic fallbacks. | The hard byte budget is the gate; quality remains informational. |
 | D-025 | 2026-08-05 | Pack raw audio as independent 188-byte one-second chunks and disclose exact sample count in `A1-E15-S<n>`. | Preserves exact length while keeping the wire bytes header-free. |
+| D-028 | 2026-08-05 | Expand raw images to explicit 128-, 768-, and 2,048-byte profiles and default the dashboard to 128 by 128 / 768 bytes. | Supersedes D-024 as the only UI choice; preserves its tiny profile and legacy decode alias while providing practical quality options. |
+| D-029 | 2026-08-05 | Use a plain monochrome, text-first dashboard visual system. | Owner requested clarity over decorative styling; controls and evidence remain the focus. |
 
 ## Public references
 
@@ -359,3 +369,4 @@ offline-smoke reports remain ignored and reproducible.
 | 2026-08-05 | Published the corrected history, verified every GitHub commit maps to the repository owner, and confirmed corrected-head CI run `31034723025` passed. |
 | 2026-08-05 | Implemented and locally validated the header-free raw image/audio contracts, 64 by 64 strict-QNN decoder, raw CLI, future adapter interfaces, and `/transmit`/`/receive`/`/loopback` dashboard; preserved `.lwv` and recorded the intentionally missing wire protections. |
 | 2026-08-05 | Published raw-mode commit `140f9ae` to `origin/main` and confirmed hardware-independent GitHub Actions run `31047777514` passed. |
+| 2026-08-05 | Added explicit tiny/balanced/quality raw image profiles, a strict 128 by 128 QNN graph, local sample patterns, and a monochrome responsive dashboard; validated all profile budgets and strict NPU assignment and made balanced the UI default. |

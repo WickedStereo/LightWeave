@@ -196,6 +196,20 @@ private endpoints, and confidential material must never appear here.
 | Workaround | Track both artifact contracts, keep generated files ignored, validate source/model hashes locally, and consider QNN context caching after functional milestones |
 | Suggested improvement | Provide a documented multi-shape artifact/context-cache workflow and distinguish graph preparation latency from inference latency in default profiling output |
 
+### DX-015 - Fixed-shape QNN decoders scale predictably across image budgets
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-05; add a practical 128 by 128 raw image option between the existing tiny and 256-pixel decoders |
+| Environment | Snapdragon X Elite X1E80100; Windows 11 ARM64; x64 Python 3.11 preparation; native ARM64 Python 3.11 worker |
+| Tool/source | PyTorch 2.13.0, CompressAI 1.2.8, ONNX Runtime 1.24.4, `onnxruntime-qnn` 2.4.0, QNN HTP |
+| Intended workflow | Export `[1,192,8,8] -> [1,3,128,128]`, calibrate all balanced effective-detail levels, use unsigned 16-bit QDQ, disable fallback, and compare CPU and NPU output across the acceptance set |
+| Actual result and evidence | Export parity passed with `5.96e-7` maximum absolute error. The QDQ graph reached 66.74 dB minimum CPU parity. The QNN probe and four real payloads selected the Qualcomm NPU, listed only `QNNExecutionProvider`, recorded zero CPU nodes, returned finite 128 by 128 output, and measured at least 51.29 dB NPU/CPU parity. Inference was about 6-7 ms after roughly 2.1-2.5 seconds of per-session graph setup. |
+| Usefulness | A middle static shape materially improves the demo: measured payloads were 216-664 bytes instead of forcing every image through the 128-byte/64-pixel path, while preserving the complete-NPU claim |
+| Friction and owner | Each resolution still needs a separately exported, calibrated, hashed, and deployed artifact; repeated graph preparation dominates interactive latency. This is an integration and QNN startup-cost issue. |
+| Workaround | Keep explicit preset-to-artifact mapping, validate each graph independently, default the UI to the balanced profile, and reuse the existing 256 graph for the quality raw profile |
+| Suggested improvement | Make multi-shape export plus QNN context-cache generation a first-class workflow, with a single manifest and separate graph-setup/inference timing in standard output |
+
 ## Change log
 
 | Date | Change |
@@ -208,3 +222,4 @@ private endpoints, and confidential material must never appear here.
 | 2026-08-05 | Published the complete public engineering log alongside a green hardware-independent repository CI run; native Snapdragon QNN evidence remains an explicit local gate. |
 | 2026-08-05 | Added the raw 64 by 64 CompressAI decoder evidence: 71.75 dB minimum CPU QDQ parity, 59.92 dB minimum NPU/CPU parity, complete HTP assignment, zero CPU nodes, and the separate-static-artifact/session-startup tradeoff. |
 | 2026-08-05 | Published the raw transmitter/receiver milestone and confirmed its hardware-independent Windows CI run passed; strict Snapdragon QNN evidence remains a reproducible local gate. |
+| 2026-08-05 | Added and profiled the 128 by 128 raw decoder: 66.74 dB minimum CPU QDQ parity, at least 51.29 dB NPU/CPU parity, complete QNN HTP assignment, zero CPU nodes, and explicit multi-shape artifact/startup guidance. |

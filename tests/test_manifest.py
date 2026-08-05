@@ -25,11 +25,20 @@ def test_tracked_model_manifest_records_validated_conversion_contracts() -> None
         "cpu_fallback": False,
     }
     raw_image = manifest["image"]["raw"]
-    assert raw_image["preset_code"] == "I64-Q1"
-    assert raw_image["latent_shape"] == [1, 192, 4, 4]
-    assert raw_image["maximum_payload_bytes"] == 128
+    assert raw_image["default_preset"] == "I128-Q1-B768"
+    assert raw_image["legacy_aliases"] == {"I64-Q1": "I64-Q1-B128"}
     assert raw_image["wire_fields"] == []
-    assert raw_image["onnx"]["quantization"]["cpu_fallback"] is False
+    assert [item["maximum_payload_bytes"] for item in raw_image["presets"]] == [
+        128,
+        768,
+        2048,
+    ]
+    assert [item["latent_shape"] for item in raw_image["presets"]] == [
+        [1, 192, 4, 4],
+        [1, 192, 8, 8],
+        [1, 192, 16, 16],
+    ]
+    assert raw_image["quantization"]["cpu_fallback"] is False
 
     audio = manifest["audio"]
     audio_onnx = audio["onnx"]
@@ -52,6 +61,7 @@ def test_example_environment_exposes_all_supported_path_overrides() -> None:
         "LIGHTWEAVE_ARM64_PYTHON",
         "LIGHTWEAVE_IMAGE_DECODER_ONNX",
         "LIGHTWEAVE_RAW_IMAGE_DECODER_ONNX",
+        "LIGHTWEAVE_RAW_IMAGE_128_DECODER_ONNX",
         "LIGHTWEAVE_AUDIO_TAIL_ONNX",
         "LIGHTWEAVE_ENFORCE_OFFLINE",
     ):
