@@ -191,3 +191,4 @@ private endpoints, and confidential material must never appear here.
 | 2026-08-05 | Recorded the automation boundary: portable lint/unit checks run in CI, while QNN assignment and profiling remain native Snapdragon acceptance gates. |
 | 2026-08-05 | Added the final dual-Python recovery observation and the successful post-repair QNN/offline validation evidence. |
 | 2026-08-05 | Revalidated strict QNN image/audio paths through the installed CLI and rendered dashboard, with zero CPU profile nodes and no browser console errors. |
+| 2026-08-05 | Published the complete public engineering log alongside a green hardware-independent repository CI run; native Snapdragon QNN evidence remains an explicit local gate. |

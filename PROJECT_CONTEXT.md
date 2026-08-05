@@ -6,7 +6,7 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | Software MVP implemented; local image and audio acceptance passed |
+| Phase | Software MVP implemented and published; local acceptance and repository CI pass |
 | Primary milestone | Air-gapped optical image-network software path |
 | Secondary milestone | EnCodec audio extension with an honest CPU/NPU split |
 | Last updated | 2026-08-05 |
@@ -200,19 +200,19 @@ offline-smoke reports remain ignored and reproducible.
 
 | Work item | Status | Evidence / next action |
 | --- | --- | --- |
-| Planning/repository baseline | Complete locally | Commit `7d4b91d`; push blocked by GitHub repository permission |
-| Software MVP repository handoff | Complete locally | Commit `61bc8fb`; full CLI/dashboard, strict QNN, offline, and packaging audits pass |
+| Planning/repository baseline | Published | Commit `7d4b91d` is on `origin/main` |
+| Software MVP repository handoff | Published | Full CLI/dashboard, strict QNN, offline, and packaging audits pass |
 | `.lwv` envelope and image core | Complete | Unit and real-model acceptance tests pass |
 | Image export/QDQ/strict QNN | Complete | Full graph, no fallback, 0 CPU profile nodes |
 | CLI and offline dashboard | Complete | Image and audio APIs implemented; localhost assets only |
 | Audio extension | Complete locally | Truthful narrowed hybrid passes acceptance |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
-| GitHub Actions unit CI | Published; validation running | Windows Python 3.11 workflow uses a minimal pinned unit-test stack; QNN gates stay local |
+| GitHub Actions unit CI | Complete | Windows Python 3.11 run `30996830347` passed with the minimal pinned unit-test stack; QNN gates stay local |
 | Second Snapdragon PC | Pending external device | Transfer the same `.lwv` plus generated artifacts and verify |
 | AI Hub/QAIRT Visualizer | Pending access/install | Compare only when account/SDK are available |
 | Arduino/optical adapter | Deferred | Must not change `.lwv` media format |
-| GitHub push | Blocked externally | Configured GitHub identity receives HTTP 403; owner must grant repository Contents write permission |
+| GitHub push | Complete | Repository-authorized Git Credential Manager account published `main` without embedding credentials |
 
 ## Risks and mitigations
 
@@ -227,7 +227,7 @@ offline-smoke reports remain ignored and reproducible.
 | Audio chunk clicks | Labeled CPU de-click correction; raw and conditioned jumps reported |
 | Model-weight redistribution terms | Weights remain ignored; verify upstream terms before distribution |
 | AI Hub/QAIRT unavailable | Direct QNN path and reproducible local evidence do not depend on them |
-| GitHub credentials/permission | Never store tokens; push only after correct repository-scoped write access exists |
+| GitHub credentials/permission | Resolved with Git Credential Manager; never store tokens in source, remotes, or documentation |
 
 ## Open questions
 
@@ -291,3 +291,4 @@ offline-smoke reports remain ignored and reproducible.
 | 2026-08-05 | Recorded local implementation commit `61bc8fb`, final validation reruns, repaired Python base interpreters, and the repeated GitHub 403 permission blocker. |
 | 2026-08-05 | Re-ran full image/audio QNN acceptance, verified the installed CLI and rendered dashboard, audited wheel contents, and corrected the tracked audio/quantization manifest contract. |
 | 2026-08-05 | Published the implementation to `origin/main` and split CI dependencies from the heavyweight codec/model-preparation environment after observing redundant installation work. |
+| 2026-08-05 | Confirmed optimized GitHub Actions run `30996830347` passed and replaced the obsolete push blocker with the published repository state. |

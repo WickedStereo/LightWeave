@@ -1,5 +1,7 @@
 # LightWeave
 
+[![CI](https://github.com/WickedStereo/LightWeave/actions/workflows/ci.yml/badge.svg)](https://github.com/WickedStereo/LightWeave/actions/workflows/ci.yml)
+
 LightWeave turns images and PCM WAV audio into compact, self-validating `.lwv`
 byte streams for an extremely low-bandwidth, air-gapped link. The current
 software treats the future Arduino/optical layer as a reliable ordered byte
