@@ -208,7 +208,7 @@ offline-smoke reports remain ignored and reproducible.
 | Audio extension | Complete locally | Truthful narrowed hybrid passes acceptance |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
-| GitHub Actions unit CI | Complete | Windows Python 3.11 workflow runs Ruff and hardware-independent tests |
+| GitHub Actions unit CI | Published; validation running | Windows Python 3.11 workflow uses a minimal pinned unit-test stack; QNN gates stay local |
 | Second Snapdragon PC | Pending external device | Transfer the same `.lwv` plus generated artifacts and verify |
 | AI Hub/QAIRT Visualizer | Pending access/install | Compare only when account/SDK are available |
 | Arduino/optical adapter | Deferred | Must not change `.lwv` media format |
@@ -290,3 +290,4 @@ offline-smoke reports remain ignored and reproducible.
 | 2026-08-05 | Added Windows unit CI while keeping model conversion and QNN hardware acceptance as explicit local gates. |
 | 2026-08-05 | Recorded local implementation commit `61bc8fb`, final validation reruns, repaired Python base interpreters, and the repeated GitHub 403 permission blocker. |
 | 2026-08-05 | Re-ran full image/audio QNN acceptance, verified the installed CLI and rendered dashboard, audited wheel contents, and corrected the tracked audio/quantization manifest contract. |
+| 2026-08-05 | Published the implementation to `origin/main` and split CI dependencies from the heavyweight codec/model-preparation environment after observing redundant installation work. |

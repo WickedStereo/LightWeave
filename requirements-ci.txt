@@ -1,0 +1,9 @@
+# Hardware-independent unit and lint environment for GitHub-hosted Windows.
+# Model conversion and QNN acceptance remain explicit Snapdragon-local gates.
+-r requirements-dev.txt
+numpy==1.26.4
+Pillow==11.3.0
+torch==2.13.0
+pytorch-msssim==1.0.0
+fastapi==0.116.1
+python-multipart==0.0.20
