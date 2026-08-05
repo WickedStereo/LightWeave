@@ -190,6 +190,7 @@ offline-smoke reports remain ignored and reproducible.
 | Work item | Status | Evidence / next action |
 | --- | --- | --- |
 | Planning/repository baseline | Complete locally | Commit `7d4b91d`; push blocked by GitHub repository permission |
+| Software MVP repository handoff | Complete locally | Commit `61bc8fb`; final lint, 23 tests, strict QNN probe, and offline smoke pass |
 | `.lwv` envelope and image core | Complete | Unit and real-model acceptance tests pass |
 | Image export/QDQ/strict QNN | Complete | Full graph, no fallback, 0 CPU profile nodes |
 | CLI and offline dashboard | Complete | Image and audio APIs implemented; localhost assets only |
@@ -200,7 +201,7 @@ offline-smoke reports remain ignored and reproducible.
 | Second Snapdragon PC | Pending external device | Transfer the same `.lwv` plus generated artifacts and verify |
 | AI Hub/QAIRT Visualizer | Pending access/install | Compare only when account/SDK are available |
 | Arduino/optical adapter | Deferred | Must not change `.lwv` media format |
-| GitHub push | Blocked externally | Owner must grant repository Contents write permission |
+| GitHub push | Blocked externally | Configured GitHub identity receives HTTP 403; owner must grant repository Contents write permission |
 
 ## Risks and mitigations
 
@@ -276,3 +277,4 @@ offline-smoke reports remain ignored and reproducible.
 | 2026-08-05 | Recorded the completed image path, QDQ/full-HTP evidence, CLI, dashboard, acceptance set, and corrected Windows environment facts. |
 | 2026-08-05 | Recorded the implemented EnCodec payload, failed larger NPU-tail experiments, narrowed passing hybrid, boundary conditioning, audio acceptance, QUAD evidence, remaining external validations, and GitHub permission blocker. |
 | 2026-08-05 | Added Windows unit CI while keeping model conversion and QNN hardware acceptance as explicit local gates. |
+| 2026-08-05 | Recorded local implementation commit `61bc8fb`, final validation reruns, repaired Python base interpreters, and the repeated GitHub 403 permission blocker. |

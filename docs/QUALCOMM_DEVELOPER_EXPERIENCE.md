@@ -106,10 +106,10 @@ private endpoints, and confidential material must never appear here.
 | Environment | Python 3.11.9 x64 and ARM64 on the same Snapdragon Windows PC |
 | Tool/source | Windows Python, PyTorch 2.13.0, CompressAI 1.2.8, ORT/QNN plugin |
 | Intended workflow | Use one reproducible environment for codec and NPU work |
-| Actual result and evidence | CompressAI built from source in x64 with Visual Studio C++ tools; native ARM64 QNN inference worked in a separate environment. A neutral `.npy` handoff preserved the tensor contract. |
+| Actual result and evidence | CompressAI built from source in x64 with Visual Studio C++ tools; native ARM64 QNN inference worked in a separate environment. A neutral `.npy` handoff preserved the tensor contract. During final validation, registered Python components remained while both base interpreter executables were absent; repairing each Core Interpreter MSI restored the existing environments, after which unit, strict-QNN, and offline smoke checks passed again. |
 | Usefulness | Keeps the heavy synthesis/reconstruction subgraphs native on Hexagon while retaining mature x64 model tooling |
 | Friction and owner | No dependable matching native Windows ARM64 PyTorch/CompressAI path for this stack; third-party packaging limitation. Managing two environments is extra Windows on Snapdragon friction. |
-| Workaround | Pin both environments, never mix plain/QNN ORT in ARM64, verify architecture explicitly, and provide one setup script |
+| Workaround | Pin both environments, never mix plain/QNN ORT in ARM64, verify architecture and interpreter launchability explicitly, provide one setup script, and document MSI repair as recovery rather than rebuilding model environments |
 | Suggested improvement | Publish a tested Windows on Snapdragon package matrix and native ARM64 wheels for common model-preparation dependencies |
 
 ### DX-006 - Full HTP assignment does not by itself prove audio semantics
@@ -189,3 +189,4 @@ private endpoints, and confidential material must never appear here.
 | 2026-08-05 | Created the resource register and initial planning observations. |
 | 2026-08-05 | Replaced planning assumptions with exercised QUAD 0.2.0, ORT/QNN 1.24.4/2.4.0, full image HTP, precision tuning, dual-architecture setup, EnCodec hybrid, failure evidence, unavailable AI Hub/QAIRT paths, and actionable improvement notes. |
 | 2026-08-05 | Recorded the automation boundary: portable lint/unit checks run in CI, while QNN assignment and profiling remain native Snapdragon acceptance gates. |
+| 2026-08-05 | Added the final dual-Python recovery observation and the successful post-repair QNN/offline validation evidence. |
