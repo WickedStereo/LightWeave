@@ -6,7 +6,7 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | Raw transmitter/receiver milestone implemented and locally validated; publication pending |
+| Phase | Raw transmitter/receiver milestone implemented, published, and validated locally plus in CI |
 | Primary milestone | Header-free image/audio payload generation and receiver dashboard |
 | Secondary milestone | EnCodec audio extension with an honest CPU/NPU split |
 | Last updated | 2026-08-05 |
@@ -259,7 +259,7 @@ offline-smoke reports remain ignored and reproducible.
 | Audio extension | Complete locally | Truthful narrowed hybrid passes acceptance |
 | Raw optical mode | Complete locally | `I64-Q1` and `A1-E15-S<n>` byte contracts, CLI, adapters, and three-page dashboard pass local acceptance |
 | Raw 64 by 64 strict QNN decoder | Complete locally | QUInt16 QDQ, no fallback, 0 CPU nodes, 59.92 dB minimum NPU/CPU parity |
-| Raw milestone publication | Pending current handoff | Commit intended files, push `main`, and verify hardware-independent GitHub Actions |
+| Raw milestone publication | Complete | Commit `140f9ae`; GitHub Actions run `31047777514` passed |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
 | GitHub Actions unit CI | Complete | Corrected-history Windows Python 3.11 run `31034723025` passed; QNN gates stay local |
@@ -358,3 +358,4 @@ offline-smoke reports remain ignored and reproducible.
 | 2026-08-05 | Corrected author and committer attribution for the six assistant-created commits, preserved the original repository root and content, configured repository-local identity, and removed the stale GitHub credential. |
 | 2026-08-05 | Published the corrected history, verified every GitHub commit maps to the repository owner, and confirmed corrected-head CI run `31034723025` passed. |
 | 2026-08-05 | Implemented and locally validated the header-free raw image/audio contracts, 64 by 64 strict-QNN decoder, raw CLI, future adapter interfaces, and `/transmit`/`/receive`/`/loopback` dashboard; preserved `.lwv` and recorded the intentionally missing wire protections. |
+| 2026-08-05 | Published raw-mode commit `140f9ae` to `origin/main` and confirmed hardware-independent GitHub Actions run `31047777514` passed. |
