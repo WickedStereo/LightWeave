@@ -78,7 +78,7 @@ private endpoints, and confidential material must never appear here.
 | Environment | Snapdragon X Elite; Windows ARM64 Python 3.11.9; ONNX Runtime 1.24.4; `onnxruntime-qnn` 2.4.0 |
 | Tool/source | ONNX Runtime QNN plugin and QNN HTP backend |
 | Intended workflow | Register the plugin library, enumerate EP devices, select only the NPU, compile a static QDQ graph, and reject fallback |
-| Actual result and evidence | Complete `[1,192,16,16] -> [1,3,256,256]` graph ran with `session.disable_cpu_ep_fallback=1`. Profile events list only `QNNExecutionProvider` and zero CPU nodes. NPU/image-reference parity was at least 56.99 dB over the acceptance set. |
+| Actual result and evidence | Complete `[1,192,16,16] -> [1,3,256,256]` graph ran with `session.disable_cpu_ep_fallback=1`. Profile events list only `QNNExecutionProvider` and zero CPU nodes. NPU/image-reference parity was at least 56.99 dB over the acceptance set. A fresh installed-CLI run and the rendered localhost dashboard reproduced the same strict device/provider evidence. |
 | Usefulness | Provides defensible on-device AI evidence rather than inferring NPU use from a successful call |
 | Friction and owner | Many older provider-list examples do not show plugin registration or concrete NPU-device selection; documentation/sample versioning issue |
 | Workaround | Centralize current plugin registration, exact NPU selection, fallback disabling, and profile validation in the ARM64 worker |
@@ -190,3 +190,4 @@ private endpoints, and confidential material must never appear here.
 | 2026-08-05 | Replaced planning assumptions with exercised QUAD 0.2.0, ORT/QNN 1.24.4/2.4.0, full image HTP, precision tuning, dual-architecture setup, EnCodec hybrid, failure evidence, unavailable AI Hub/QAIRT paths, and actionable improvement notes. |
 | 2026-08-05 | Recorded the automation boundary: portable lint/unit checks run in CI, while QNN assignment and profiling remain native Snapdragon acceptance gates. |
 | 2026-08-05 | Added the final dual-Python recovery observation and the successful post-repair QNN/offline validation evidence. |
+| 2026-08-05 | Revalidated strict QNN image/audio paths through the installed CLI and rendered dashboard, with zero CPU profile nodes and no browser console errors. |

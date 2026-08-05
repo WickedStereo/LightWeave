@@ -31,11 +31,19 @@
       "output_name": "image",
       "fp32_path": "artifacts/generated/image_decoder_fp32.onnx",
       "qnn_path": "artifacts/generated/image_decoder_qdq.onnx",
-      "local_manifest": "artifacts/generated/image_decoder.manifest.json"
+      "local_manifest": "artifacts/generated/image_decoder.manifest.json",
+      "quantization": {
+        "format": "QDQ",
+        "activation_type": "QUInt16",
+        "weight_type": "QUInt16",
+        "calibration_method": "MinMax",
+        "calibration_source": "data/demo_manifest.json acceptance image latents",
+        "cpu_fallback": false
+      }
     }
   },
   "audio": {
-    "status": "image-gate-passed-audio-in-progress",
+    "status": "validated-hybrid-qnn",
     "profile": "encodec-24khz-mono-1.5kbps",
     "codec_profile": 513,
     "sample_rate": 24000,
@@ -45,6 +53,11 @@
     "bits_per_code": 10,
     "frame_rate": 75,
     "chunk_frames": 75,
+    "decoder_partition": {
+      "cpu": "codebook reconstruction and decoder layers 0-12",
+      "qnn_htp": "fixed-shape decoder layers 13-15",
+      "cpu_postprocess": "480-sample boundary de-click"
+    },
     "weights": {
       "filename": "encodec_24khz-d7cc33bc.th",
       "url": "https://dl.fbaipublicfiles.com/encodec/v0/encodec_24khz-d7cc33bc.th",
@@ -64,7 +77,15 @@
       "fp32_path": "artifacts/generated/audio_tail_fp32.onnx",
       "fp32_reference_path": "artifacts/generated/audio_tail_fp32.onnx",
       "runtime_path": "artifacts/generated/audio_tail_qdq.onnx",
-      "local_manifest": "artifacts/generated/audio_tail.manifest.json"
+      "local_manifest": "artifacts/generated/audio_tail.manifest.json",
+      "quantization": {
+        "format": "QDQ",
+        "activation_type": "QUInt16",
+        "weight_type": "QUInt8",
+        "calibration_method": "MinMax",
+        "calibration_source": "data/generated/demo-audio/chirp-and-tones.wav CPU-prefix tensors",
+        "cpu_fallback": false
+      }
     }
   }
 }

@@ -166,8 +166,19 @@ adapter can carry `.lwv` unchanged.
 | NPU-tail parity | 48.80 dB |
 | Full CPU to hybrid output parity | 44.95 dB |
 
-Focused unit tests currently report 23 passing tests. Generated acceptance and
+Focused unit tests currently report 25 passing tests. Generated acceptance and
 offline-smoke reports remain ignored and reproducible.
+
+### Product surface and packaging
+
+| Check | Result |
+| --- | --- |
+| Installed CLI image round trip and inspect | Pass with strict QNN evidence |
+| Installed CLI audio round trip and inspect | Pass with strict hybrid-QNN evidence |
+| Rendered localhost dashboard image workflow | Pass; images, metrics, and QNN evidence displayed |
+| Rendered localhost dashboard audio workflow | Pass; playback result metrics and hybrid evidence displayed |
+| Dashboard browser console | No errors |
+| Built wheel contents | Pass; CLI modules and all local HTML/CSS/JavaScript assets included |
 
 ## Qualcomm workflow evidence
 
@@ -190,7 +201,7 @@ offline-smoke reports remain ignored and reproducible.
 | Work item | Status | Evidence / next action |
 | --- | --- | --- |
 | Planning/repository baseline | Complete locally | Commit `7d4b91d`; push blocked by GitHub repository permission |
-| Software MVP repository handoff | Complete locally | Commit `61bc8fb`; final lint, 23 tests, strict QNN probe, and offline smoke pass |
+| Software MVP repository handoff | Complete locally | Commit `61bc8fb`; full CLI/dashboard, strict QNN, offline, and packaging audits pass |
 | `.lwv` envelope and image core | Complete | Unit and real-model acceptance tests pass |
 | Image export/QDQ/strict QNN | Complete | Full graph, no fallback, 0 CPU profile nodes |
 | CLI and offline dashboard | Complete | Image and audio APIs implemented; localhost assets only |
@@ -278,3 +289,4 @@ offline-smoke reports remain ignored and reproducible.
 | 2026-08-05 | Recorded the implemented EnCodec payload, failed larger NPU-tail experiments, narrowed passing hybrid, boundary conditioning, audio acceptance, QUAD evidence, remaining external validations, and GitHub permission blocker. |
 | 2026-08-05 | Added Windows unit CI while keeping model conversion and QNN hardware acceptance as explicit local gates. |
 | 2026-08-05 | Recorded local implementation commit `61bc8fb`, final validation reruns, repaired Python base interpreters, and the repeated GitHub 403 permission blocker. |
+| 2026-08-05 | Re-ran full image/audio QNN acceptance, verified the installed CLI and rendered dashboard, audited wheel contents, and corrected the tracked audio/quantization manifest contract. |
