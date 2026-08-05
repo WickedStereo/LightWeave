@@ -39,6 +39,13 @@ def default_decoder_model() -> Path:
     return generated_artifact_dir() / "image_decoder_qdq.onnx"
 
 
+def default_raw_decoder_model() -> Path:
+    configured = os.environ.get("LIGHTWEAVE_RAW_IMAGE_DECODER_ONNX")
+    if configured:
+        return Path(configured).expanduser().resolve()
+    return generated_artifact_dir() / "raw_image_decoder_qdq.onnx"
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -47,8 +54,9 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _verify_local_decoder(model_path: Path, source_model_hash: bytes) -> None:
-    manifest_path = generated_artifact_dir() / "image_decoder.manifest.json"
+def _verify_local_decoder(
+    model_path: Path, source_model_hash: bytes, manifest_path: Path
+) -> None:
     if not manifest_path.is_file():
         raise FileNotFoundError(
             "The generated decoder manifest is missing. Run "
@@ -59,17 +67,16 @@ def _verify_local_decoder(model_path: Path, source_model_hash: bytes) -> None:
         raise ModelMismatchError(
             "The generated ONNX decoder was exported from different model weights."
         )
-    quantized_path = manifest.get("quantized_onnx_path")
-    if quantized_path and Path(quantized_path).resolve() == model_path.resolve():
-        expected_onnx_hash = manifest.get("quantized_onnx_sha256")
-    elif Path(manifest.get("onnx_path", "")).resolve() == model_path.resolve():
-        expected_onnx_hash = manifest.get("onnx_sha256")
-    else:
-        raise ModelMismatchError(
-            "The selected decoder is not recorded in the generated model manifest."
-        )
     actual_onnx_hash = _sha256(model_path)
-    if expected_onnx_hash != actual_onnx_hash:
+    expected_hashes = {
+        value
+        for value in (
+            manifest.get("onnx_sha256"),
+            manifest.get("quantized_onnx_sha256"),
+        )
+        if value
+    }
+    if actual_onnx_hash not in expected_hashes:
         raise ModelMismatchError(
             "The generated ONNX decoder hash does not match its local manifest."
         )
@@ -81,9 +88,23 @@ def reconstruct_on_npu(
     source_model_hash: bytes,
     arm64_python: Path | None = None,
     model_path: Path | None = None,
+    manifest_path: Path | None = None,
+    raw_image: bool = False,
 ) -> NPUResult:
     interpreter = (arm64_python or default_arm64_python()).resolve()
-    decoder = (model_path or default_decoder_model()).resolve()
+    decoder = (
+        model_path
+        or (default_raw_decoder_model() if raw_image else default_decoder_model())
+    ).resolve()
+    local_manifest = (
+        manifest_path
+        or generated_artifact_dir()
+        / (
+            "raw_image_decoder.manifest.json"
+            if raw_image
+            else "image_decoder.manifest.json"
+        )
+    ).resolve()
     if not interpreter.is_file():
         raise FileNotFoundError(
             f"Native ARM64 Python was not found at {interpreter}. Set "
@@ -93,7 +114,7 @@ def reconstruct_on_npu(
         raise FileNotFoundError(
             f"The QNN decoder model was not found at {decoder}. Run the export script."
         )
-    _verify_local_decoder(decoder, source_model_hash)
+    _verify_local_decoder(decoder, source_model_hash, local_manifest)
 
     array = latent.detach().cpu().numpy().astype(np.float32, copy=False)
     with tempfile.TemporaryDirectory(prefix="lightweave-npu-") as directory:

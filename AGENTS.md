@@ -18,12 +18,14 @@
 ## Implementation authorization and scope
 
 - The project owner explicitly authorized implementation of the approved image-first software plan on 2026-08-05.
+- The project owner explicitly authorized the raw transmitter/receiver dashboard milestone on 2026-08-05. Preserve `.lwv` while adding the header-free `I64-Q1` and `A1-E15-S<n>` workflows.
 - Application source code, tests, portable setup scripts, and development configuration may be created within that plan.
 - The current milestone assumes a reliable ordered byte pipe and excludes optical hardware, Arduino firmware, modulation, analog circuitry, Galaxy S25 runtime work, and Cloud AI runtime work.
 - The complete image synthesis transform must not silently fall back to CPU. If strict QNN HTP execution cannot be proven, preserve the failure evidence and stop before weakening the claim.
 - The image feasibility gate passed locally on 2026-08-05; the audio extension is authorized and implemented.
 - Describe the audio decoder accurately: layers 0-12 run on CPU, fixed layers 13-15 run on QNN HTP, and a labeled CPU boundary de-click follows. Do not restore the failed larger-tail claim without new numerical evidence.
 - A successful QNN assignment is not enough by itself. Preserve CPU/ONNX/NPU numerical parity gates and profile evidence for every generated graph.
+- Raw mode must remain honest: its optical bytes contain no integrity, version, length, media, or model-negotiation fields. Preset codes are trusted out-of-band configuration and are not counted as payload bytes.
 
 ## Repository hygiene
 

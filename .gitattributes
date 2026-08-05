@@ -10,6 +10,7 @@
 *.gif binary
 *.wav binary
 *.lwv binary
+*.bin binary
 *.onnx binary
 *.ort binary
 *.dlc binary

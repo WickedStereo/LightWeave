@@ -6,8 +6,8 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | Software MVP implemented and published; local acceptance and repository CI pass |
-| Primary milestone | Air-gapped optical image-network software path |
+| Phase | Raw transmitter/receiver milestone implemented and locally validated; publication pending |
+| Primary milestone | Header-free image/audio payload generation and receiver dashboard |
 | Secondary milestone | EnCodec audio extension with an honest CPU/NPU split |
 | Last updated | 2026-08-05 |
 | Approval gate | Application implementation explicitly approved on 2026-08-05 |
@@ -48,6 +48,12 @@ The implemented milestone assumes a reliable ordered byte pipe and includes:
   fallback disabled, and profile evidence.
 - A localhost-only offline dashboard for images and playable audio.
 - An optional runtime guard that blocks DNS and non-loopback networking.
+- A header-free raw mode that preserves `.lwv` while sending only codec bytes.
+- Raw `I64-Q1` images with a hard 128-byte ceiling and fixed 64 by 64 output.
+- Raw `A1-E15-S<n>` audio with exact 188-byte independently packed chunks and
+  an out-of-band exact sample count.
+- Separate `/transmit`, `/receive`, and `/loopback` dashboard pages plus
+  `RawByteSink`/`RawByteSource` adapter contracts for future hardware.
 
 The following remain out of scope:
 
@@ -73,6 +79,27 @@ payload. Typed metadata includes the exact model-weight SHA-256.
 Parsers reject unsupported versions/profiles/flags, invalid dimensions,
 impossible metadata, truncation, trailing bytes, hash failure, payload-length
 mismatch, and model mismatch before reconstruction.
+
+### Raw optical mode
+
+Raw mode assumes the byte pipe supplies reliable ordered delivery and exact
+message boundaries, and that both hosts have the same pinned model artifacts.
+The transmitted bytes contain no magic, version, media type, length, hash, or
+model fingerprint. The short settings code is trusted out-of-band
+configuration and is not counted toward payload size. `.lwv` remains the safer
+format for archival, diagnosis, integrity checking, and model negotiation.
+
+- Image preset `I64-Q1` tries effective-detail levels 64, 56, 48, 40, 32, 24,
+  16, and 8 on a fixed 64 by 64 letterboxed canvas. It selects the highest
+  detail whose CompressAI entropy string is no more than 128 bytes, then tries
+  deterministic mean-color and black fallbacks. The only wire bytes are the
+  entropy string. Entropy decode restores `[1,192,4,4]`; the complete static
+  synthesis graph runs on strict QNN HTP and outputs `[1,3,64,64]`.
+- Audio preset `A1-E15-S<n>` resamples to 24 kHz mono and discloses the exact
+  pre-padding sample count as `n`. Each 75-frame, two-codebook second contains
+  1,500 valid bits plus four zero pad bits, exactly 188 bytes. The receiver
+  rejects non-multiples of 188, nonzero pad bits, and impossible sample counts,
+  then uses the established truthful CPU/QNN hybrid and trims to `n`.
 
 ### Image path
 
@@ -131,12 +158,18 @@ lightweave image roundtrip INPUT --work-dir DIR
 lightweave audio encode INPUT.wav --output PAYLOAD
 lightweave audio decode PAYLOAD --output OUTPUT.wav
 lightweave audio roundtrip INPUT.wav --work-dir DIR
+lightweave raw image encode INPUT --output payload.bin
+lightweave raw image decode payload.bin --preset I64-Q1 --output IMAGE --require-npu
+lightweave raw audio encode INPUT.wav --output payload.bin
+lightweave raw audio decode payload.bin --preset A1-E15-S48000 --output AUDIO.wav
 lightweave inspect PAYLOAD
 lightweave dashboard
 ```
 
-Core encode/decode functions operate on bytes and files so a future serial
-adapter can carry `.lwv` unchanged.
+Core encode/decode functions operate on bytes and files. The raw path exposes
+`RawByteSink.send(payload) -> SendReceipt` and `RawByteSource.receive() ->
+bytes`; the current browser implementation downloads/uploads `payload.bin`,
+and a later serial adapter can implement the same contract.
 
 ## Verified evidence
 
@@ -166,7 +199,22 @@ adapter can carry `.lwv` unchanged.
 | NPU-tail parity | 48.80 dB |
 | Full CPU to hybrid output parity | 44.95 dB |
 
-Focused unit tests currently report 25 passing tests. Generated acceptance and
+### Raw-mode acceptance
+
+| Check | Result |
+| --- | --- |
+| Image corpus | 4/4 deterministic payloads at or below 128 bytes |
+| Measured image payloads | 76, 80, 120, and 124 bytes |
+| Image output | Exactly 64 by 64 for every case |
+| Raw image CPU QDQ parity | 71.75 dB minimum |
+| Raw image strict QNN profile | `QNNExecutionProvider` only; 0 CPU nodes |
+| Raw image NPU/CPU parity | 59.92 dB minimum across four cases |
+| Image quality | 13.16-27.67 dB PSNR and 0.646-0.954 MS-SSIM; informational at the hard 128-byte budget |
+| Audio payload | 188 bytes/started second; two-second sample is 376 bytes / 1,504 bps including byte padding |
+| Audio reconstruction | Exact 48,000 samples; finite output; conditioned boundary jump 0.0 |
+| Audio strict QNN tail | `QNNExecutionProvider` only; 0 CPU nodes |
+
+Focused unit tests currently report 40 passing tests. Generated acceptance and
 offline-smoke reports remain ignored and reproducible.
 
 ### Product surface and packaging
@@ -177,6 +225,9 @@ offline-smoke reports remain ignored and reproducible.
 | Installed CLI audio round trip and inspect | Pass with strict hybrid-QNN evidence |
 | Rendered localhost dashboard image workflow | Pass; images, metrics, and QNN evidence displayed |
 | Rendered localhost dashboard audio workflow | Pass; playback result metrics and hybrid evidence displayed |
+| Raw `/transmit` image/audio workflows | Pass; codes, exact bytes, download links, metrics, and local verification displayed |
+| Raw `/receive` workflow | Pass; strict image reconstruction, save link, and oversize error state displayed |
+| Raw disconnected-runtime smoke | Pass for strict image QNN and audio hybrid; 80/376 raw bytes and exact outputs |
 | Dashboard browser console | No errors |
 | Built wheel contents | Pass; CLI modules and all local HTML/CSS/JavaScript assets included |
 
@@ -206,6 +257,9 @@ offline-smoke reports remain ignored and reproducible.
 | Image export/QDQ/strict QNN | Complete | Full graph, no fallback, 0 CPU profile nodes |
 | CLI and offline dashboard | Complete | Image and audio APIs implemented; localhost assets only |
 | Audio extension | Complete locally | Truthful narrowed hybrid passes acceptance |
+| Raw optical mode | Complete locally | `I64-Q1` and `A1-E15-S<n>` byte contracts, CLI, adapters, and three-page dashboard pass local acceptance |
+| Raw 64 by 64 strict QNN decoder | Complete locally | QUInt16 QDQ, no fallback, 0 CPU nodes, 59.92 dB minimum NPU/CPU parity |
+| Raw milestone publication | Pending current handoff | Commit intended files, push `main`, and verify hardware-independent GitHub Actions |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
 | GitHub Actions unit CI | Complete | Corrected-history Windows Python 3.11 run `31034723025` passed; QNN gates stay local |
@@ -221,6 +275,7 @@ offline-smoke reports remain ignored and reproducible.
 | Two Python architectures | Mitigated with pinned requirements, setup script, neutral handoff, and diagnostics |
 | Silent CPU fallback | Mitigated with explicit NPU device selection, disabled fallback, and profile checks |
 | Weight/artifact mismatch | Mitigated with tracked hashes and runtime fingerprints |
+| Generated manifests move to a second PC | Runtime trusts recorded graph hashes rather than setup-machine absolute paths |
 | Complex images exceed 2,048 bytes | Fail closed; documented stress image proves rejection |
 | EnCodec/torchaudio package mismatch | LightWeave uses tested PCM WAV I/O; EnCodec neural model remains upstream |
 | Larger EnCodec NPU tail has incorrect HTP semantics | Do not claim it; supported split ends at layers 13-15 and records failed experiments |
@@ -229,6 +284,8 @@ offline-smoke reports remain ignored and reproducible.
 | AI Hub/QAIRT unavailable | Direct QNN path and reproducible local evidence do not depend on them |
 | GitHub credentials/permission | Resolved with Git Credential Manager; never store tokens in source, remotes, or documentation |
 | Git commit attribution | Corrected commits use the verified repository-owner GitHub no-reply identity; original root is unchanged |
+| Raw payload has no integrity/model negotiation | Intentional tradeoff; UI warns, preset validation fails early where possible, and `.lwv` remains available |
+| 128-byte image quality varies sharply | Hard size gate wins; report effective detail/fallback and quality without claiming original-resolution recovery |
 
 ## Open questions
 
@@ -268,6 +325,10 @@ offline-smoke reports remain ignored and reproducible.
 | D-019 | 2026-08-05 | Apply and disclose a 480-sample CPU boundary de-click. | Removes independent fixed-chunk DC steps without changing length. |
 | D-020 | 2026-08-05 | Use LightWeave PCM WAV I/O instead of torchaudio. | Avoids an unavailable PyTorch 2.13 companion wheel on Windows. |
 | D-021 | 2026-08-05 | Rewrite only the assistant-created commits to the verified repository-owner identity. | Corrects attribution while preserving the original root commit, file trees, messages, and timestamps. |
+| D-022 | 2026-08-05 | Preserve `.lwv` and add a separate raw optical mode containing only codec bytes. | Meets the minimum-wire-payload goal without weakening archival/debug workflows. |
+| D-023 | 2026-08-05 | Treat preset codes as trusted out-of-band configuration. | Keeps hashes, headers, lengths, and fingerprints out of the optical payload. |
+| D-024 | 2026-08-05 | Fix raw image output at 64 by 64 and enforce 128 bytes with adaptive detail and deterministic fallbacks. | The hard byte budget is the gate; quality remains informational. |
+| D-025 | 2026-08-05 | Pack raw audio as independent 188-byte one-second chunks and disclose exact sample count in `A1-E15-S<n>`. | Preserves exact length while keeping the wire bytes header-free. |
 
 ## Public references
 
@@ -296,3 +357,4 @@ offline-smoke reports remain ignored and reproducible.
 | 2026-08-05 | Confirmed optimized GitHub Actions run `30996830347` passed and replaced the obsolete push blocker with the published repository state. |
 | 2026-08-05 | Corrected author and committer attribution for the six assistant-created commits, preserved the original repository root and content, configured repository-local identity, and removed the stale GitHub credential. |
 | 2026-08-05 | Published the corrected history, verified every GitHub commit maps to the repository owner, and confirmed corrected-head CI run `31034723025` passed. |
+| 2026-08-05 | Implemented and locally validated the header-free raw image/audio contracts, 64 by 64 strict-QNN decoder, raw CLI, future adapter interfaces, and `/transmit`/`/receive`/`/loopback` dashboard; preserved `.lwv` and recorded the intentionally missing wire protections. |

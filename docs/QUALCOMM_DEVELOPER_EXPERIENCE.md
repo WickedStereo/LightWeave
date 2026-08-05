@@ -182,6 +182,20 @@ private endpoints, and confidential material must never appear here.
 | Workaround | Defer hardware and revalidate the maintained router when that milestone begins |
 | Suggested improvement | Run automated link checks and retain redirects or archived references for renamed samples |
 
+### DX-011 - A second static CompressAI shape reuses the strict QNN workflow cleanly
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-05; reduce an image to a hard 128-byte raw payload while retaining a complete Hexagon reconstruction graph |
+| Environment | Snapdragon X Elite X1E80100; Windows 11 ARM64; x64 Python 3.11 model preparation; native ARM64 Python 3.11 worker |
+| Tool/source | PyTorch 2.13.0, CompressAI 1.2.8, ONNX 1.19.0, ONNX Runtime 1.24.4, `onnxruntime-qnn` 2.4.0, QNN HTP |
+| Intended workflow | Export a fixed `[1,192,4,4] -> [1,3,64,64]` `g_s`, calibrate every raw effective-detail level, quantize to QDQ, select the concrete QNN NPU device, disable CPU fallback, and prove numerical parity plus provider assignment |
+| Actual result and evidence | PyTorch/CPU ONNX export parity passed with maximum absolute error `7.15e-7`. Unsigned 16-bit activation/weight QDQ reached 71.75 dB minimum CPU parity. Four deterministic raw image cases measured 76-124 bytes; every strict NPU profile listed only `QNNExecutionProvider`, zero CPU nodes, finite 64 by 64 output, and at least 59.92 dB NPU/CPU parity. The rendered transmitter/receiver workflow reproduced the device/profile evidence without browser console errors, and the raw image/audio workers passed again with non-loopback networking blocked. |
+| Usefulness | The same strict worker contract supports both the 256-pixel `.lwv` decoder and a much smaller raw preset without weakening the NPU claim |
+| Friction and owner | Static shapes require separate generated graphs/manifests, and QNN session preparation remains much longer than the single-digit-millisecond inference; integration and runtime startup cost rather than an assignment failure |
+| Workaround | Track both artifact contracts, keep generated files ignored, validate source/model hashes locally, and consider QNN context caching after functional milestones |
+| Suggested improvement | Provide a documented multi-shape artifact/context-cache workflow and distinguish graph preparation latency from inference latency in default profiling output |
+
 ## Change log
 
 | Date | Change |
@@ -192,3 +206,4 @@ private endpoints, and confidential material must never appear here.
 | 2026-08-05 | Added the final dual-Python recovery observation and the successful post-repair QNN/offline validation evidence. |
 | 2026-08-05 | Revalidated strict QNN image/audio paths through the installed CLI and rendered dashboard, with zero CPU profile nodes and no browser console errors. |
 | 2026-08-05 | Published the complete public engineering log alongside a green hardware-independent repository CI run; native Snapdragon QNN evidence remains an explicit local gate. |
+| 2026-08-05 | Added the raw 64 by 64 CompressAI decoder evidence: 71.75 dB minimum CPU QDQ parity, 59.92 dB minimum NPU/CPU parity, complete HTP assignment, zero CPU nodes, and the separate-static-artifact/session-startup tradeoff. |

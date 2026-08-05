@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>Transmit · LightWeave</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <main>
+      <nav class="nav" aria-label="LightWeave workflows">
+        <a class="brand" href="/transmit">Light<span>Weave</span></a>
+        <div>
+          <a class="active" href="/transmit">Transmit</a>
+          <a href="/receive">Receive</a>
+          <a href="/loopback">.lwv workbench</a>
+        </div>
+      </nav>
+
+      <header class="page-hero">
+        <div>
+          <p class="eyebrow">Raw optical transmitter</p>
+          <h1>Media in.<br><span>Bytes out.</span></h1>
+          <p class="lede">Create the exact header-free payload that a future optical
+            adapter will send. The settings code travels separately.</p>
+        </div>
+        <div class="status" id="runtime-status">Checking local runtime…</div>
+      </header>
+
+      <aside class="wire-warning">
+        <strong>Thin-wire mode</strong>
+        <span>No hash, length, version, or model fingerprint is embedded in
+          <code>payload.bin</code>. Exact delivery and matching pinned models are required.</span>
+      </aside>
+
+      <div class="workflow-grid">
+        <section class="workflow-card">
+          <div class="card-heading">
+            <span class="media-tag">I64-Q1</span>
+            <h2>Image · 128 bytes max</h2>
+            <p>A fixed 64×64 reconstruction with adaptive effective detail.</p>
+          </div>
+          <form id="image-transmit-form" class="stack-form">
+            <label class="drop-zone" for="image-input">
+              <strong>Select an image</strong>
+              <span>EXIF-corrected, RGB, aspect-preserved · 20 MiB max</span>
+              <input id="image-input" name="file" type="file" accept="image/*" required>
+            </label>
+            <img class="media-preview" id="image-preview" alt="Selected image preview" hidden>
+            <button type="submit">Generate image payload</button>
+          </form>
+          <div class="activity" id="image-activity" hidden><span></span> Compressing candidates…</div>
+          <div class="error" id="image-error" hidden></div>
+          <div id="image-result" hidden>
+            <div class="code-row">
+              <div><small>Settings code</small><code id="image-code"></code></div>
+              <button class="secondary" id="image-copy" type="button">Copy code</button>
+            </div>
+            <div class="metrics compact" id="image-metrics"></div>
+            <div class="action-row">
+              <a class="download-button" id="image-download" download="payload.bin">Download payload.bin</a>
+              <button class="secondary" id="image-verify" type="button">Verify locally on NPU</button>
+            </div>
+            <div id="image-verification" hidden>
+              <div class="comparison">
+                <figure><img id="image-reference" alt="64 by 64 encoded reference"><figcaption>64×64 encoded target</figcaption></figure>
+                <figure><img id="image-reconstructed" class="pixelated" alt="64 by 64 reconstructed image"><figcaption>NPU reconstruction</figcaption></figure>
+              </div>
+              <div class="metrics compact" id="image-verify-metrics"></div>
+              <details><summary>QNN execution evidence</summary><pre id="image-evidence"></pre></details>
+            </div>
+          </div>
+        </section>
+
+        <section class="workflow-card">
+          <div class="card-heading">
+            <span class="media-tag">A1-E15-S&lt;n&gt;</span>
+            <h2>Audio · 188 bytes / second</h2>
+            <p>24 kHz mono EnCodec indices in independently packed one-second chunks.</p>
+          </div>
+          <form id="audio-transmit-form" class="stack-form">
+            <label class="drop-zone" for="audio-input">
+              <strong>Select a PCM WAV</strong>
+              <span>Mono or stereo, resampled to 24 kHz · 20 MiB max</span>
+              <input id="audio-input" name="file" type="file" accept="audio/wav,.wav" required>
+            </label>
+            <audio id="audio-preview" controls hidden></audio>
+            <button type="submit">Generate audio payload</button>
+          </form>
+          <div class="activity" id="audio-activity" hidden><span></span> Encoding audio…</div>
+          <div class="error" id="audio-error" hidden></div>
+          <div id="audio-result" hidden>
+            <div class="code-row">
+              <div><small>Settings code</small><code id="audio-code"></code></div>
+              <button class="secondary" id="audio-copy" type="button">Copy code</button>
+            </div>
+            <div class="metrics compact" id="audio-metrics"></div>
+            <div class="action-row">
+              <a class="download-button" id="audio-download" download="payload.bin">Download payload.bin</a>
+              <button class="secondary" id="audio-verify" type="button">Verify locally on hybrid NPU</button>
+            </div>
+            <div id="audio-verification" hidden>
+              <audio id="audio-reconstructed" controls></audio>
+              <div class="metrics compact" id="audio-verify-metrics"></div>
+              <details><summary>Hybrid execution evidence</summary><pre id="audio-evidence"></pre></details>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+    <script src="/static/transmit.js" defer></script>
+  </body>
+</html>

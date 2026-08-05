@@ -34,13 +34,15 @@ def _verify_audio_tail(model_path: Path, source_model_hash: bytes) -> None:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest.get("source_weights_sha256") != source_model_hash.hex():
         raise ModelMismatchError("The audio tail uses incompatible EnCodec weights.")
-    if Path(manifest.get("quantized_onnx_path", "")).resolve() == model_path.resolve():
-        expected_hash = manifest.get("quantized_onnx_sha256")
-    elif Path(manifest.get("onnx_path", "")).resolve() == model_path.resolve():
-        expected_hash = manifest.get("onnx_sha256")
-    else:
-        raise ModelMismatchError("The audio tail is not recorded in its manifest.")
-    if expected_hash != _sha256(model_path):
+    expected_hashes = {
+        value
+        for value in (
+            manifest.get("onnx_sha256"),
+            manifest.get("quantized_onnx_sha256"),
+        )
+        if value
+    }
+    if _sha256(model_path) not in expected_hashes:
         raise ModelMismatchError("The audio-tail ONNX hash does not match.")
 
 

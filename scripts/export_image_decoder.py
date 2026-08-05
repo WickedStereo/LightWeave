@@ -39,11 +39,15 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def export_decoder(output: Path, weights: Path | None) -> dict[str, object]:
+def export_decoder(
+    output: Path, weights: Path | None, latent_size: int
+) -> dict[str, object]:
+    if latent_size not in (4, 16):
+        raise ValueError("LightWeave image decoder latent size must be 4 or 16.")
     model, weight_path, weight_hash = load_image_model(weights)
     wrapper = SynthesisWrapper(model.g_s).eval()
     generator = torch.Generator().manual_seed(20260805)
-    latent = torch.randn((1, 192, 16, 16), generator=generator)
+    latent = torch.randn((1, 192, latent_size, latent_size), generator=generator)
 
     output.parent.mkdir(parents=True, exist_ok=True)
     with torch.inference_mode():
@@ -82,7 +86,7 @@ def export_decoder(output: Path, weights: Path | None) -> dict[str, object]:
         "onnx_sha256": file_sha256(output),
         "opset": 18,
         "input_name": "latent",
-        "input_shape": [1, 192, 16, 16],
+        "input_shape": [1, 192, latent_size, latent_size],
         "output_name": "image",
         "output_shape": list(ort_output.shape),
         "cpu_parity": {
@@ -109,9 +113,16 @@ def main() -> None:
         default=artifact_dir / "image_decoder.manifest.json",
     )
     parser.add_argument("--weights", type=Path)
+    parser.add_argument(
+        "--latent-size",
+        type=int,
+        choices=(4, 16),
+        default=16,
+        help="Use 4 for the I64-Q1 raw decoder or 16 for the 256px .lwv decoder.",
+    )
     args = parser.parse_args()
 
-    result = export_decoder(args.output.resolve(), args.weights)
+    result = export_decoder(args.output.resolve(), args.weights, args.latent_size)
     args.manifest.parent.mkdir(parents=True, exist_ok=True)
     args.manifest.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result, indent=2))

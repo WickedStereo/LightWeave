@@ -75,3 +75,55 @@ pre { overflow: auto; color: #80e7d8; background: #050912; border-radius: 12px; 
   .metrics { grid-template-columns: repeat(2, 1fr); }
   .audio-panel form { grid-template-columns: 1fr; }
 }
+
+.nav { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 64px; }
+.brand { color: #edf4ff; font-size: 1.22rem; font-weight: 850; letter-spacing: -.045em; text-decoration: none; }
+.brand span { color: #69ebd7; }
+.nav > div { display: flex; align-items: center; gap: 8px; }
+.nav > div a { border-radius: 999px; color: #8796ad; padding: 9px 14px; text-decoration: none; font-size: .84rem; }
+.nav > div a:hover, .nav > div a.active { color: #edf4ff; background: #11182a; }
+.page-hero { display: flex; justify-content: space-between; gap: 32px; align-items: end; margin-bottom: 34px; }
+.page-hero h1 { font-size: clamp(3.7rem, 9vw, 7.2rem); }
+.compact-hero h1 { font-size: clamp(3.5rem, 8vw, 6.6rem); }
+.wire-warning { display: grid; grid-template-columns: 180px 1fr; gap: 18px; align-items: center; margin-bottom: 22px; padding: 16px 20px; border: 1px solid rgba(105, 235, 215, .28); border-radius: 16px; background: rgba(105, 235, 215, .06); color: #a9b9ce; }
+.wire-warning strong { color: #69ebd7; }
+.wire-warning.danger { border-color: rgba(255, 174, 84, .3); background: rgba(255, 174, 84, .06); }
+.wire-warning.danger strong { color: #ffc27d; }
+.workflow-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; align-items: start; }
+.workflow-card { min-width: 0; padding: 26px; border: 1px solid #202940; border-radius: 24px; background: rgba(13, 18, 33, .88); box-shadow: 0 24px 80px rgba(0, 0, 0, .22); }
+.card-heading { min-height: 150px; }
+.card-heading h2 { margin: 15px 0 8px; font-size: clamp(1.65rem, 3vw, 2.35rem); letter-spacing: -.04em; }
+.card-heading p { color: #8e9db4; line-height: 1.55; margin: 0; }
+.media-tag { display: inline-block; padding: 6px 9px; border: 1px solid #2d3a55; border-radius: 7px; color: #69ebd7; background: #090e1b; font: 700 .73rem ui-monospace, monospace; }
+.stack-form { display: grid; grid-template-columns: 1fr; align-items: stretch; }
+.stack-form input:not([type="file"]) { height: 44px; width: 100%; padding: 0 12px; border: 1px solid #303b54; border-radius: 12px; background: #0a0f1e; color: #edf4ff; font: inherit; }
+.media-preview { display: block; width: 100%; height: 220px; object-fit: contain; border: 1px solid #222b41; border-radius: 14px; background: #03050b; }
+.stack-form audio, .workflow-card audio { width: 100%; }
+.code-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 22px; padding: 16px; border: 1px solid #28344e; border-radius: 14px; background: #080d19; }
+.code-row small { display: block; margin-bottom: 6px; color: #77869d; text-transform: uppercase; letter-spacing: .1em; }
+.code-row code { font-size: 1rem; font-weight: 800; word-break: break-all; }
+button.secondary { border: 1px solid #35425d; color: #c4d0e2; background: #11182a; }
+button.secondary:hover { color: #fff; background: #192239; }
+.action-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.download-button { display: inline-flex; min-height: 44px; align-items: center; padding: 0 22px; border-radius: 12px; color: #04110f; background: #69ebd7; font-weight: 800; text-decoration: none; }
+.download-button:hover { background: #8ff3e4; }
+.metrics.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 18px; }
+.metrics.compact .metric strong { font-size: 1.05rem; }
+.comparison { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 24px; }
+.comparison figure img, .single-output img { width: 100%; height: 260px; image-rendering: pixelated; object-fit: contain; background: #03050b; border: 1px solid #222b41; border-radius: 14px; }
+.single-output { margin-top: 24px; }
+.download-link { display: inline-flex; margin-top: 14px; color: #69ebd7; text-underline-offset: 4px; }
+.pixelated { image-rendering: pixelated; }
+
+@media (max-width: 920px) {
+  .workflow-grid { grid-template-columns: 1fr; }
+  .card-heading { min-height: 0; margin-bottom: 22px; }
+}
+
+@media (max-width: 680px) {
+  .nav { align-items: flex-start; margin-bottom: 42px; }
+  .nav > div { align-items: flex-end; flex-direction: column; }
+  .page-hero { display: block; }
+  .wire-warning { grid-template-columns: 1fr; }
+  .metrics.compact, .comparison { grid-template-columns: 1fr; }
+}

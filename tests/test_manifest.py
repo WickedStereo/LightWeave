@@ -24,6 +24,12 @@ def test_tracked_model_manifest_records_validated_conversion_contracts() -> None
         "calibration_source": "data/demo_manifest.json acceptance image latents",
         "cpu_fallback": False,
     }
+    raw_image = manifest["image"]["raw"]
+    assert raw_image["preset_code"] == "I64-Q1"
+    assert raw_image["latent_shape"] == [1, 192, 4, 4]
+    assert raw_image["maximum_payload_bytes"] == 128
+    assert raw_image["wire_fields"] == []
+    assert raw_image["onnx"]["quantization"]["cpu_fallback"] is False
 
     audio = manifest["audio"]
     audio_onnx = audio["onnx"]
@@ -45,6 +51,7 @@ def test_example_environment_exposes_all_supported_path_overrides() -> None:
         "LIGHTWEAVE_AUDIO_WEIGHTS",
         "LIGHTWEAVE_ARM64_PYTHON",
         "LIGHTWEAVE_IMAGE_DECODER_ONNX",
+        "LIGHTWEAVE_RAW_IMAGE_DECODER_ONNX",
         "LIGHTWEAVE_AUDIO_TAIL_ONNX",
         "LIGHTWEAVE_ENFORCE_OFFLINE",
     ):

@@ -32,6 +32,11 @@ try {
     & .\.venv-x64\Scripts\python.exe scripts\generate_demo_audio.py
     & .\.venv-x64\Scripts\python.exe scripts\export_image_decoder.py
     & .\.venv-x64\Scripts\python.exe scripts\quantize_image_decoder.py
+    & .\.venv-x64\Scripts\python.exe scripts\export_image_decoder.py `
+        --latent-size 4 `
+        --output artifacts\generated\raw_image_decoder_fp32.onnx `
+        --manifest artifacts\generated\raw_image_decoder.manifest.json
+    & .\.venv-x64\Scripts\python.exe scripts\quantize_raw_image_decoder.py
     & .\.venv-x64\Scripts\python.exe scripts\export_audio_tail.py
     & .\.venv-x64\Scripts\python.exe scripts\quantize_audio_tail.py
 

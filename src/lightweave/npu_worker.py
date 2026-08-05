@@ -55,9 +55,16 @@ def run(
     profile_prefix: Path,
 ) -> None:
     latent = np.load(input_path, allow_pickle=False)
-    if latent.shape != (1, 192, 16, 16) or latent.dtype != np.float32:
+    if (
+        latent.ndim != 4
+        or latent.shape[0] != 1
+        or latent.shape[1] != 192
+        or latent.shape[2] <= 0
+        or latent.shape[3] <= 0
+        or latent.dtype != np.float32
+    ):
         raise ValueError(
-            "The image NPU worker requires float32 latent shape [1,192,16,16]; "
+            "The image NPU worker requires float32 latent shape [1,192,H,W]; "
             f"got {latent.shape} {latent.dtype}."
         )
 
@@ -90,6 +97,17 @@ def run(
         inputs = session.get_inputs()
         if len(inputs) != 1 or inputs[0].name != "latent":
             raise RuntimeError("The NPU decoder has an unexpected input contract.")
+        if tuple(inputs[0].shape) != tuple(latent.shape):
+            raise RuntimeError(
+                f"Decoder input shape {inputs[0].shape} does not match "
+                f"latent shape {latent.shape}."
+            )
+        outputs = session.get_outputs()
+        if len(outputs) != 1 or outputs[0].name != "image":
+            raise RuntimeError("The NPU decoder has an unexpected output contract.")
+        expected_output_shape = tuple(outputs[0].shape)
+        if not all(isinstance(value, int) for value in expected_output_shape):
+            raise RuntimeError("The NPU decoder output shape must be fully static.")
         run_options = ort.RunOptions()
         run_options.add_run_config_entry("qnn.perf_mode", "burst")
         inference_started = time.perf_counter()
@@ -98,7 +116,7 @@ def run(
         if len(result) != 1:
             raise RuntimeError("The NPU decoder returned an unexpected output count.")
         reconstructed = np.asarray(result[0], dtype=np.float32)
-        if reconstructed.shape != (1, 3, 256, 256):
+        if reconstructed.shape != expected_output_shape:
             raise RuntimeError(
                 f"Unexpected NPU decoder output shape: {reconstructed.shape}."
             )

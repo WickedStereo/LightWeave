@@ -2,11 +2,19 @@
 
 [![CI](https://github.com/WickedStereo/LightWeave/actions/workflows/ci.yml/badge.svg)](https://github.com/WickedStereo/LightWeave/actions/workflows/ci.yml)
 
-LightWeave turns images and PCM WAV audio into compact, self-validating `.lwv`
-byte streams for an extremely low-bandwidth, air-gapped link. The current
-software treats the future Arduino/optical layer as a reliable ordered byte
-pipe: encode on one host, transfer the bytes unchanged, and reconstruct on a
-Snapdragon receiver.
+LightWeave turns images and PCM WAV audio into compact bytes for an extremely
+low-bandwidth, air-gapped link. The current software treats the future
+Arduino/optical layer as a reliable ordered, message-bounded byte pipe: encode
+on one host, transfer the bytes unchanged, and reconstruct on a Snapdragon
+receiver.
+
+Two wire formats coexist:
+
+- Raw optical mode sends only codec bytes. `I64-Q1` images are at most 128
+  bytes and reconstruct to exactly 64×64. `A1-E15-S<n>` audio uses exactly 188
+  bytes per started second. The preset code travels separately.
+- `.lwv` remains the self-validating archival and debugging format with typed
+  metadata, length, model fingerprint, and SHA-256 integrity.
 
 The image path is fully NPU-backed. CompressAI creates an entropy-coded image
 payload, the receiver restores the latent tensor on CPU, and the complete
@@ -30,6 +38,11 @@ CPU de-click correction removes independent one-second chunk-edge steps.
   zero conditioned boundary jump, and 48.80 dB NPU-tail parity.
 - Audio tail profile: `QNNExecutionProvider` only, zero CPU nodes.
 - Runtime smoke-tested with non-loopback networking blocked in both workers.
+- Raw image set: 4/4 payloads at or below 128 bytes, deterministic output,
+  strict full-decoder QNN profiles with zero CPU nodes, and at least 59.92 dB
+  NPU/CPU parity. Reconstruction quality is informational at this wire budget.
+- Raw audio sample: exactly 376 bytes for two seconds, 48,000 samples restored,
+  and a strict zero-CPU-node QNN tail profile.
 
 Generated reports, model weights, ONNX/QDQ artifacts, and profiles are ignored
 by Git. Reproduce the evidence locally with the scripts below.
@@ -67,13 +80,26 @@ lightweave inspect audio.lwv
 lightweave audio decode audio.lwv --output reconstructed.wav
 lightweave audio roundtrip input.wav --work-dir out\audio
 
+# Header-free raw optical payloads
+lightweave raw image encode input.png --output payload.bin
+lightweave raw image decode payload.bin --preset I64-Q1 --output image.png --require-npu
+lightweave raw audio encode input.wav --output payload.bin
+lightweave raw audio decode payload.bin --preset A1-E15-S48000 --output audio.wav
+
 # Offline local UI
 lightweave dashboard
 ```
 
-The dashboard binds only to `127.0.0.1`, loads no remote assets, and shows
-payload size, transfer estimates, quality/latency metrics, images or playable
-audio, QNN device selection, and strict provider evidence.
+The dashboard binds only to `127.0.0.1` and loads no remote assets. `/transmit`
+generates and downloads the exact raw `payload.bin`, `/receive` reconstructs an
+uploaded payload using its out-of-band settings code, and `/loopback` preserves
+the `.lwv` development workbench. The pages show transfer estimates,
+quality/latency metrics, playable media, QNN device selection, and strict
+provider evidence.
+
+Raw mode intentionally has no integrity or model-negotiation bytes. Corruption,
+wrong message boundaries, or mismatched pinned artifacts may fail decoding or
+produce incorrect media; use `.lwv` when those protections are required.
 
 ## Reproduce acceptance evidence
 
@@ -82,6 +108,7 @@ audio, QNN device selection, and strict provider evidence.
 .\.venv-x64\Scripts\python.exe -m ruff check .
 .\.venv-x64\Scripts\python.exe scripts\evaluate_image_set.py --backend qnn
 .\.venv-x64\Scripts\python.exe scripts\evaluate_audio.py
+.\.venv-x64\Scripts\python.exe scripts\evaluate_raw.py --image-backend qnn --audio data\generated\demo-audio\chirp-and-tones.wav --audio-backend hybrid-qnn
 .\.venv-x64\Scripts\python.exe scripts\offline_smoke.py
 ```
 

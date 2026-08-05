@@ -11,7 +11,7 @@ import types
 import wave
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, BinaryIO, Literal
 
 import numpy as np
 
@@ -142,12 +142,13 @@ def _decode_pcm(value: bytes, sample_width: int) -> np.ndarray:
     raise ValueError(f"Unsupported PCM WAV sample width: {sample_width} bytes.")
 
 
-def load_wav(path: Path) -> LoadedAudio:
+def load_wav(path: Path | BinaryIO) -> LoadedAudio:
     import torch
     import torch.nn.functional as functional
 
     try:
-        with wave.open(str(path), "rb") as stream:
+        wave_source = str(path) if isinstance(path, Path) else path
+        with wave.open(wave_source, "rb") as stream:
             if stream.getcomptype() != "NONE":
                 raise ValueError("Only uncompressed PCM WAV input is supported.")
             channels = stream.getnchannels()

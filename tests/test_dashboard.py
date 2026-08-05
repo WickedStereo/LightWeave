@@ -15,9 +15,37 @@ def test_dashboard_is_local_and_offline() -> None:
 
 def test_dashboard_serves_only_local_assets() -> None:
     with TestClient(create_app()) as client:
-        page = client.get("/")
+        redirect = client.get("/", follow_redirects=False)
+        assert redirect.status_code == 307
+        assert redirect.headers["location"] == "/transmit"
+        page = client.get("/transmit")
         assert page.status_code == 200
         assert 'href="/static/styles.css"' in page.text
-        assert 'src="/static/app.js"' in page.text
+        assert 'src="/static/transmit.js"' in page.text
         assert "https://" not in page.text
+        receive = client.get("/receive")
+        assert receive.status_code == 200
+        assert 'src="/static/receive.js"' in receive.text
+        loopback = client.get("/loopback")
+        assert loopback.status_code == 200
+        assert 'src="/static/app.js"' in loopback.text
         assert client.get("/static/styles.css").status_code == 200
+
+
+def test_raw_receive_contract_errors_precede_model_loading() -> None:
+    with TestClient(create_app()) as client:
+        image = client.post(
+            "/api/receive/image",
+            data={"preset_code": "wrong", "backend": "cpu"},
+            files={"file": ("payload.bin", b"one byte")},
+        )
+        assert image.status_code == 422
+        assert "Unsupported raw image preset" in image.json()["detail"]
+
+        audio = client.post(
+            "/api/receive/audio",
+            data={"preset_code": "A1-E15-S24000", "backend": "cpu"},
+            files={"file": ("payload.bin", bytes(187))},
+        )
+        assert audio.status_code == 422
+        assert "divisible by 188" in audio.json()["detail"]

@@ -14,6 +14,13 @@ from .envelope import envelope_summary, read_envelope
 from .errors import LightWeaveError
 from .image import encode_image, write_bytes_atomic
 from .metrics import transfer_estimates
+from .raw import (
+    RAW_IMAGE_MAX_BYTES,
+    decode_raw_audio,
+    decode_raw_image,
+    encode_raw_audio,
+    encode_raw_image,
+)
 from .service import decode_image_bytes, roundtrip_image
 
 
@@ -136,6 +143,91 @@ def command_audio_roundtrip(args: argparse.Namespace) -> None:
     _print_json(result)
 
 
+def command_raw_image_encode(args: argparse.Namespace) -> None:
+    encoded = encode_raw_image(Path(args.input))
+    _write_artifact(encoded.payload, args.output)
+    if args.output != "-":
+        _print_json(
+            {
+                "preset_code": encoded.preset_code,
+                "raw_bytes": len(encoded.payload),
+                "maximum_bytes": RAW_IMAGE_MAX_BYTES,
+                "within_budget": len(encoded.payload) <= RAW_IMAGE_MAX_BYTES,
+                "effective_detail": encoded.effective_detail,
+                "fallback": encoded.fallback,
+                "bits_per_pixel": len(encoded.payload) * 8 / (64 * 64),
+                "encode_seconds": encoded.encode_seconds,
+                **transfer_estimates(len(encoded.payload)),
+                "output": str(Path(args.output).resolve()),
+            }
+        )
+
+
+def command_raw_image_decode(args: argparse.Namespace) -> None:
+    if args.require_npu and args.backend != "qnn":
+        raise ValueError("--require-npu cannot be combined with --backend cpu.")
+    decoded = decode_raw_image(
+        _read_artifact(args.payload),
+        preset_code=args.preset,
+        backend=args.backend,
+        output_path=Path(args.output),
+        arm64_python=Path(args.arm64_python) if args.arm64_python else None,
+        decoder_model=Path(args.decoder_model) if args.decoder_model else None,
+    )
+    _print_json(
+        {
+            "preset_code": args.preset,
+            "backend": decoded.backend,
+            "output": str(Path(args.output).resolve()),
+            "output_size": list(decoded.image.size),
+            "entropy_decode_seconds": decoded.entropy_decode_seconds,
+            "reconstruction_seconds": decoded.reconstruction_seconds,
+            "npu_evidence": decoded.evidence,
+        }
+    )
+
+
+def command_raw_audio_encode(args: argparse.Namespace) -> None:
+    encoded = encode_raw_audio(Path(args.input))
+    _write_artifact(encoded.payload, args.output)
+    if args.output != "-":
+        duration = encoded.original_samples / 24_000
+        _print_json(
+            {
+                "preset_code": encoded.preset_code,
+                "raw_bytes": len(encoded.payload),
+                "chunk_count": encoded.chunk_count,
+                "bytes_per_chunk": 188,
+                "original_samples": encoded.original_samples,
+                "code_payload_bps": len(encoded.payload) * 8 / duration,
+                "encode_seconds": encoded.encode_seconds,
+                **transfer_estimates(len(encoded.payload)),
+                "output": str(Path(args.output).resolve()),
+            }
+        )
+
+
+def command_raw_audio_decode(args: argparse.Namespace) -> None:
+    decoded = decode_raw_audio(
+        _read_artifact(args.payload),
+        preset_code=args.preset,
+        backend=args.backend,
+        output_path=Path(args.output),
+    )
+    _print_json(
+        {
+            "preset_code": args.preset,
+            "backend": decoded.backend,
+            "output": str(Path(args.output).resolve()),
+            "restored_samples": int(decoded.waveform.shape[-1]),
+            "codebook_decode_seconds": decoded.codebook_seconds,
+            "cpu_prefix_seconds": decoded.cpu_prefix_seconds,
+            "reconstruction_seconds": decoded.reconstruction_seconds,
+            "execution_evidence": decoded.evidence,
+        }
+    )
+
+
 def command_dashboard(args: argparse.Namespace) -> None:
     from .dashboard import run_dashboard
 
@@ -207,6 +299,54 @@ def parser() -> argparse.ArgumentParser:
         "--backend", choices=("hybrid-qnn", "cpu"), default="hybrid-qnn"
     )
     audio_roundtrip.set_defaults(handler=command_audio_roundtrip)
+
+    raw_parser = subcommands.add_parser(
+        "raw", help="Header-free optical payload operations"
+    )
+    raw_media = raw_parser.add_subparsers(dest="raw_media", required=True)
+
+    raw_image = raw_media.add_parser("image", help="Raw I64-Q1 image operations")
+    raw_image_commands = raw_image.add_subparsers(
+        dest="raw_image_command", required=True
+    )
+    raw_image_encode = raw_image_commands.add_parser(
+        "encode", help="Encode an image into raw entropy bytes"
+    )
+    raw_image_encode.add_argument("input")
+    raw_image_encode.add_argument("--output", "-o", required=True)
+    raw_image_encode.set_defaults(handler=command_raw_image_encode)
+    raw_image_decode = raw_image_commands.add_parser(
+        "decode", help="Decode raw I64-Q1 entropy bytes"
+    )
+    raw_image_decode.add_argument("payload", help="Payload path, or - for stdin")
+    raw_image_decode.add_argument("--preset", required=True)
+    raw_image_decode.add_argument("--output", "-o", required=True)
+    raw_image_decode.add_argument("--backend", choices=("qnn", "cpu"), default="qnn")
+    raw_image_decode.add_argument("--require-npu", action="store_true")
+    raw_image_decode.add_argument("--arm64-python")
+    raw_image_decode.add_argument("--decoder-model")
+    raw_image_decode.set_defaults(handler=command_raw_image_decode)
+
+    raw_audio = raw_media.add_parser("audio", help="Raw A1-E15 audio operations")
+    raw_audio_commands = raw_audio.add_subparsers(
+        dest="raw_audio_command", required=True
+    )
+    raw_audio_encode = raw_audio_commands.add_parser(
+        "encode", help="Encode a PCM WAV into raw EnCodec bytes"
+    )
+    raw_audio_encode.add_argument("input")
+    raw_audio_encode.add_argument("--output", "-o", required=True)
+    raw_audio_encode.set_defaults(handler=command_raw_audio_encode)
+    raw_audio_decode = raw_audio_commands.add_parser(
+        "decode", help="Decode raw EnCodec bytes"
+    )
+    raw_audio_decode.add_argument("payload", help="Payload path, or - for stdin")
+    raw_audio_decode.add_argument("--preset", required=True)
+    raw_audio_decode.add_argument("--output", "-o", required=True)
+    raw_audio_decode.add_argument(
+        "--backend", choices=("hybrid-qnn", "cpu"), default="hybrid-qnn"
+    )
+    raw_audio_decode.set_defaults(handler=command_raw_audio_decode)
 
     dashboard = subcommands.add_parser("dashboard", help="Run the offline local UI")
     dashboard.add_argument("--port", type=int, default=8765)
