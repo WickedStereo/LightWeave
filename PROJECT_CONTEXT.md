@@ -200,19 +200,19 @@ offline-smoke reports remain ignored and reproducible.
 
 | Work item | Status | Evidence / next action |
 | --- | --- | --- |
-| Planning/repository baseline | Published | Commit `7d4b91d` is on `origin/main` |
-| Software MVP repository handoff | Published | Full CLI/dashboard, strict QNN, offline, and packaging audits pass |
+| Planning/repository baseline | Corrected locally | Rewritten commit `2d8c2e6`; original repository root preserved |
+| Software MVP repository handoff | Corrected locally | Rewritten implementation commit `5dc4e8b`; file trees and timestamps preserved |
 | `.lwv` envelope and image core | Complete | Unit and real-model acceptance tests pass |
 | Image export/QDQ/strict QNN | Complete | Full graph, no fallback, 0 CPU profile nodes |
 | CLI and offline dashboard | Complete | Image and audio APIs implemented; localhost assets only |
 | Audio extension | Complete locally | Truthful narrowed hybrid passes acceptance |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
-| GitHub Actions unit CI | Complete | Windows Python 3.11 run `30996830347` passed with the minimal pinned unit-test stack; QNN gates stay local |
+| GitHub Actions unit CI | Pending corrected-history push | Content-equivalent Windows Python 3.11 runs passed; QNN gates stay local |
 | Second Snapdragon PC | Pending external device | Transfer the same `.lwv` plus generated artifacts and verify |
 | AI Hub/QAIRT Visualizer | Pending access/install | Compare only when account/SDK are available |
 | Arduino/optical adapter | Deferred | Must not change `.lwv` media format |
-| GitHub push | Complete | Repository-authorized Git Credential Manager account published `main` without embedding credentials |
+| GitHub push | Pending guarded history replacement | Corrected local history will replace `origin/main` with an exact force-with-lease |
 
 ## Risks and mitigations
 
@@ -228,6 +228,7 @@ offline-smoke reports remain ignored and reproducible.
 | Model-weight redistribution terms | Weights remain ignored; verify upstream terms before distribution |
 | AI Hub/QAIRT unavailable | Direct QNN path and reproducible local evidence do not depend on them |
 | GitHub credentials/permission | Resolved with Git Credential Manager; never store tokens in source, remotes, or documentation |
+| Git commit attribution | Corrected commits use the verified repository-owner GitHub no-reply identity; original root is unchanged |
 
 ## Open questions
 
@@ -266,6 +267,7 @@ offline-smoke reports remain ignored and reproducible.
 | D-018 | 2026-08-05 | Use `QUInt16` audio activations and `QUInt8` weights. | Passed CPU and NPU fidelity; 16-bit weights overflowed bias ranges. |
 | D-019 | 2026-08-05 | Apply and disclose a 480-sample CPU boundary de-click. | Removes independent fixed-chunk DC steps without changing length. |
 | D-020 | 2026-08-05 | Use LightWeave PCM WAV I/O instead of torchaudio. | Avoids an unavailable PyTorch 2.13 companion wheel on Windows. |
+| D-021 | 2026-08-05 | Rewrite only the assistant-created commits to the verified repository-owner identity. | Corrects attribution while preserving the original root commit, file trees, messages, and timestamps. |
 
 ## Public references
 
@@ -292,3 +294,4 @@ offline-smoke reports remain ignored and reproducible.
 | 2026-08-05 | Re-ran full image/audio QNN acceptance, verified the installed CLI and rendered dashboard, audited wheel contents, and corrected the tracked audio/quantization manifest contract. |
 | 2026-08-05 | Published the implementation to `origin/main` and split CI dependencies from the heavyweight codec/model-preparation environment after observing redundant installation work. |
 | 2026-08-05 | Confirmed optimized GitHub Actions run `30996830347` passed and replaced the obsolete push blocker with the published repository state. |
+| 2026-08-05 | Corrected author and committer attribution for the six assistant-created commits, preserved the original repository root and content, configured repository-local identity, and removed the stale GitHub credential. |
