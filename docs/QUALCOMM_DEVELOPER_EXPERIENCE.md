@@ -369,6 +369,20 @@ private endpoints, and confidential material must never appear here.
 | Workaround | Make stopping another app opt-in, detect the UNO Q by a successful App CLI probe, decode subprocess output as UTF-8, test result-file existence before reading it, publish inbox files atomically with SHA-256/length validation, maintain an estimated busy window, and report only buffer/launch acceptance. |
 | Suggested improvement | Add an official App Lab host-to-app USB inbox/upload recipe, stable machine-readable status without decorative Unicode, explicit multi-device selection guidance, a lifecycle API that explains the one-active-app rule, bulk binary RouterBridge examples, and an MCU-to-MPU completion/progress callback pattern. |
 
+### DX-024 - Initial two-board USB discovery exposed only the transmitter
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-06; discover the newly connected receiver UNO Q without disturbing the running transmitter |
+| Environment | Windows 11 build 26100 x64; Android Debug Bridge 1.0.41/platform-tools 36.0.2; transmitting UNO Q `123900964`/`UNOQ-1` on COM3 with App CLI 0.12.1 |
+| Tool/source | Read-only ADB device/app discovery plus Windows PnP and serial-port enumeration |
+| Intended workflow | Enumerate two independent UNO Q serials, preserve the running transmitter, and map the second board before inspecting its receiver application |
+| Actual result and evidence | ADB and Windows both continued to expose only one Arduino `2341:0078` composite device, one ADB interface, and COM3 after a delayed rescan. `lightweave_transmitter` remained running; no app was stopped, started, flashed, or modified. |
+| Usefulness | Capability-based discovery prevented the connected transmitter from being mistaken for an unverified receiver and avoided changing the wrong board. |
+| Friction and owner | The second board has not enumerated as a USB data device, so this is currently a cable/port/power/enumeration blocker rather than an App Lab or LightWeave software failure. |
+| Workaround | Verify receiver power and a known data-capable cable/direct host port, then rescan for a second USB composite/ADB/serial identity before any receiver action. |
+| Suggested improvement | Provide a concise official two-UNO-Q host setup guide covering unique USB identities, expected composite interfaces, power/cable requirements, and deterministic App CLI device selection. |
+
 ## Change log
 
 | Date | Change |
@@ -398,3 +412,4 @@ private endpoints, and confidential material must never appear here.
 | 2026-08-06 | Cloned and exercised the tracked `lightweave_transmitter` App Lab app, recorded its USB/ADB atomic inbox and exact variable-length image/audio transfers, preserved backup hashes and waveform timing, and documented App Lab lifecycle, Unicode output, multi-device, polling, and completion-evidence friction. |
 | 2026-08-06 | Published the dashboard-to-App-Lab transmitter source, installer, tests, setup guidance, and board evidence to `origin/main` as commit `028f9d9`. |
 | 2026-08-06 | Added the owner's direct visual observation of laser activity from a dashboard send while keeping optical byte correctness and reception explicitly unverified. |
+| 2026-08-06 | Recorded that the first two-board discovery attempt exposed only transmitter `123900964`/COM3, leaving receiver inspection blocked on USB data enumeration while preserving the running app. |

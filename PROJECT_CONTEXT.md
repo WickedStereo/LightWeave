@@ -228,6 +228,13 @@ visually observed the physical laser blinking. This proves the commanded laser
 activity reached the hardware; it does not yet prove optical byte correctness
 or receiver reconstruction.
 
+On the first receiver-connection attempt later on 2026-08-06, Windows PnP and
+ADB still exposed only the transmitter board (`123900964`, hostname `UNOQ-1`,
+COM3). No second Arduino USB composite, serial, or ADB interface appeared after
+an additional delayed rescan. The running transmitter app was not stopped or
+modified. Receiver inspection is blocked until its USB data connection
+enumerates independently.
+
 ## Confirmed architecture
 
 ### `.lwv` envelope
@@ -678,3 +685,4 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-06 | Implemented the tracked `lightweave_transmitter` App Lab clone, variable-length STM32 transmit loop, atomic USB/ADB sink, dashboard status/Send flow, hash-preserving installer, and setup documentation; verified exact real image/audio byte counts, busy rejection, unchanged 25 ms waveform completion, and browser acceptance without modifying the backup. |
 | 2026-08-06 | Published the complete Windows-dashboard-to-UNO Q transmitter milestone as commit `028f9d9` on `origin/main` without force-pushing. |
 | 2026-08-06 | Recorded the owner's independent visual observation that a dashboard-initiated request made the physical laser blink; optical byte correctness and reception remain the next gate. |
+| 2026-08-06 | Attempted read-only two-board discovery after the receiver was connected; only transmitter `123900964`/COM3 enumerated, so receiver inspection remains pending a second USB data connection. |
