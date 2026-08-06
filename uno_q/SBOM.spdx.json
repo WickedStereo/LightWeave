@@ -1,0 +1,94 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "LightWeave-UNO-Q-receiver",
+  "documentNamespace": "https://github.com/WickedStereo/LightWeave/sbom/uno-q/0.1.0",
+  "creationInfo": {
+    "created": "2026-08-06T01:00:00Z",
+    "creators": [
+      "Tool: LightWeave repository maintenance"
+    ]
+  },
+  "packages": [
+    {
+      "name": "LightWeave UNO Q receiver",
+      "SPDXID": "SPDXRef-Package-LightWeaveUNO",
+      "versionInfo": "0.1.0",
+      "downloadLocation": "https://github.com/WickedStereo/LightWeave",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "NOASSERTION",
+      "primaryPackagePurpose": "APPLICATION"
+    },
+    {
+      "name": "ncnn",
+      "SPDXID": "SPDXRef-Package-ncnn",
+      "versionInfo": "20260805",
+      "downloadLocation": "https://github.com/Tencent/ncnn",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "copyrightText": "Copyright (c) 2017 Tencent",
+      "primaryPackagePurpose": "LIBRARY",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "6aa36f8ad4c68f5b330ee0e2e97203b5c94f0705865543aae1b4bdb70bc136ee"
+        }
+      ]
+    },
+    {
+      "name": "CompressAI",
+      "SPDXID": "SPDXRef-Package-CompressAI",
+      "versionInfo": "1.2.8",
+      "downloadLocation": "https://github.com/InterDigitalInc/CompressAI",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "copyrightText": "Copyright (c) 2021-2024 InterDigital AI Lab",
+      "primaryPackagePurpose": "LIBRARY"
+    },
+    {
+      "name": "bmshj2018-factorized quality-1 checkpoint",
+      "SPDXID": "SPDXRef-Package-CompressAICheckpoint",
+      "versionInfo": "446d5c7f",
+      "downloadLocation": "https://compressai.s3.amazonaws.com/models/v1/bmshj2018-factorized-prior-1-446d5c7f.pth.tar",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "copyrightText": "NOASSERTION",
+      "primaryPackagePurpose": "MACHINE-LEARNING-MODEL",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "446d5c7f56d4d5108dc7fb2532cbe45bbf2e78f1778384b04526a8fcd641f5c5"
+        }
+      ],
+      "comment": "Checkpoint and converted artifacts are not committed; verify upstream redistribution terms before sharing a bundle."
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-LightWeaveUNO"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-LightWeaveUNO",
+      "relationshipType": "STATIC_LINK",
+      "relatedSpdxElement": "SPDXRef-Package-ncnn"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-LightWeaveUNO",
+      "relationshipType": "GENERATED_FROM",
+      "relatedSpdxElement": "SPDXRef-Package-CompressAI"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-LightWeaveUNO",
+      "relationshipType": "GENERATED_FROM",
+      "relatedSpdxElement": "SPDXRef-Package-CompressAICheckpoint"
+    }
+  ]
+}

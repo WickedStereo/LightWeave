@@ -45,6 +45,9 @@ CPU de-click correction removes independent one-second chunk-edge steps.
   parity was at least 51.29 dB.
 - Raw audio sample: exactly 376 bytes for two seconds, 48,000 samples restored,
   and a strict zero-CPU-node QNN tail profile.
+- UNO Q: all three raw image decoders run as complete 16-layer graphs through
+  ncnn Vulkan on the Adreno 702 with CPU fallback rejected; board
+  accelerator/CPU parity is 36.34-44.38 dB.
 
 Generated reports, model weights, ONNX/QDQ artifacts, and profiles are ignored
 by Git. Reproduce the evidence locally with the scripts below.
@@ -104,6 +107,40 @@ Raw mode intentionally has no integrity or model-negotiation bytes. Corruption,
 wrong message boundaries, or mismatched pinned artifacts may fail decoding or
 produce incorrect media; use `.lwv` when those protections are required.
 
+## Android text/image receiver
+
+The [`android/`](android/) Android Studio project prepares the phone side of a
+direct UNO Q-to-Galaxy S25 Ultra USB-C link. It treats the UNO Q as the future
+reconstruction host and the phone as a presentation client. The current app:
+
+- matches the observed UNO Q USB identity `2341:0078`;
+- reads CDC/ACM through pinned `usb-serial-for-android` 3.10.0;
+- parses length- and CRC-protected `LWRX` frames;
+- displays UTF-8 text and PNG/JPEG images; and
+- provides hardware-free text/image demos through the production parser.
+
+The debug APK, 9 focused unit tests, and Android lint pass locally. UNO Q
+reconstruction now passes separately, while phone enumeration, cable power,
+USB delivery, and sustained throughput have not been exercised and are not
+claimed. The Android app requests neither Internet nor broad storage
+permission. See [android/README.md](android/README.md) for Android Studio,
+wireless-debugging, build, and sender-protocol details.
+
+## UNO Q accelerated image receiver
+
+The [`uno_q/`](uno_q/) target receives the same header-free `payload.bin` and
+reconstructs 64, 128, or 256-pixel images on the board. Its native ARM64 CLI
+runs directly on the existing Debian OS—Docker is not a runtime dependency.
+CPU code performs entropy decoding and PNG packaging; the complete neural
+synthesis graph runs strictly on Turnip Adreno 702 through ncnn Vulkan.
+
+The repository provides source, a pinned manifest, preparation/packaging
+scripts, a hash-checking installer with `-DryRun`, an offline-bundle option,
+native commands, and a monochrome App Lab receive page. Generated models,
+vendor runtime files, and bundles remain ignored. See
+[uno_q/README.md](uno_q/README.md) for build, install, evidence, commands, and
+API details.
+
 ## Reproduce acceptance evidence
 
 ```powershell
@@ -117,9 +154,10 @@ produce incorrect media; use `.lwv` when those protections are required.
 
 ## Scope and records
 
-Laser/LED hardware, photodiodes, Arduino firmware, serial framing, Galaxy S25,
-and Cloud AI remain outside this software milestone. A later serial adapter can
-carry `.lwv` unchanged.
+Laser/LED hardware, photodiodes, Arduino firmware, physical USB-to-phone
+validation, Galaxy audio playback, and Cloud AI remain outside the verified
+software milestone. A later hardware adapter can carry `.lwv` or raw codec
+bytes without changing their existing formats.
 
 - [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) is the living source of truth.
 - [docs/QUALCOMM_DEVELOPER_EXPERIENCE.md](docs/QUALCOMM_DEVELOPER_EXPERIENCE.md)

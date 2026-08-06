@@ -1,0 +1,80 @@
+ARG ARDUINO_BASE=ghcr.io/arduino/app-bricks/python-apps-base:0.11.0
+
+FROM ${ARDUINO_BASE} AS builder
+
+ARG NCNN_SOURCE_SHA256
+ARG BUILD_UTC=2026-08-06_02:00:00
+
+USER root
+
+RUN printf 'deb http://deb.debian.org/debian trixie main\n' \
+        > /tmp/lightweave.sources.list \
+    && apt-get \
+        -o Dir::Etc::sourcelist=/tmp/lightweave.sources.list \
+        -o Dir::Etc::sourceparts=- update \
+    && cd /tmp \
+    && apt-get download libfaketime \
+    && dpkg --install ./libfaketime_*.deb
+
+RUN export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/faketime/libfaketime.so.1 \
+    && export FAKETIME="@$(printf '%s' "${BUILD_UTC}" | tr _ ' ')" \
+    && apt-get update \
+    && apt-get --fix-broken install --yes \
+    && apt-get install --yes --no-install-recommends \
+        build-essential \
+        ca-certificates \
+        cmake \
+        glslang-dev \
+        glslang-tools \
+        libvulkan-dev \
+        ninja-build \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /source
+COPY ncnn-source.tar.gz /source/ncnn-source.tar.gz
+RUN echo "${NCNN_SOURCE_SHA256}  /source/ncnn-source.tar.gz" | sha256sum --check - \
+    && mkdir /source/ncnn \
+    && tar --extract --gzip --file /source/ncnn-source.tar.gz \
+        --directory /source/ncnn --strip-components=1
+
+RUN cmake -S /source/ncnn -B /build/ncnn -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/opt/ncnn \
+        -DNCNN_BUILD_BENCHMARK=OFF \
+        -DNCNN_BUILD_EXAMPLES=OFF \
+        -DNCNN_BUILD_TESTS=OFF \
+        -DNCNN_BUILD_TOOLS=OFF \
+        -DNCNN_DISABLE_RTTI=ON \
+        -DNCNN_SHARED_LIB=OFF \
+        -DNCNN_SYSTEM_GLSLANG=ON \
+        -DNCNN_VULKAN=ON \
+    && cmake --build /build/ncnn --parallel 2 \
+    && cmake --install /build/ncnn
+
+COPY native /source/lightweave-native
+RUN find /source/lightweave-native -exec touch {} + \
+    && cmake -S /source/lightweave-native -B /build/lightweave -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_PREFIX_PATH=/opt/ncnn \
+        -DLIGHTWEAVE_WITH_NCNN=ON \
+    && cmake --build /build/lightweave --parallel 2
+
+FROM ${ARDUINO_BASE} AS runtime
+
+USER root
+
+RUN printf 'deb http://deb.debian.org/debian trixie main\n' \
+        > /tmp/lightweave.sources.list \
+    && apt-get \
+        -o Dir::Etc::sourcelist=/tmp/lightweave.sources.list \
+        -o Dir::Etc::sourceparts=- update \
+    && apt-get install --yes --no-install-recommends \
+        libgomp1 \
+        libvulkan1 \
+        mesa-vulkan-drivers \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /build/lightweave/lightweave-uno-runner \
+    /usr/local/bin/lightweave-uno-runner
+
+ENTRYPOINT ["/usr/local/bin/lightweave-uno-runner"]

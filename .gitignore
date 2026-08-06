@@ -104,6 +104,8 @@ arduino-cli.yaml
 .cache/
 htp_cache/
 qnn_context_cache/
+uno_q/app/runtime/
+uno_q/app/uno_q.manifest.json
 *.onnx.data
 *.ort
 *.dlc

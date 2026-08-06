@@ -6,9 +6,9 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | Multi-size raw image dashboard published and validated locally plus in CI |
-| Primary milestone | Header-free image/audio payload generation and receiver dashboard |
-| Secondary milestone | EnCodec audio extension with an honest CPU/NPU split |
+| Phase | UNO Q accelerated image receiver validated and packaged; publication ready |
+| Primary milestone | Header-free image reconstruction on UNO Q Adreno with no neural CPU fallback |
+| Secondary milestone | Galaxy S25 delivery after the UNO Q receiver milestone |
 | Last updated | 2026-08-05 |
 | Approval gate | Application implementation explicitly approved on 2026-08-05 |
 
@@ -31,7 +31,7 @@ Repository enforcement lives in `AGENTS.md`.
 
 LightWeave is an offline-first, transport-agnostic software system that turns
 media into compact bytes for a very low-bandwidth optical link and reconstructs
-the media on a Snapdragon PC.
+the media on Qualcomm-based Windows and Debian edge devices.
 
 The implemented milestone assumes a reliable ordered byte pipe and includes:
 
@@ -55,14 +55,82 @@ The implemented milestone assumes a reliable ordered byte pipe and includes:
   an out-of-band exact sample count.
 - Separate `/transmit`, `/receive`, and `/loopback` dashboard pages plus
   `RawByteSink`/`RawByteSource` adapter contracts for future hardware.
+- A native Android receiver prototype for direct UNO Q USB text/image display,
+  with hardware-free framed demos and no Internet permission.
 
 The following remain out of scope:
 
 - Laser/LED, photodiode, analog circuitry, modulation, clock recovery, Arduino
   firmware, and serial framing.
-- Galaxy S25, WebSockets, and Cloud AI in the runtime path.
+- Galaxy S25 hardware validation, Android audio playback, WebSockets, and Cloud
+  AI in the runtime path.
 - Medical, regulatory, safety, or absolute-security claims.
 - A packaged EXE/MSIX.
+
+### UNO Q-to-Android receiver extension
+
+The owner selected a direct USB-C-to-USB-C receiver path: Galaxy S25 Ultra as
+USB host, UNO Q as USB device, and a native Android application displaying
+results already reconstructed by the UNO Q. Text and images are the current
+app scope; audio is deferred. The phone application is presentation and USB
+transport only, not an AI decoder.
+
+The `android/` Android Studio project implements the hardware-independent side
+of that contract. It matches observed UNO Q USB identity `2341:0078`, requests
+USB-host permission, uses `usb-serial-for-android` 3.10.0 for CDC/ACM reads,
+and parses incremental `LWRX` v1 frames. A 16-byte little-endian header carries
+magic, version, media type, flags, payload length, and CRC32. Type 1 is UTF-8
+text; type 2 is PNG/JPEG. USB framing is downstream of the optical link and
+does not count against the raw optical payload budget.
+
+The UNO Q reconstruction boundary is now verified independently of the phone.
+Its native ARM64 rANS decoder produces the same latent tensor as CompressAI for
+all three raw image presets, and the complete `g_s` graph runs through ncnn
+Vulkan on the Adreno 702 with unsupported layers and CPU fallback rejected.
+The board-local CLI and App Lab WebUI both reconstruct real payloads. The
+remaining Android uncertainty is the USB transport, phone power, and display
+path—not whether the UNO Q can reconstruct the image.
+
+Documentation claims: Arduino specifies that UNO Q has a Qualcomm Dragonwing
+QRB2210 MPU running Debian, an STM32U585 MCU, Bridge/RPC, Wi-Fi, Bluetooth, and
+USB-C role switching. Samsung specifies USB-C/USB 3.2 Gen 1 for the Galaxy S25
+Ultra. Direct local PC observation: UNO Q enumerated as Arduino USB composite
+`2341:0078` with ADB and a standard USB serial interface. UNO Q-to-S25
+enumeration, sustained power, Android CDC matching, and throughput remain
+unexercised.
+
+### Qualcomm edge-device inference targets
+
+For the Galaxy S25, Samsung documents Snapdragon 8 Elite for Galaxy. ONNX
+Runtime documents QNN Execution Provider support on Android, HTP as the NPU
+backend, and a Java `addQnn` API. Because its prebuilt QNN packages are
+Windows-only, LightWeave would need a custom Android ARM64 AAR built against a
+pinned Qualcomm AI Engine Direct/QNN SDK and compatible device runtime. The
+recommended first gate is a stored latent tensor through one fixed-shape QDQ
+`g_s` graph, requiring HTP-only execution, disabled CPU fallback, zero profiled
+CPU graph nodes, finite output, and at least 35 dB parity against the Windows
+CPU reference. CompressAI rANS entropy decoding would be ported to Android
+C++/NDK and remain on CPU; the complete neural synthesis graph would use the
+NPU. On-phone image encoding is a second phase using `g_a` on HTP and CPU rANS
+encoding. EnCodec audio is later and higher risk because upstream EnCodec does
+not support Android/mobile ARM and LightWeave's current audio path is hybrid.
+
+The exercised UNO Q Debian image does not expose QNN/FastRPC libraries,
+firmware, or device nodes. It does expose Mesa 25.2.6 Turnip Vulkan on the
+Adreno 702. The accepted backend is therefore ncnn Vulkan: one native runner
+executes every complete static `g_s` graph, audits Vulkan support for all 16
+compute layers, rejects llvmpipe/non-Adreno devices, and never selects a CPU
+neural path. CPU work is limited to rANS entropy decoding, PNG packaging, and
+application orchestration. On-board `g_a` compression is the next UNO Q phase;
+audio and Galaxy S25 HTP work remain deferred.
+
+The repository should be the single source of source code, pinned manifests,
+payload contracts, validation vectors, and setup orchestration for all targets.
+It should not pretend that one binary or environment installs everywhere:
+Windows x64/ARM64, Android ARM64, and UNO Q Debian ARM64 need separate thin
+installers that consume shared versioned model/codec definitions. Generated
+models, SDK redistributables, and credentials remain outside Git; manifests and
+download/verification scripts are tracked.
 
 ## Confirmed architecture
 
@@ -147,6 +215,10 @@ parity and is the truthful supported hybrid.
 - Windows x64 Python 3.11: PyTorch, CompressAI, EnCodec, entropy/codebook work,
   model preparation, orchestration, dashboard, and tests.
 - Native Windows ARM64 Python 3.11: ONNX Runtime 1.24.4 and QNN plugin 2.4.0.
+- UNO Q Debian 13.1 ARM64: native CompressAI-compatible rANS plus a statically
+  linked ncnn Vulkan runner on Mesa Turnip Adreno 702. Docker is not a runtime
+  dependency; Arduino App Lab supplies its normal generic application
+  container for the optional WebUI.
 - Plain and QNN ONNX Runtime distributions are kept out of the same ARM64
   environment.
 - Weights, ONNX/QDQ graphs, calibration data, QNN profiles, reports, and caches
@@ -168,6 +240,10 @@ lightweave raw audio encode INPUT.wav --output payload.bin
 lightweave raw audio decode payload.bin --preset A1-E15-S48000 --output AUDIO.wav
 lightweave inspect PAYLOAD
 lightweave dashboard
+lightweave-uno doctor --json
+lightweave-uno image decode PAYLOAD --preset PRESET --output IMAGE --require-accelerator
+lightweave-uno benchmark --preset all --json
+lightweave-uno serve
 ```
 
 Core encode/decode functions operate on bytes and files. The raw path exposes
@@ -219,8 +295,45 @@ and a later serial adapter can implement the same contract.
 | Audio reconstruction | Exact 48,000 samples; finite output; conditioned boundary jump 0.0 |
 | Audio strict QNN tail | `QNNExecutionProvider` only; 0 CPU nodes |
 
-Focused unit tests currently report 44 passing tests. Generated acceptance and
-offline-smoke reports remain ignored and reproducible.
+The hardware-independent repository suite reports 51 passing Python tests.
+Generated acceptance and offline-smoke reports remain ignored and reproducible.
+
+### UNO Q image receiver acceptance
+
+| Check | Result |
+| --- | --- |
+| Board | Arduino UNO Q; Debian 13.1 ARM64; 3.6 GiB RAM |
+| Accelerator | Mesa 25.2.6 Turnip Vulkan on Adreno 702 |
+| QNN/FastRPC discovery | Not present on the exercised base image |
+| Entropy decoder | Exact latent equality with CompressAI for all three presets |
+| Neural graph | Complete 16-compute-layer `g_s` on Vulkan for every preset |
+| Fallback enforcement | Non-Adreno devices, unsupported Vulkan layers, and neural CPU fallback rejected |
+| Static model CPU parity | 43.11 dB tiny, 42.15 dB balanced, 41.17 dB quality |
+| Board accelerator/CPU parity | 36.34 dB tiny, 41.77 dB balanced, 44.38 dB quality |
+| Exercised payloads | 80 bytes tiny, 216 bytes balanced, 716 bytes quality |
+| Five-run median/p95 inference | 0.173/0.176 s tiny, 0.521/0.562 s balanced, 1.978/2.160 s quality |
+| Process/disk measurements | Up to about 60.6 MiB observed child RSS; 35.6 MiB installed bundle; 17.6 GB board disk free |
+| Repeated-run behavior | Initial FP16-arithmetic stress produced an MSM GPU hang; FP32 arithmetic with FP16 storage/packing and a shared serialized one-second cooldown passed five runs of all profiles |
+| Cross-entry-point arbitration | Concurrent native quality decode plus App Lab balanced request both passed strictly; shared file lock serialized the GPU work |
+| Board-local API | Status and real 128 by 128 reconstruction passed with strict evidence |
+| Runtime Docker dependency | None for the native CLI; App Lab uses the platform's existing container |
+| First native dependency build | About 27 minutes at two jobs; cached runner rebuild about 20 seconds |
+
+### Android receiver acceptance
+
+| Check | Result |
+| --- | --- |
+| Toolchain | Java 17, Android SDK/target 36, AGP 9.0.0, Gradle 9.1.0 |
+| Debug APK | Builds successfully; package `com.lightweave.receiver` |
+| Unit tests | 9 passing tests for identity, framing, fragmentation, CRC/resync, UTF-8, and counters |
+| Android lint | 0 errors; Gradle-version notice only |
+| Offline rebuild after dependency setup | Pass |
+| USB host declaration | Present; exact UNO Q filter `2341:0078` |
+| App network permission | None |
+| Supported result types | UTF-8 text and PNG/JPEG image |
+| Hardware-free demos | Text and generated PNG traverse the production frame parser |
+| S25/UNO Q cable and power | Not exercised |
+| UNO Q decoder deployment | Verified separately on board; UNO Q-to-phone delivery remains unexercised |
 
 ### Product surface and packaging
 
@@ -235,6 +348,9 @@ offline-smoke reports remain ignored and reproducible.
 | Monochrome dashboard refresh | Pass; text-first square layout, no gradients/shadows, responsive at 390 px without horizontal overflow |
 | Multi-size browser workflow | Pass; balanced sample transmit/verify and separate receiver upload both reconstructed 128 by 128 with 0 CPU profile nodes |
 | Raw disconnected-runtime smoke | Pass for balanced strict image QNN and audio hybrid; 216/376 raw bytes and exact outputs |
+| Android text/image receiver | Debug APK, framed demos, unit tests, and lint pass; real UNO Q/S25 path pending |
+| UNO Q native receiver | All image profiles reconstruct on Adreno Vulkan with strict no-fallback and at least 36.34 dB accelerator/CPU parity |
+| UNO Q App Lab WebUI | Rendered browser upload/reconstruction/download and oversize error pass; balanced accelerator time about 524 ms; no console errors |
 | Dashboard browser console | No errors |
 | Built wheel contents | Pass; CLI modules and all local HTML/CSS/JavaScript assets included |
 
@@ -269,6 +385,9 @@ offline-smoke reports remain ignored and reproducible.
 | Raw 128 by 128 strict QNN decoder | Complete locally | QUInt16 QDQ, 66.74 dB minimum CPU parity, no fallback, 0 CPU nodes, 51.29 dB minimum NPU/CPU parity |
 | Raw milestone publication | Complete | Commit `140f9ae`; GitHub Actions run `31047777514` passed |
 | Multi-size dashboard publication | Complete | Commit `9aee230`; GitHub Actions run `31057418505` passed |
+| Android text/image receiver | Complete locally; hardware pending | APK builds; 9 unit tests and lint pass; validate UNO Q CDC, S25 power, and decoded output next |
+| UNO Q accelerator feasibility | Complete | ncnn Vulkan executes all three complete graphs on Adreno 702; QNN/FastRPC is absent on the exercised image |
+| UNO Q native receiver | Complete locally | Native rANS, strict runner, CLI, rendered API/WebUI, manifest, SPDX SBOM, offline bundle, dry-run/idempotent installer, and 51-test repository suite pass |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
 | GitHub Actions unit CI | Complete | Corrected-history Windows Python 3.11 run `31034723025` passed; QNN gates stay local |
@@ -295,6 +414,12 @@ offline-smoke reports remain ignored and reproducible.
 | Git commit attribution | Corrected commits use the verified repository-owner GitHub no-reply identity; original root is unchanged |
 | Raw payload has no integrity/model negotiation | Intentional tradeoff; UI warns, preset validation fails early where possible, and `.lwv` remains available |
 | Image quality and transfer time trade off sharply | UI exposes explicit 128/768/2,048-byte profiles, output resolution, measured bytes, and 1/2 kbps estimates; no original-resolution claim |
+| UNO Q App Lab image lacks Vulkan user-space files | Installer copies the target board's own loader, Turnip driver, and ICD into only the LightWeave app; no vendor binary is committed or redistributed |
+| UNO Q QNN/Hexagon availability | QNN/FastRPC was absent, so the accepted claim is Adreno Vulkan only; do not imply Hexagon execution |
+| UNO Q source build time and disk use | Use two compile jobs and preserve cache for iteration; native runtime does not require Docker or a compiler |
+| Repeated UNO Q quality runs can stress Turnip/MSM | FP16 arithmetic produced a kernel-reported GPU hang; final runner uses FP16 storage/packing with FP32 arithmetic, explicit Vulkan teardown, cross-process serialization, and a one-second cooldown; five runs of all profiles pass |
+| USB stream loses boundaries or reconnects mid-result | `LWRX` length plus CRC32 framing rejects corruption and resynchronizes on magic |
+| Phone receives an unsafe image allocation | Reject payloads above 8 MiB and decoded dimensions above 16 megapixels |
 
 ## Open questions
 
@@ -308,6 +433,21 @@ offline-smoke reports remain ignored and reproducible.
   preparation time?
 - Which serial reliability/framing adapter will carry `.lwv` over the physical
   optical link without altering the media format?
+- Will Android match the observed UNO Q composite device as CDC/ACM through
+  `usb-serial-for-android`, or will a custom probe/device interface be needed?
+- Can the S25 reliably power the UNO Q during sustained receive, or is a
+  standards-compliant powered USB-C hub/PD arrangement required?
+- What sustained USB throughput is reliable for decoded PNG/JPEG results,
+  before the later audio transport is designed?
+- Can a custom Android ONNX Runtime/QNN AAR run the existing fixed-shape QDQ
+  image decoder on Galaxy S25 HTP with no fallback, zero CPU graph nodes, and
+  at least 35 dB parity against the Windows CPU reference?
+- Can the pinned CompressAI rANS decoder and tables be ported to Android NDK
+  while decoding existing raw `payload.bin` files byte-identically?
+- What are cold-start, median, p95, peak-memory, disk, and sustained thermal
+  measurements for the final UNO Q bundle across repeated runs?
+- Can the UNO Q `g_a` encoder also execute completely on Adreno Vulkan while a
+  native CPU rANS encoder preserves the existing raw payload contract?
 
 ## Decision log
 
@@ -338,8 +478,14 @@ offline-smoke reports remain ignored and reproducible.
 | D-023 | 2026-08-05 | Treat preset codes as trusted out-of-band configuration. | Keeps hashes, headers, lengths, and fingerprints out of the optical payload. |
 | D-024 | 2026-08-05 | Fix raw image output at 64 by 64 and enforce 128 bytes with adaptive detail and deterministic fallbacks. | The hard byte budget is the gate; quality remains informational. |
 | D-025 | 2026-08-05 | Pack raw audio as independent 188-byte one-second chunks and disclose exact sample count in `A1-E15-S<n>`. | Preserves exact length while keeping the wire bytes header-free. |
+| D-026 | 2026-08-05 | Use a direct USB-C-to-USB-C link from UNO Q to Galaxy S25 Ultra. | Explicit owner preference; S25 is host and real device behavior remains unverified. |
+| D-027 | 2026-08-05 | Keep reconstruction on UNO Q and start the Android app with decoded UTF-8 text and PNG/JPEG images. | Owner-defined boundary; UNO Q reconstruction now passes independently, while Android uses `LWRX` framing and presentation only. |
 | D-028 | 2026-08-05 | Expand raw images to explicit 128-, 768-, and 2,048-byte profiles and default the dashboard to 128 by 128 / 768 bytes. | Supersedes D-024 as the only UI choice; preserves its tiny profile and legacy decode alias while providing practical quality options. |
 | D-029 | 2026-08-05 | Use a plain monochrome, text-first dashboard visual system. | Owner requested clarity over decorative styling; controls and evidence remain the focus. |
+| D-030 | 2026-08-05 | Accept ncnn Vulkan on Adreno 702 as the UNO Q accelerator backend. | QNN/FastRPC is absent on the exercised image; strict full-graph Vulkan passed every preset and the owner allowed any proven Qualcomm accelerator. |
+| D-031 | 2026-08-05 | Keep the UNO Q CLI native on the existing Debian OS. | Docker is limited to reproducible build preparation; the delivered CLI has no Docker runtime dependency. |
+| D-032 | 2026-08-05 | Copy Vulkan runtime files only from the target board into the installed App Lab app. | Arduino's generic App container omits the Vulkan loader/driver; target-local copying enables the WebUI without redistributing vendor binaries or modifying the base OS. |
+| D-033 | 2026-08-05 | Use FP16 storage/packing with FP32 arithmetic and serialize UNO Q accelerator calls across host and App Lab. | Repeated FP16-arithmetic quality runs triggered an MSM GPU hang; the stable configuration plus explicit teardown and one-second shared cooldown passed five runs of every profile. |
 
 ## Public references
 
@@ -368,7 +514,18 @@ offline-smoke reports remain ignored and reproducible.
 | 2026-08-05 | Confirmed optimized GitHub Actions run `30996830347` passed and replaced the obsolete push blocker with the published repository state. |
 | 2026-08-05 | Corrected author and committer attribution for the six assistant-created commits, preserved the original repository root and content, configured repository-local identity, and removed the stale GitHub credential. |
 | 2026-08-05 | Published the corrected history, verified every GitHub commit maps to the repository owner, and confirmed corrected-head CI run `31034723025` passed. |
+| 2026-08-05 | Recorded the proposed UNO Q-to-Galaxy S25 Ultra receiver display extension as future, unimplemented scope; recommended an offline LAN browser prototype and separated documentation claims from unverified device behavior. |
+| 2026-08-05 | Replaced the preliminary Wi-Fi recommendation with the owner's selected direct USB-C path; recorded S25-host/UNO-Q-device topology and the unresolved gadget, power, and Android-decoder gates. |
+| 2026-08-05 | Observed the connected UNO Q enumerate on the development PC as USB composite `2341:0078` with both ADB and standard USB serial interfaces; phone enumeration remains the next hardware gate. |
 | 2026-08-05 | Implemented and locally validated the header-free raw image/audio contracts, 64 by 64 strict-QNN decoder, raw CLI, future adapter interfaces, and `/transmit`/`/receive`/`/loopback` dashboard; preserved `.lwv` and recorded the intentionally missing wire protections. |
 | 2026-08-05 | Published raw-mode commit `140f9ae` to `origin/main` and confirmed hardware-independent GitHub Actions run `31047777514` passed. |
+| 2026-08-05 | Implemented the Android Studio text/image receiver prototype with USB-host permission, pinned CDC library, `LWRX` length/CRC framing, type-aware rendering, local demos, 9 passing tests, successful lint, and a debug APK; recorded UNO Q decoding and S25 cable behavior as unverified. |
 | 2026-08-05 | Added explicit tiny/balanced/quality raw image profiles, a strict 128 by 128 QNN graph, local sample patterns, and a monochrome responsive dashboard; validated all profile budgets and strict NPU assignment and made balanced the UI default. |
 | 2026-08-05 | Published multi-size dashboard commit `9aee230` to `origin/main` and confirmed Windows GitHub Actions run `31057418505` passed lint and all hardware-independent tests. |
+| 2026-08-05 | Researched Galaxy S25 and UNO Q Qualcomm inference paths and a one-repository/multiple-target-installer architecture; S25 HTP is a credible strict-NPU target, while the Arduino App Lab QNN/FastRPC container makes QRB2210 acceleration credible but still unprofiled, and neither mobile/board path has been implemented. |
+| 2026-08-05 | Exercised the UNO Q directly: identified Debian 13.1 ARM64 and Turnip Adreno 702, found no QNN/FastRPC runtime, proved exact native rANS latent parity, ran all three complete `g_s` graphs strictly through ncnn Vulkan, and measured at least 36.34 dB board accelerator/CPU parity. |
+| 2026-08-05 | Added the native UNO Q CLI, strict runner, App Lab receive WebUI/API, target-local Vulkan integration, hash-verified offline bundle, dry-run/idempotent installer, model manifest records, and portable tests; Docker remains build-only rather than a delivered runtime dependency. |
+| 2026-08-05 | Browser-tested the live board WebUI with a real 216-byte balanced payload and its 128-byte oversize error, observed strict Adreno evidence and PNG download with no console errors, and completed a clean-Ruff validation plus installer dry run. |
+| 2026-08-05 | Stress testing exposed a recoverable MSM GPU hang during repeated FP16-arithmetic quality runs; stabilized the runner with FP32 arithmetic plus FP16 storage/packing, explicit teardown, and a shared serialized cooldown, then passed five runs of all profiles with p95 and memory/disk evidence. |
+| 2026-08-05 | Proved the shared accelerator lock across the Debian host CLI and App Lab container by launching a quality decode alongside a balanced API request; both completed on Adreno with fallback disabled. |
+| 2026-08-05 | Added a tracked SPDX SBOM and bundle notice, completed 51 Python tests, rebuilt the portable native entropy runner with exact latent equality, reinstalled the 24-file offline bundle, and confirmed the final board status and runner hash. |

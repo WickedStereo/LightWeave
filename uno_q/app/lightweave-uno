@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+
+APP_HOME="${LIGHTWEAVE_UNO_HOME:-$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)}"
+export LIGHTWEAVE_UNO_HOME="$APP_HOME"
+exec python3 "$APP_HOME/python/lightweave_uno.py" "$@"

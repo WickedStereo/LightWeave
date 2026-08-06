@@ -94,6 +94,60 @@
         "calibration_method": "MinMax",
         "calibration_source": "all profile detail levels for data/demo_manifest.json acceptance images",
         "cpu_fallback": false
+      },
+      "uno_q": {
+        "status": "validated-adreno-vulkan",
+        "target": "Arduino UNO Q / Debian 13.1 / ARM64",
+        "hardware": "Qualcomm QRB2210 / Turnip Adreno 702",
+        "entropy_decoder": {
+          "implementation": "native CompressAI-compatible rANS",
+          "tables_path": "artifacts/generated/uno_q/entropy_tables.bin",
+          "reference_equality": "exact latent equality for all three presets"
+        },
+        "neural_backend": {
+          "runtime": "ncnn Vulkan",
+          "source_archive_sha256": "6aa36f8ad4c68f5b330ee0e2e97203b5c94f0705865543aae1b4bdb70bc136ee",
+          "build_reported_version": "20260805",
+          "strict_no_fallback": true,
+          "compute_layers": 16,
+          "runner_path": "artifacts/generated/uno_q/lightweave-uno-runner",
+          "runner_sha256": "a9b4237473f3781b1cab6eaf7a356d9bd0040e3de63e9b687925778a7e28fa7f",
+          "fp16_storage": true,
+          "fp16_packing": true,
+          "fp16_arithmetic": false,
+          "serialized_cooldown_seconds": 1.0
+        },
+        "artifacts": {
+          "generated_manifest": "artifacts/generated/uno_q/bundle.manifest.json",
+          "offline_bundle": "artifacts/generated/uno_q/offline-bundle/lightweave-uno-offline.zip",
+          "tracked_in_git": false
+        },
+        "profiles": {
+          "I64-Q1-B128": {
+            "graph": "artifacts/generated/uno_q/tiny.ncnn.param",
+            "weights": "artifacts/generated/uno_q/tiny.ncnn.bin",
+            "accelerator_cpu_parity_db": 36.3437,
+            "median_inference_seconds_five_runs": 0.173061,
+            "p95_inference_seconds_five_runs": 0.1758654
+          },
+          "I128-Q1-B768": {
+            "graph": "artifacts/generated/uno_q/balanced.ncnn.param",
+            "weights": "artifacts/generated/uno_q/balanced.ncnn.bin",
+            "accelerator_cpu_parity_db": 41.7705,
+            "median_inference_seconds_five_runs": 0.521224,
+            "p95_inference_seconds_five_runs": 0.5617668
+          },
+          "I256-Q1-B2048": {
+            "graph": "artifacts/generated/uno_q/quality.ncnn.param",
+            "weights": "artifacts/generated/uno_q/quality.ncnn.bin",
+            "accelerator_cpu_parity_db": 44.3754,
+            "median_inference_seconds_five_runs": 1.97778,
+            "p95_inference_seconds_five_runs": 2.159822
+          }
+        },
+        "unsupported_on_exercised_image": {
+          "qnn_fastrpc": "libraries, firmware, and device nodes not present"
+        }
       }
     }
   },

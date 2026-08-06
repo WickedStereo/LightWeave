@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>LightWeave / UNO Q receiver</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">LIGHTWEAVE / UNO Q</p>
+      <h1>Image receiver</h1>
+      <p>Decode a raw optical payload with the board's Adreno GPU.</p>
+    </header>
+
+    <section class="status" aria-live="polite">
+      <span id="status-mark" aria-hidden="true">[ ]</span>
+      <span id="status-text">Checking accelerator...</span>
+    </section>
+
+    <form id="receive-form">
+      <label for="preset">Preset</label>
+      <select id="preset" name="preset" required></select>
+
+      <label for="payload">Received payload.bin</label>
+      <input id="payload" name="payload" type="file" accept=".bin,application/octet-stream" required>
+      <p id="budget" class="note"></p>
+
+      <button type="submit">Reconstruct image</button>
+    </form>
+
+    <p class="warning">
+      Raw mode contains no integrity hash, version, or model negotiation. The sender and
+      receiver must use the same preset and pinned model.
+    </p>
+
+    <section id="result" hidden>
+      <h2>Reconstruction</h2>
+      <div class="image-frame"><img id="image" alt="Reconstructed LightWeave image"></div>
+      <a id="download" download="lightweave-reconstruction.png">Download PNG</a>
+      <dl id="metrics"></dl>
+    </section>
+
+    <section id="error" class="error" role="alert" hidden></section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
