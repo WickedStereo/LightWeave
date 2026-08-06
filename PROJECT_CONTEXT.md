@@ -6,9 +6,9 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | UNO Q accelerated image/audio receiver implemented and under final publication validation |
-| Primary milestone | Header-free image and audio reconstruction on UNO Q Adreno with fail-closed acceleration evidence |
-| Secondary milestone | Galaxy S25 delivery after the UNO Q receiver milestone |
+| Phase | UNO Q accelerated image/audio receiver published; project paused before the next integration milestones |
+| Primary milestone | Android receiver UI and hardware validation |
+| Secondary milestone | Direct Windows transmitter-to-UNO Q receiver workflow |
 | Last updated | 2026-08-05 |
 | Approval gate | Application implementation explicitly approved on 2026-08-05 |
 
@@ -145,6 +145,28 @@ Windows x64/ARM64, Android ARM64, and UNO Q Debian ARM64 need separate thin
 installers that consume shared versioned model/codec definitions. Generated
 models, SDK redistributables, and credentials remain outside Git; manifests and
 download/verification scripts are tracked.
+
+### Deferred next milestones
+
+The owner selected the following next milestones and paused further work for
+now:
+
+1. Finish and hardware-validate the Android receiver UI for presentation of
+   text, reconstructed images, and later audio received from UNO Q.
+2. Add a direct Windows transmitter-to-UNO Q workflow so the Windows dashboard
+   can hand generated raw payload bytes to a receiver adapter without the
+   current manual download/upload step.
+
+The Windows-to-UNO Q integration should preserve the existing
+`RawByteSink`/`RawByteSource` boundary and header-free codec payloads. The
+board's existing App Lab text-transmission program is a candidate transport
+adapter, not a codec component. It can be reused directly only if its internal
+path accepts arbitrary binary bytes, preserves every byte including `0x00`,
+and supplies reliable message boundaries. If it is text-only, LightWeave should
+retain its hardware/modulation logic while adding a binary-safe input/output
+boundary; base64 or hexadecimal on the optical wire is not the preferred final
+design because it increases the payload size. Its exact API, framing, and
+direction must be inspected before choosing the adapter.
 
 ## Confirmed architecture
 
@@ -426,7 +448,9 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | UNO Q accelerator feasibility | Complete | ncnn Vulkan executes all three complete graphs on Adreno 702; QNN/FastRPC is absent on the exercised image |
 | UNO Q native receiver | Complete locally | Native rANS, strict runner, CLI, rendered API/WebUI, manifest, SPDX SBOM, offline bundle, dry-run/idempotent installer, and 60-test repository suite pass |
 | UNO Q receiver publication | Complete | Source/evidence commit `8074645` and Android-preservation commit `fa19c64` published to `origin/main` |
-| UNO Q audio receiver | Complete locally; publication pending | Native unpack/codebook parity, earliest valid split 5, strict 39-layer Adreno suffix, 1/5-second parity, CLI/API/WebUI, offline bundle, installer, and offline smoke pass |
+| UNO Q audio receiver | Complete and published | Commit `03b0bd7`; native unpack/codebook parity, earliest valid split 5, strict 39-layer Adreno suffix, 1/5-second parity, CLI/API/WebUI, offline bundle, installer, and offline smoke pass |
+| Android receiver UI and hardware path | Next milestone; deferred for now | Refine the existing prototype, then validate S25/UNO Q enumeration, power, text/image rendering, reconnects, throughput, and later WAV playback |
+| Windows-to-UNO Q direct flow | Next milestone; deferred for now | Implement a `RawByteSink` adapter to the board receiver; first inspect whether the existing App Lab text transmitter is binary-safe and reusable |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
 | GitHub Actions unit CI | Complete | Corrected-history Windows Python 3.11 run `31034723025` passed; QNN gates stay local |
@@ -488,6 +512,10 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
   while decoding existing raw `payload.bin` files byte-identically?
 - Would a future, explicitly approved UNO Q encoding phase justify the extra
   `g_a` model, native rANS encoder, storage, and accelerator-validation cost?
+- Does the owner's existing App Lab text transmitter accept and preserve
+  arbitrary binary data, or does it currently encode only UTF-8/text strings?
+- What local API and message-boundary contract does that transmitter expose to
+  the Windows host, and is it located on the transmitting or receiving UNO Q?
 
 ## Decision log
 
@@ -529,6 +557,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | D-034 | 2026-08-05 | Keep UNO Q receiver-only while adding raw EnCodec audio reconstruction. | Owner explicitly limited the board to reconstruction; encoding, mobile, optical firmware, and MCU integration remain deferred. |
 | D-035 | 2026-08-05 | Select EnCodec decoder split 5 as the earliest valid UNO Q CPU/Adreno partition. | Split 2 produced non-finite Adreno output; split 5 passed 39-layer Vulkan support, strict no-fallback, finite output, and greater-than-35-dB parity gates. |
 | D-036 | 2026-08-05 | Cap the first UNO Q audio receiver at five seconds/940 bytes. | Owner approved the reduction; it halves worst-case work/memory and removes unneeded 6-10 second prefix variants. |
+| D-037 | 2026-08-05 | Make the Android receiver UI and direct Windows-to-UNO Q flow the next two milestones, with work paused for now. | Owner-defined follow-on order after completing the UNO Q image/audio receiver. |
 
 ## Public references
 
@@ -575,3 +604,4 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-05 | Committed the accelerated UNO Q receiver, source-build path, installer, WebUI, tests, manifest, and evidence as `8074645`; the separately preserved Android prototype is commit `fa19c64`. |
 | 2026-08-05 | Pushed the Android-preservation, UNO Q receiver, and milestone documentation commits directly to `origin/main` without force-pushing. |
 | 2026-08-05 | Added the receiver-only UNO Q EnCodec path, rejected split 2, selected the earliest passing split 5, proved exact native indices/zero-error codebook reconstruction and 52.07 dB or better board parity, reduced the limit to five seconds, and integrated the CLI/API/App Lab audio surface plus offline package. |
+| 2026-08-05 | Recorded publication of the UNO Q audio receiver and selected Android receiver UI plus direct Windows-to-UNO Q transfer as the next deferred milestones; identified the existing App Lab text transmitter as a reusable transport candidate pending a binary-safety and interface audit. |
