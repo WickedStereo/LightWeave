@@ -6,7 +6,7 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | UNO Q accelerated image receiver validated and packaged; publication ready |
+| Phase | UNO Q accelerated image receiver validated, packaged, and committed |
 | Primary milestone | Header-free image reconstruction on UNO Q Adreno with no neural CPU fallback |
 | Secondary milestone | Galaxy S25 delivery after the UNO Q receiver milestone |
 | Last updated | 2026-08-05 |
@@ -388,6 +388,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Android text/image receiver | Complete locally; hardware pending | APK builds; 9 unit tests and lint pass; validate UNO Q CDC, S25 power, and decoded output next |
 | UNO Q accelerator feasibility | Complete | ncnn Vulkan executes all three complete graphs on Adreno 702; QNN/FastRPC is absent on the exercised image |
 | UNO Q native receiver | Complete locally | Native rANS, strict runner, CLI, rendered API/WebUI, manifest, SPDX SBOM, offline bundle, dry-run/idempotent installer, and 51-test repository suite pass |
+| UNO Q receiver publication | Complete | Source and evidence commit `8074645`; push pending with this documentation update |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
 | GitHub Actions unit CI | Complete | Corrected-history Windows Python 3.11 run `31034723025` passed; QNN gates stay local |
@@ -529,3 +530,4 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-05 | Stress testing exposed a recoverable MSM GPU hang during repeated FP16-arithmetic quality runs; stabilized the runner with FP32 arithmetic plus FP16 storage/packing, explicit teardown, and a shared serialized cooldown, then passed five runs of all profiles with p95 and memory/disk evidence. |
 | 2026-08-05 | Proved the shared accelerator lock across the Debian host CLI and App Lab container by launching a quality decode alongside a balanced API request; both completed on Adreno with fallback disabled. |
 | 2026-08-05 | Added a tracked SPDX SBOM and bundle notice, completed 51 Python tests, rebuilt the portable native entropy runner with exact latent equality, reinstalled the 24-file offline bundle, and confirmed the final board status and runner hash. |
+| 2026-08-05 | Committed the accelerated UNO Q receiver, source-build path, installer, WebUI, tests, manifest, and evidence as `8074645`; the separately preserved Android prototype is commit `fa19c64`. |
