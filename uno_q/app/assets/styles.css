@@ -18,7 +18,7 @@ main {
   margin: 0 auto;
 }
 
-header, form, .warning, #result, .error {
+header, .receiver-section, .warning, #image-result, #audio-result, .error {
   border-top: 1px solid #666;
   padding: 20px 0;
 }
@@ -38,6 +38,8 @@ h1 {
 
 h2 { font-size: 14px; }
 
+.receiver-section > h2 { margin-bottom: 18px; }
+
 .status {
   display: flex;
   gap: 10px;
@@ -46,11 +48,11 @@ h2 { font-size: 14px; }
 
 form { display: grid; gap: 12px; }
 
-select, input, button, a {
+select, input, button, a, audio {
   font: inherit;
 }
 
-select, input[type="file"] {
+select, input[type="file"], input[type="text"] {
   width: 100%;
   min-height: 44px;
   padding: 10px;
@@ -97,6 +99,12 @@ img {
   max-height: 512px;
   object-fit: contain;
   image-rendering: pixelated;
+}
+
+audio {
+  display: block;
+  width: 100%;
+  margin: 14px 0;
 }
 
 dl {

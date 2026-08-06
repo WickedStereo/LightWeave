@@ -195,6 +195,59 @@
         "calibration_source": "data/generated/demo-audio/chirp-and-tones.wav CPU-prefix tensors",
         "cpu_fallback": false
       }
+    },
+    "uno_q": {
+      "status": "validated-cpu-adreno-hybrid",
+      "target": "Arduino UNO Q / Debian 13.1 / ARM64",
+      "hardware": "Qualcomm QRB2210 / Turnip Adreno 702",
+      "maximum_seconds": 5,
+      "maximum_payload_bytes": 940,
+      "native_unpacking": {
+        "format": "two 10-bit codebooks, 75 frames, four zero pad bits per 188-byte chunk",
+        "codebook_artifact": "artifacts/generated/uno_q/audio/audio-codebooks.bin",
+        "model_sha256": "d7cc33bcf1aad7f2dad9836f36431530744abeace3ca033005e3290ed4fa47bf"
+      },
+      "decoder_partition": {
+        "selection_policy": "earliest split in 2,5,8,11,13 passing complete Vulkan suffix, parity, and stability gates",
+        "rejected_split_2": "Adreno suffix returned non-finite output",
+        "selected_split": 5,
+        "cpu": "codebook reconstruction and decoder layers 0-4",
+        "adreno_vulkan": "decoder layers 5-15",
+        "cpu_compute_layers": 24,
+        "vulkan_compute_layers": 39,
+        "strict_suffix_no_fallback": true,
+        "tail_input_per_chunk": [1, 256, 600]
+      },
+      "artifacts": {
+        "generated_manifest": "artifacts/generated/uno_q/audio/audio.manifest.json",
+        "prefix_shapes": "1-5 whole seconds",
+        "shared_prefix_weights": "artifacts/generated/uno_q/audio/audio-prefix.ncnn.bin",
+        "suffix_graph": "artifacts/generated/uno_q/audio/audio-tail.ncnn.param",
+        "suffix_weights": "artifacts/generated/uno_q/audio/audio-tail.ncnn.bin",
+        "runner_path": "artifacts/generated/uno_q/lightweave-uno-runner",
+        "runner_sha256": "98392e479a06b3a448576d0598c8f6fe31452858d920402e801f077b5f1aa259",
+        "tracked_in_git": false
+      },
+      "numerical_evidence": {
+        "one_second_pytorch_parity_db": 52.1066,
+        "five_second_pytorch_parity_db": 52.0681,
+        "finite_output": true,
+        "conditioned_boundary_jump_maximum": 0.0,
+        "one_second_median_adreno_seconds_five_runs": 1.30594,
+        "one_second_p95_adreno_seconds_five_runs": 1.31658,
+        "five_second_median_adreno_seconds_five_runs": 6.24754,
+        "five_second_p95_adreno_seconds_five_runs": 6.249064,
+        "five_second_median_total_seconds_five_runs": 8.483237809,
+        "five_second_p95_total_seconds_five_runs": 8.486788601,
+        "peak_child_rss_kib": 111716
+      },
+      "tools": {
+        "pnnx_model_conversion": "20260526",
+        "ncnn_board_runtime": "20260805",
+        "fp16_storage": true,
+        "fp16_packing": true,
+        "fp16_arithmetic": false
+      }
     }
   }
 }

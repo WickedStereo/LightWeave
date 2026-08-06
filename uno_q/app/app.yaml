@@ -1,5 +1,5 @@
 name: LightWeave UNO Q Receiver
-description: Reconstruct header-free LightWeave images on the Adreno GPU.
+description: Reconstruct raw LightWeave images and EnCodec audio on UNO Q.
 ports: []
 bricks:
 - arduino:web_ui: {}

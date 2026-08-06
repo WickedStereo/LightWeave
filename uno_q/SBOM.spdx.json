@@ -3,7 +3,7 @@
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
   "name": "LightWeave-UNO-Q-receiver",
-  "documentNamespace": "https://github.com/WickedStereo/LightWeave/sbom/uno-q/0.1.0",
+  "documentNamespace": "https://github.com/WickedStereo/LightWeave/sbom/uno-q/0.2.0",
   "creationInfo": {
     "created": "2026-08-06T01:00:00Z",
     "creators": [
@@ -14,7 +14,7 @@
     {
       "name": "LightWeave UNO Q receiver",
       "SPDXID": "SPDXRef-Package-LightWeaveUNO",
-      "versionInfo": "0.1.0",
+      "versionInfo": "0.2.0",
       "downloadLocation": "https://github.com/WickedStereo/LightWeave",
       "filesAnalyzed": false,
       "licenseConcluded": "MIT",
@@ -67,6 +67,35 @@
         }
       ],
       "comment": "Checkpoint and converted artifacts are not committed; verify upstream redistribution terms before sharing a bundle."
+    },
+    {
+      "name": "EnCodec",
+      "SPDXID": "SPDXRef-Package-EnCodec",
+      "versionInfo": "0.1.1",
+      "downloadLocation": "https://github.com/facebookresearch/encodec",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "copyrightText": "Copyright (c) Meta Platforms, Inc. and affiliates",
+      "primaryPackagePurpose": "SOURCE"
+    },
+    {
+      "name": "EnCodec 24 kHz checkpoint",
+      "SPDXID": "SPDXRef-Package-EnCodecCheckpoint",
+      "versionInfo": "d7cc33bc",
+      "downloadLocation": "https://dl.fbaipublicfiles.com/encodec/v0/encodec_24khz-d7cc33bc.th",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "copyrightText": "NOASSERTION",
+      "primaryPackagePurpose": "MACHINE-LEARNING-MODEL",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "d7cc33bcf1aad7f2dad9836f36431530744abeace3ca033005e3290ed4fa47bf"
+        }
+      ],
+      "comment": "Checkpoint, codebooks, and converted graphs are not committed; verify upstream redistribution terms before sharing a bundle."
     }
   ],
   "relationships": [
@@ -89,6 +118,16 @@
       "spdxElementId": "SPDXRef-Package-LightWeaveUNO",
       "relationshipType": "GENERATED_FROM",
       "relatedSpdxElement": "SPDXRef-Package-CompressAICheckpoint"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-LightWeaveUNO",
+      "relationshipType": "GENERATED_FROM",
+      "relatedSpdxElement": "SPDXRef-Package-EnCodec"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-LightWeaveUNO",
+      "relationshipType": "GENERATED_FROM",
+      "relatedSpdxElement": "SPDXRef-Package-EnCodecCheckpoint"
     }
   ]
 }

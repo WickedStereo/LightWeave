@@ -44,12 +44,18 @@ def test_tracked_model_manifest_records_validated_conversion_contracts() -> None
     audio_onnx = audio["onnx"]
     assert audio_onnx["input_shape"] == [1, 32, 24000]
     assert audio_onnx["output_shape"] == [1, 1, 24000]
-    assert audio["decoder_partition"]["qnn_htp"] == (
-        "fixed-shape decoder layers 13-15"
-    )
+    assert audio["decoder_partition"]["qnn_htp"] == ("fixed-shape decoder layers 13-15")
     assert audio_onnx["quantization"]["activation_type"] == "QUInt16"
     assert audio_onnx["quantization"]["weight_type"] == "QUInt8"
     assert audio_onnx["quantization"]["cpu_fallback"] is False
+    uno_audio = audio["uno_q"]
+    assert uno_audio["maximum_seconds"] == 5
+    assert uno_audio["maximum_payload_bytes"] == 940
+    assert uno_audio["decoder_partition"]["selected_split"] == 5
+    assert uno_audio["decoder_partition"]["strict_suffix_no_fallback"] is True
+    assert uno_audio["decoder_partition"]["vulkan_compute_layers"] == 39
+    assert uno_audio["numerical_evidence"]["one_second_pytorch_parity_db"] >= 35
+    assert uno_audio["numerical_evidence"]["five_second_pytorch_parity_db"] >= 35
 
 
 def test_example_environment_exposes_all_supported_path_overrides() -> None:

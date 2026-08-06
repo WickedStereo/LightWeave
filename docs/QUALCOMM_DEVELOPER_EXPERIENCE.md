@@ -38,7 +38,8 @@ private endpoints, and confidential material must never appear here.
 | Scaler Chatbot | Unavailable reference | Potential local chatbot sample | No unambiguous public link supplied |
 | [Awesome Qualcomm Developer](https://qualcomm.github.io/awesome-qualcomm-developer/) | Discovery reference | Comparable projects and samples | Available |
 | [Arduino UNO Q documentation](https://docs.arduino.cc/hardware/uno-q) | Active hardware documentation | QRB2210 receiver, Debian/App Lab deployment, and direct USB phone interface | Board receiver exercised; phone path pending |
-| [ncnn](https://github.com/Tencent/ncnn) Vulkan runtime | Active third-party tooling | Complete image synthesis on UNO Q Adreno 702 | All three static graphs exercised with strict no-fallback |
+| [ncnn](https://github.com/Tencent/ncnn) Vulkan runtime | Active third-party tooling | Complete image synthesis and EnCodec suffix execution on UNO Q Adreno 702 | All image graphs and the selected 39-layer audio suffix exercised with strict no-fallback |
+| [Meta EnCodec](https://github.com/facebookresearch/encodec) | Model/preparation dependency | 24 kHz raw audio codebooks and decoder conversion | Native UNO Q conversion validated; upstream Python runtime is not installed on board |
 | [Android USB host documentation](https://developer.android.com/develop/connectivity/usb/host) | Platform documentation | Galaxy S25 USB enumeration, permission, and endpoint workflow | Used for Android receiver design; phone path not exercised |
 | [usb-serial-for-android](https://github.com/mik3y/usb-serial-for-android) 3.10.0 | Third-party Android library | CDC/ACM transport for decoded UNO Q results | Integrated and built; real UNO Q/S25 match not exercised |
 | Provided `qualcomm/edge-ai-labs-arduino` RPC path | Later hardware reference | Future UNO Q byte adapter | Stale/404 |
@@ -326,6 +327,20 @@ private endpoints, and confidential material must never appear here.
 | Workaround | Use the validated mixed-storage/FP32-arithmetic configuration, coordinate all LightWeave accelerator clients with one shared lock and cooldown, retain kernel-log evidence, and keep CPU fallback forbidden |
 | Suggested improvement | Add a maintained UNO Q GPU-inference stress sample, automatic device-loss diagnostics/reset guidance, and App Lab-wide accelerator arbitration for host plus container clients |
 
+### DX-021 - EnCodec audio requires a truthful CPU/Adreno partition on UNO Q
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-05; add receiver-only raw EnCodec reconstruction to the existing native UNO Q image receiver |
+| Environment | Arduino UNO Q; Qualcomm QRB2210 CPU plus Turnip Adreno 702; Debian 13.1 ARM64; App Lab 0.12.1; EnCodec 0.1.1 preparation under Windows x64 Python 3.11.9; board Python 3.13.14 |
+| Tool/source | Meta EnCodec 24 kHz checkpoint `d7cc33bc`; PyTorch 2.13.0 CPU; pnnx 20260526; ncnn board runtime 20260805; native C++ 10-bit unpacking/codebook summation |
+| Intended workflow | Preserve `A1-E15-S<n>` exactly, run recurrent work on CPU, select the earliest split in 2/5/8/11/13 whose complete suffix is Vulkan-supported and numerically stable, and expose the result through the native CLI plus App Lab |
+| Actual result and evidence | Split 2 was fully Vulkan-supported but returned non-finite Adreno output and was rejected. Split 5 was the earliest pass: code indices matched Python exactly, native codebook error was 0.0, CPU layers 0-4 preserved recurrence across the complete clip, and all 39 suffix compute layers 5-15 ran on Adreno. One- and five-second board output measured 52.11/52.07 dB against PyTorch with exact 24,000/120,000 samples and zero conditioned boundary jump. Five-run one-second median/p95 was 1.306/1.317 s for the Adreno suffix and 2.716/2.745 s total; five-second results were 6.248/6.249 s and 8.483/8.487 s. Peak child RSS was about 109.1 MiB. |
+| Usefulness | Extends the same 188-byte-per-second transport contract to a small Qualcomm edge board without installing PyTorch/EnCodec or making a false full-GPU/NPU claim |
+| Friction and owner | Upstream EnCodec does not provide an onboard ARM runtime; its LSTM is outside ncnn Vulkan, pnnx produces many duration-specific static shape files, and a graph can report Vulkan support yet still fail numerically. This is primarily third-party model/runtime friction, with Qualcomm/Arduino documentation lacking an end-to-end neural audio partition example. |
+| Workaround | Export two codebooks plus one content-addressed shared prefix weight file, generate static 1-5 second prefix params, audit every suffix layer, pair assignment with finite/parity tests, reject split 2, cap the first release at five seconds, and retain the shared accelerator lock/cooldown. Docker is used only for the reproducible board build; the installed tool runs natively on Debian/App Lab. |
+| Suggested improvement | Publish a maintained QRB2210 audio-inference sample covering recurrent CPU/GPU partitioning, Vulkan numerical validation, shared accelerator arbitration, duration/memory tradeoffs, and packaging into App Lab without a Python ML runtime. |
+
 ## Change log
 
 | Date | Change |
@@ -350,3 +365,4 @@ private endpoints, and confidential material must never appear here.
 | 2026-08-05 | Browser-tested the live App Lab receiver: a 216-byte payload reconstructed to 128 by 128 with about 524 ms accelerator time, exposed 16-layer/no-fallback evidence and PNG download, and showed the preset-budget error without browser console failures. |
 | 2026-08-05 | Added repeated-run evidence: diagnosed an FP16-arithmetic quality-run MSM GPU hang, introduced explicit teardown and cross-process serialization with FP32 arithmetic/FP16 storage, and passed five runs of every profile while recording p95, RSS, and disk measurements. |
 | 2026-08-05 | Packaged the final runner with an SPDX SBOM and third-party notice, rebuilt the portable entropy reference with exact latent equality, and reinstalled the hash-verified 24-file App Lab bundle with healthy strict-Adreno status. |
+| 2026-08-05 | Implemented and exercised the UNO Q EnCodec receiver: split 2 failed numerically, split 5 passed strict 39-layer Adreno execution and 52.07 dB or better parity, native indices/codebooks matched exactly, the limit became five seconds, and App Lab playback/download/error plus offline-network tests passed. |

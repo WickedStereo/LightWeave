@@ -15,6 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 GENERATED = PROJECT_ROOT / "artifacts" / "generated" / "uno_q"
 APP_SOURCE = PROJECT_ROOT / "uno_q" / "app"
 MODEL_SHA256 = "446d5c7f56d4d5108dc7fb2532cbe45bbf2e78f1778384b04526a8fcd641f5c5"
+AUDIO_MODEL_SHA256 = "d7cc33bcf1aad7f2dad9836f36431530744abeace3ca033005e3290ed4fa47bf"
 RUNTIME_FILES = (
     "lightweave-uno-runner",
     "entropy_tables.bin",
@@ -27,6 +28,14 @@ RUNTIME_FILES = (
     "quality.ncnn.param",
     "quality.ncnn.bin",
     "quality.payload.bin",
+)
+AUDIO_RUNTIME_FILES = (
+    "audio-codebooks.bin",
+    "audio-prefix.ncnn.bin",
+    *(f"audio-prefix-{seconds}s.ncnn.param" for seconds in range(1, 6)),
+    "audio-tail.ncnn.param",
+    "audio-tail.ncnn.bin",
+    "audio.payload.bin",
 )
 
 
@@ -60,6 +69,15 @@ def make_bundle(output_root: Path) -> tuple[Path, Path, dict[str, object]]:
                 f"Missing generated UNO Q artifact {source}; run prepare/build first."
             )
         shutil.copy2(source, runtime / name)
+    audio_generated = GENERATED / "audio"
+    for name in AUDIO_RUNTIME_FILES:
+        source = audio_generated / name
+        if not source.is_file():
+            raise RuntimeError(
+                f"Missing generated UNO Q audio artifact {source}; run "
+                "prepare_uno_q_audio.py first."
+            )
+        shutil.copy2(source, runtime / name)
     shutil.copy2(
         PROJECT_ROOT / "uno_q" / "native" / "THIRD_PARTY_NOTICES.md",
         bundle_root / "THIRD_PARTY_NOTICES.md",
@@ -78,20 +96,66 @@ def make_bundle(output_root: Path) -> tuple[Path, Path, dict[str, object]]:
     source_manifest = json.loads(source_manifest_path.read_text(encoding="utf-8"))
     if source_manifest.get("model_sha256") != MODEL_SHA256:
         raise RuntimeError("Generated UNO Q model fingerprint is incompatible.")
+    audio_manifest_path = audio_generated / "audio.manifest.json"
+    audio_manifest = json.loads(audio_manifest_path.read_text(encoding="utf-8"))
+    if (
+        audio_manifest.get("model_sha256") != AUDIO_MODEL_SHA256
+        or audio_manifest.get("maximum_seconds") != 5
+        or audio_manifest.get("selected_split") != 5
+    ):
+        raise RuntimeError("Generated UNO Q audio manifest is incompatible.")
+    selected_audio = audio_manifest.get("selected")
+    if not isinstance(selected_audio, dict):
+        raise RuntimeError("Generated UNO Q audio selection is missing.")
     files: dict[str, object] = {}
     for path in sorted(item for item in bundle_root.rglob("*") if item.is_file()):
         relative = path.relative_to(bundle_root).as_posix()
         files[relative] = {"size": path.stat().st_size, "sha256": file_sha256(path)}
     manifest: dict[str, object] = {
         "schema_version": 1,
-        "bundle_version": "0.1.0",
+        "bundle_version": "0.2.0",
         "target": "Arduino UNO Q / Debian ARM64 / Adreno Vulkan",
         "backend": "ncnn-vulkan",
         "strict_no_fallback": True,
+        "strict_audio_suffix_no_fallback": True,
         "model_sha256": MODEL_SHA256,
+        "audio_model_sha256": AUDIO_MODEL_SHA256,
         "runner_sha256": file_sha256(runtime / "lightweave-uno-runner"),
         "entropy_tables_sha256": file_sha256(runtime / "entropy_tables.bin"),
         "source_artifact_manifest_sha256": file_sha256(source_manifest_path),
+        "audio_artifact_manifest_sha256": file_sha256(audio_manifest_path),
+        "audio": {
+            "profile": "A1-E15-S<n>",
+            "model_sha256": AUDIO_MODEL_SHA256,
+            "maximum_seconds": 5,
+            "maximum_payload_bytes": 940,
+            "selected_split": audio_manifest["selected_split"],
+            "tail_channels": selected_audio["tail_channels"],
+            "tail_frames_per_chunk": selected_audio["tail_frames_per_chunk"],
+            "selection_policy": audio_manifest["selection_policy"],
+            "duration_shapes_seconds": [1, 2, 3, 4, 5],
+            "content_addressed_prefix_weights_sha256": selected_audio[
+                "prefix_weights_sha256"
+            ],
+            "cpu_stages": [
+                "10-bit unpacking and two-codebook reconstruction",
+                f"decoder layers 0-{int(audio_manifest['selected_split']) - 1}",
+                "boundary correction and PCM16 WAV packaging",
+            ],
+            "vulkan_stages": [f"decoder layers {audio_manifest['selected_split']}-15"],
+            "board_validation": {
+                "rejected_split_2": "non-finite Adreno Vulkan output",
+                "native_code_indices_exact": True,
+                "native_codebook_maximum_absolute_error": 0.0,
+                "one_second_pytorch_parity_db": 52.1066,
+                "five_second_pytorch_parity_db": 52.0681,
+                "conditioned_boundary_jump_maximum": 0.0,
+                "vulkan_compute_layers": 39,
+                "five_second_median_adreno_seconds_five_runs": 6.24754,
+                "five_second_p95_adreno_seconds_five_runs": 6.249064,
+                "peak_child_rss_kib": 111716,
+            },
+        },
         "files": files,
     }
     manifest_path = bundle_root / "uno_q.manifest.json"

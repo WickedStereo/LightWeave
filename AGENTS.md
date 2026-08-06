@@ -23,7 +23,9 @@
 - The current milestone assumes a reliable ordered byte pipe and excludes optical hardware, Arduino firmware, modulation, analog circuitry, Galaxy S25 runtime work, and Cloud AI runtime work.
 - The complete image synthesis transform must not silently fall back to CPU. If strict QNN HTP execution cannot be proven, preserve the failure evidence and stop before weakening the claim.
 - The image feasibility gate passed locally on 2026-08-05; the audio extension is authorized and implemented.
-- Describe the audio decoder accurately: layers 0-12 run on CPU, fixed layers 13-15 run on QNN HTP, and a labeled CPU boundary de-click follows. Do not restore the failed larger-tail claim without new numerical evidence.
+- The owner authorized the UNO Q receiver-only image/audio milestone on 2026-08-05. UNO Q encoding, optical firmware, MCU integration, and Galaxy S25 delivery remain deferred.
+- Describe each audio target accurately: Windows runs layers 0-12 on CPU and 13-15 on QNN HTP; UNO Q runs codebooks/layers 0-4 on CPU and a strict layers 5-15 suffix on Adreno Vulkan. Both apply the labeled CPU boundary de-click. Do not imply full-NPU/full-GPU audio or restore a failed partition without new numerical evidence.
+- The UNO Q audio limit is five seconds/940 raw bytes. Preserve exact `A1-E15-S<n>` compatibility and fail closed on any unexpected CPU layer inside its selected Vulkan suffix.
 - A successful QNN assignment is not enough by itself. Preserve CPU/ONNX/NPU numerical parity gates and profile evidence for every generated graph.
 - Raw mode must remain honest: its optical bytes contain no integrity, version, length, media, or model-negotiation fields. Preset codes are trusted out-of-band configuration and are not counted as payload bytes.
 

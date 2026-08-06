@@ -8,6 +8,13 @@ BSD-3-Clause-Clear license included with CompressAI.
 The underlying 64-bit rANS algorithm is based on `ryg_rans`, Copyright Fabian
 Giesen, dedicated to the public domain under CC0 1.0.
 
-The optional accelerated backend links to ncnn 20260526, Copyright Tencent,
-under the BSD-3-Clause license. ncnn is acquired during the build and is not
-vendored in this repository.
+The accelerated backend links to ncnn 20260805, Copyright Tencent, under the
+BSD-3-Clause license. Model preparation uses pnnx 20260526. Both tools are
+acquired during preparation/build and are not vendored in this repository.
+
+The audio artifact preparation workflow uses Meta EnCodec, Copyright Meta
+Platforms, Inc. and affiliates, under the MIT license. EnCodec source is not
+installed on the UNO Q. The native receiver reads converted codebooks and ncnn
+graphs generated from the separately downloaded 24 kHz model checkpoint. The
+checkpoint and converted artifacts are not committed; verify the upstream
+checkpoint redistribution terms before distributing an offline bundle.

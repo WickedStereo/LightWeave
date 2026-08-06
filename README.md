@@ -48,6 +48,9 @@ CPU de-click correction removes independent one-second chunk-edge steps.
 - UNO Q: all three raw image decoders run as complete 16-layer graphs through
   ncnn Vulkan on the Adreno 702 with CPU fallback rejected; board
   accelerator/CPU parity is 36.34-44.38 dB.
+- UNO Q audio: split 5 is the earliest valid CPU/Adreno EnCodec partition.
+  Its 39-layer Vulkan suffix runs on Adreno 702 with fallback rejected; the
+  one-second board output reached 52.11 dB against PyTorch.
 
 Generated reports, model weights, ONNX/QDQ artifacts, and profiles are ignored
 by Git. Reproduce the evidence locally with the scripts below.
@@ -126,17 +129,20 @@ claimed. The Android app requests neither Internet nor broad storage
 permission. See [android/README.md](android/README.md) for Android Studio,
 wireless-debugging, build, and sender-protocol details.
 
-## UNO Q accelerated image receiver
+## UNO Q accelerated media receiver
 
 The [`uno_q/`](uno_q/) target receives the same header-free `payload.bin` and
-reconstructs 64, 128, or 256-pixel images on the board. Its native ARM64 CLI
-runs directly on the existing Debian OS—Docker is not a runtime dependency.
-CPU code performs entropy decoding and PNG packaging; the complete neural
-synthesis graph runs strictly on Turnip Adreno 702 through ncnn Vulkan.
+reconstructs 64, 128, or 256-pixel images plus up to five seconds of 24 kHz
+mono audio on the board. Its native ARM64 CLI runs directly on the existing
+Debian OS—Docker is not a runtime dependency. Image synthesis runs completely
+on Turnip Adreno 702 through ncnn Vulkan. Audio is explicitly hybrid:
+unpacking, codebooks, and recurrent decoder layers 0-4 use CPU, while decoder
+layers 5-15 form a strict 39-compute-layer Vulkan suffix on Adreno.
 
 The repository provides source, a pinned manifest, preparation/packaging
 scripts, a hash-checking installer with `-DryRun`, an offline-bundle option,
-native commands, and a monochrome App Lab receive page. Generated models,
+native commands, and a monochrome App Lab receive page with PNG/WAV download
+and audio playback. Generated models,
 vendor runtime files, and bundles remain ignored. See
 [uno_q/README.md](uno_q/README.md) for build, install, evidence, commands, and
 API details.

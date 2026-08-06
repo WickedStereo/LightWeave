@@ -1,10 +1,15 @@
-# LightWeave UNO Q image receiver
+# LightWeave UNO Q media receiver
 
-This target reconstructs existing header-free LightWeave image payloads on the
-Arduino UNO Q. Entropy decoding and PNG packaging run on the ARM64 CPU. The
-complete CompressAI `g_s` synthesis graph runs through ncnn Vulkan on the
-board's Turnip Adreno 702 device; the runner rejects unsupported layers,
-non-Adreno devices, and any neural CPU fallback.
+This target reconstructs existing header-free LightWeave image and EnCodec
+audio payloads on the Arduino UNO Q. It is receiver-only: encoding, optical
+firmware, MCU integration, and mobile delivery remain deferred.
+
+For images, entropy decoding and PNG packaging run on the ARM64 CPU. The
+complete CompressAI `g_s` graph runs through ncnn Vulkan on Turnip Adreno 702;
+the runner rejects unsupported layers, non-Adreno devices, and neural CPU
+fallback. Audio is an explicit hybrid: 10-bit unpacking, codebook summation,
+and EnCodec decoder layers 0-4 run on CPU, while complete decoder layers 5-15
+run on Adreno. Audio is never described as full-GPU or NPU inference.
 
 Supported presets are unchanged:
 
@@ -16,6 +21,11 @@ Supported presets are unchanged:
 
 The payload contains only the CompressAI entropy string. The preset is local
 control-plane information and must match on sender and receiver.
+
+Raw audio uses `A1-E15-S<n>`, where `n` is the exact output sample count at
+24 kHz mono. Each started second is exactly 188 raw bytes. The initial board
+limit is five seconds: at most 940 bytes and 120,000 output samples. The
+settings code is communicated out of band and is not part of `payload.bin`.
 
 ## Runtime architecture
 
@@ -34,10 +44,12 @@ notice travel with every offline bundle.
 
 ## Prepare and package
 
-From the repository's pinned Windows x64 Python environment:
+From the repository's pinned Windows x64 Python environment, prepare image and
+audio artifacts:
 
 ```powershell
 .\.venv-x64\Scripts\python.exe scripts\prepare_uno_q.py
+.\.venv-x64\Scripts\python.exe scripts\prepare_uno_q_audio.py --selected-split 5
 ```
 
 Build `uno_q/native` for Debian ARM64 with ncnn Vulkan enabled and place the
@@ -77,6 +89,8 @@ with `-OfflineBundle`. Use `-DeviceSerial` when more than one ADB target exists.
 lightweave-uno doctor --json
 lightweave-uno image decode payload.bin --preset I128-Q1-B768 --output image.png --require-accelerator
 lightweave-uno benchmark --preset all --json
+lightweave-uno audio decode payload.bin --preset A1-E15-S48000 --output audio.wav --require-accelerator
+lightweave-uno audio benchmark --seconds 1 --runs 5 --json
 lightweave-uno serve
 ```
 
@@ -86,11 +100,13 @@ The board-local service provides:
 GET  /api/status
 GET  /api/presets
 POST /api/receive/image?preset=I128-Q1-B768
+POST /api/receive/audio?preset=A1-E15-S48000
 ```
 
 The POST body is `application/octet-stream`; its raw bytes remain identical to
-the future optical payload. The response contains a base64 PNG and execution
-evidence for the local WebUI only.
+the future optical payload. Responses contain a base64 PNG or WAV plus
+execution evidence for the local WebUI only. The service binds to localhost by
+default and uses no remote assets.
 
 ## Validated board evidence
 
@@ -105,6 +121,13 @@ evidence for the local WebUI only.
 - Five-run median/p95 accelerator measurements: 0.173/0.176 s, 0.521/0.562
   s, and 1.978/2.160 s. Observed peak child RSS was at most about 60.6 MiB;
   the installed app bundle occupied about 35.6 MiB.
+- EnCodec split candidate 2 was rejected because its suffix produced
+  non-finite Vulkan output. Split 5 was the earliest passing candidate.
+- The split-5 one-second suffix executed 39 Vulkan compute layers on Adreno;
+  complete board output reached 52.11 dB against the PyTorch reference.
+- Five-run one-second median/p95 was 1.306/1.317 s for the Adreno suffix and
+  2.716/2.745 s end to end. Five-second median/p95 was 6.248/6.249 s on Adreno
+  and 8.483/8.487 s end to end; peak observed child RSS was about 109.1 MiB.
 
 The stable runner keeps FP16 packing/storage but uses FP32 arithmetic. An
 earlier FP16-arithmetic stress sequence triggered a recoverable MSM GPU hang

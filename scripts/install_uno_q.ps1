@@ -28,7 +28,11 @@ if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
     throw "UNO Q bundle manifest is missing: $manifestPath"
 }
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-if ($manifest.schema_version -ne 1 -or $manifest.strict_no_fallback -ne $true) {
+if (
+    $manifest.schema_version -ne 1 -or
+    $manifest.strict_no_fallback -ne $true -or
+    $manifest.strict_audio_suffix_no_fallback -ne $true
+) {
     throw "Unsupported or non-strict UNO Q bundle."
 }
 

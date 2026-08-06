@@ -20,7 +20,10 @@ endif()
 
 if(LIGHTWEAVE_WITH_NCNN)
     find_package(ncnn 20260526 REQUIRED CONFIG)
-    target_sources(lightweave-uno-runner PRIVATE src/ncnn_decoder.cpp)
+    target_sources(lightweave-uno-runner PRIVATE
+        src/audio_decoder.cpp
+        src/ncnn_decoder.cpp
+    )
     target_link_libraries(lightweave-uno-runner PRIVATE ncnn)
     target_compile_definitions(lightweave-uno-runner PRIVATE LIGHTWEAVE_WITH_NCNN=1)
 endif()

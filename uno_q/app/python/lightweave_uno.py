@@ -6,6 +6,7 @@ import argparse
 import base64
 import contextlib
 import hashlib
+import io
 import json
 import os
 import platform
@@ -18,6 +19,7 @@ import sys
 import tempfile
 import threading
 import time
+import wave
 import zlib
 from dataclasses import dataclass
 from http import HTTPStatus
@@ -37,7 +39,13 @@ except ImportError:  # pragma: no cover - Linux target module
     resource = None
 
 MODEL_SHA256 = "446d5c7f56d4d5108dc7fb2532cbe45bbf2e78f1778384b04526a8fcd641f5c5"
+AUDIO_MODEL_SHA256 = "d7cc33bcf1aad7f2dad9836f36431530744abeace3ca033005e3290ed4fa47bf"
 MAX_REQUEST_BYTES = 2_048
+AUDIO_CHUNK_BYTES = 188
+AUDIO_SAMPLES_PER_CHUNK = 24_000
+AUDIO_MAXIMUM_SECONDS = 5
+AUDIO_MAXIMUM_BYTES = AUDIO_CHUNK_BYTES * AUDIO_MAXIMUM_SECONDS
+AUDIO_PRESET_PATTERN = re.compile(r"A1-E15-S([1-9][0-9]*)")
 APP_ROOT = Path(
     os.environ.get("LIGHTWEAVE_UNO_HOME", Path(__file__).resolve().parents[1])
 ).resolve()
@@ -144,10 +152,63 @@ def _required_paths(preset: Preset) -> tuple[Path, ...]:
     )
 
 
-def validate_installation(preset: Preset | None = None) -> dict[str, Any]:
+def _audio_configuration(manifest: dict[str, Any]) -> dict[str, Any]:
+    audio = manifest.get("audio")
+    if not isinstance(audio, dict):
+        raise UnoQError("UNO Q bundle has no audio receiver configuration.")
+    try:
+        selected_split = int(audio["selected_split"])
+        tail_channels = int(audio["tail_channels"])
+        tail_frames = int(audio["tail_frames_per_chunk"])
+        maximum_seconds = int(audio["maximum_seconds"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise UnoQError("UNO Q audio receiver configuration is invalid.") from exc
+    if (
+        audio.get("model_sha256") != AUDIO_MODEL_SHA256
+        or selected_split not in {2, 5, 8, 11, 13}
+        or tail_channels <= 0
+        or tail_frames <= 0
+        or maximum_seconds != AUDIO_MAXIMUM_SECONDS
+    ):
+        raise UnoQError("UNO Q audio receiver artifacts are incompatible.")
+    return audio
+
+
+def _audio_required_paths(seconds: int) -> tuple[Path, ...]:
+    if not 1 <= seconds <= AUDIO_MAXIMUM_SECONDS:
+        raise UnoQError("Audio duration must be between 1 and 5 seconds.")
+    return (
+        RUNTIME_ROOT / "lightweave-uno-runner",
+        RUNTIME_ROOT / "audio-codebooks.bin",
+        RUNTIME_ROOT / "audio-prefix.ncnn.bin",
+        RUNTIME_ROOT / f"audio-prefix-{seconds}s.ncnn.param",
+        RUNTIME_ROOT / "audio-tail.ncnn.param",
+        RUNTIME_ROOT / "audio-tail.ncnn.bin",
+    )
+
+
+def validate_installation(
+    preset: Preset | None = None, *, audio_seconds: int | None = None
+) -> dict[str, Any]:
     manifest = _load_manifest()
-    selected = PRESETS if preset is None else (preset,)
+    selected = (
+        PRESETS
+        if preset is None and audio_seconds is None
+        else (() if preset is None else (preset,))
+    )
     paths = {path for item in selected for path in _required_paths(item)}
+    if preset is None or audio_seconds is not None:
+        _audio_configuration(manifest)
+        seconds_to_check = (
+            range(1, AUDIO_MAXIMUM_SECONDS + 1)
+            if audio_seconds is None
+            else (audio_seconds,)
+        )
+        paths.update(
+            path
+            for seconds in seconds_to_check
+            for path in _audio_required_paths(seconds)
+        )
     for path in sorted(paths):
         _verify_artifact(path, manifest)
     return manifest
@@ -346,6 +407,152 @@ def decode_payload(payload: bytes, preset_code: str) -> tuple[bytes, dict[str, A
     return png, evidence
 
 
+def _raw_audio_contract(payload: bytes, preset_code: str) -> tuple[int, int]:
+    match = AUDIO_PRESET_PATTERN.fullmatch(preset_code)
+    if match is None:
+        raise UnoQError("Malformed raw audio preset; expected A1-E15-S<n>.")
+    original_samples = int(match.group(1))
+    if not payload:
+        raise UnoQError("Raw audio payload is empty.")
+    if len(payload) > AUDIO_MAXIMUM_BYTES:
+        raise UnoQError("Raw audio payload exceeds the 5-second limit.")
+    if len(payload) % AUDIO_CHUNK_BYTES:
+        raise UnoQError("Raw audio payload size must be divisible by 188 bytes.")
+    chunk_count = len(payload) // AUDIO_CHUNK_BYTES
+    minimum_samples = (chunk_count - 1) * AUDIO_SAMPLES_PER_CHUNK + 1
+    maximum_samples = chunk_count * AUDIO_SAMPLES_PER_CHUNK
+    if not minimum_samples <= original_samples <= maximum_samples:
+        raise UnoQError(
+            f"Preset sample count {original_samples} is impossible for "
+            f"{chunk_count} raw audio chunks."
+        )
+    for offset in range(0, len(payload), AUDIO_CHUNK_BYTES):
+        if payload[offset + AUDIO_CHUNK_BYTES - 1] & 0xF0:
+            raise UnoQError("Raw audio chunk has non-zero padding bits.")
+    return original_samples, chunk_count
+
+
+def _validate_wav(data: bytes, expected_samples: int) -> None:
+    try:
+        with wave.open(io.BytesIO(data), "rb") as stream:
+            valid = (
+                stream.getnchannels() == 1
+                and stream.getsampwidth() == 2
+                and stream.getframerate() == AUDIO_SAMPLES_PER_CHUNK
+                and stream.getnframes() == expected_samples
+                and stream.getcomptype() == "NONE"
+            )
+    except (EOFError, wave.Error) as exc:
+        raise UnoQError("Native runner returned an invalid WAV file.") from exc
+    if not valid:
+        raise UnoQError("Native runner returned an incompatible WAV file.")
+
+
+def decode_audio_payload(
+    payload: bytes, preset_code: str
+) -> tuple[bytes, dict[str, Any]]:
+    original_samples, chunk_count = _raw_audio_contract(payload, preset_code)
+    manifest = validate_installation(audio_seconds=chunk_count)
+    audio = _audio_configuration(manifest)
+    runner = RUNTIME_ROOT / "lightweave-uno-runner"
+    with tempfile.TemporaryDirectory(prefix="lightweave-uno-audio-") as temporary:
+        work = Path(temporary)
+        payload_path = work / "payload.bin"
+        wav_path = work / "reconstruction.wav"
+        payload_path.write_bytes(payload)
+        command = [
+            str(runner),
+            "audio-decode",
+            "--preset",
+            preset_code,
+            "--payload",
+            str(payload_path),
+            "--codebooks",
+            str(RUNTIME_ROOT / "audio-codebooks.bin"),
+            "--prefix-param",
+            str(RUNTIME_ROOT / f"audio-prefix-{chunk_count}s.ncnn.param"),
+            "--prefix-bin",
+            str(RUNTIME_ROOT / "audio-prefix.ncnn.bin"),
+            "--tail-param",
+            str(RUNTIME_ROOT / "audio-tail.ncnn.param"),
+            "--tail-bin",
+            str(RUNTIME_ROOT / "audio-tail.ncnn.bin"),
+            "--split",
+            str(audio["selected_split"]),
+            "--tail-channels",
+            str(audio["tail_channels"]),
+            "--tail-frames",
+            str(audio["tail_frames_per_chunk"]),
+            "--output",
+            str(wav_path),
+        ]
+        environment = os.environ.copy()
+        vulkan_runtime = RUNTIME_ROOT / "vulkan"
+        icd_path = vulkan_runtime / "freedreno_icd.json"
+        if vulkan_runtime.is_dir() and icd_path.is_file():
+            existing_library_path = environment.get("LD_LIBRARY_PATH", "")
+            environment["LD_LIBRARY_PATH"] = str(vulkan_runtime) + (
+                f":{existing_library_path}" if existing_library_path else ""
+            )
+            environment["VK_ICD_FILENAMES"] = str(icd_path)
+        completed, total_seconds, child_peak_before, child_peak_after = _run_native(
+            command, environment
+        )
+        output_lines = [line for line in completed.stdout.splitlines() if line.strip()]
+        if completed.returncode != 0 or not output_lines:
+            detail = completed.stderr.strip() or completed.stdout.strip()
+            raise UnoQError(
+                f"Native hybrid audio reconstruction failed: {detail[:500]}"
+            )
+        try:
+            evidence = json.loads(output_lines[-1])
+        except json.JSONDecodeError as exc:
+            raise UnoQError("Native audio evidence is not valid JSON.") from exc
+        if (
+            evidence.get("status") != "ok"
+            or evidence.get("backend") != "ncnn-hybrid-cpu-vulkan"
+            or evidence.get("strict_suffix_no_fallback") is not True
+            or "Adreno" not in str(evidence.get("device", ""))
+            or int(evidence.get("vulkan_compute_layers", 0)) <= 0
+            or int(evidence.get("selected_split", -1)) != int(audio["selected_split"])
+            or evidence.get("model_sha256") != AUDIO_MODEL_SHA256
+            or int(evidence.get("output_samples", -1)) != original_samples
+            or float(evidence.get("conditioned_maximum_boundary_jump", 1.0)) > 1e-6
+        ):
+            raise UnoQError(
+                "Native runner did not prove the configured CPU/Adreno audio path."
+            )
+        try:
+            wav_data = wav_path.read_bytes()
+        except OSError as exc:
+            raise UnoQError(
+                "Native runner did not create reconstructed audio."
+            ) from exc
+        _validate_wav(wav_data, original_samples)
+    evidence.update(
+        {
+            "preset_code": preset_code,
+            "raw_bytes": len(payload),
+            "chunk_count": chunk_count,
+            "duration_seconds": original_samples / AUDIO_SAMPLES_PER_CHUNK,
+            "total_seconds": total_seconds,
+            "bundle_version": manifest.get("bundle_version", "unknown"),
+            "peak_child_rss_kib": child_peak_after,
+            "previous_peak_child_rss_kib": child_peak_before,
+            "cpu_stages": [
+                "10-bit unpacking",
+                "two-codebook reconstruction",
+                f"decoder layers 0-{int(audio['selected_split']) - 1}",
+                "480-sample boundary correction",
+                "PCM16 WAV packaging",
+            ],
+            "accelerator_stages": [f"decoder layers {audio['selected_split']}-15"],
+            "boundary_correction": "480-sample disclosed linear de-click",
+        }
+    )
+    return wav_data, evidence
+
+
 def doctor() -> dict[str, Any]:
     issues: list[str] = []
     if platform.machine().lower() not in {"aarch64", "arm64"}:
@@ -379,22 +586,31 @@ def doctor() -> dict[str, Any]:
             issues.append(f"strict Adreno probe failed: {exc}")
     return {
         "status": "ok" if not issues else "error",
+        "image_ready": not issues,
+        "audio_ready": not issues,
         "device": "Arduino UNO Q",
         "os": platform.platform(),
         "architecture": platform.machine(),
         "python": platform.python_version(),
         "render_node": str(render_node),
         "gpu": gpu_summary,
-        "backend": "ncnn-vulkan",
+        "backend": "ncnn-vulkan images / native CPU+Adreno audio",
         "strict_no_fallback": True,
         "model_sha256": manifest.get("model_sha256"),
+        "audio_model_sha256": manifest.get("audio_model_sha256"),
+        "audio_selected_split": (
+            manifest.get("audio", {}).get("selected_split")
+            if isinstance(manifest.get("audio"), dict)
+            else None
+        ),
+        "audio_maximum_seconds": AUDIO_MAXIMUM_SECONDS,
         "bundle_version": manifest.get("bundle_version"),
         "issues": issues,
     }
 
 
 class RequestHandler(BaseHTTPRequestHandler):
-    server_version = "LightWeaveUNO/0.1"
+    server_version = "LightWeaveUNO/0.2"
 
     def _json(self, status: HTTPStatus, payload: dict[str, Any]) -> None:
         data = json.dumps(payload, separators=(",", ":")).encode("utf-8")
@@ -422,7 +638,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         self.send_header(
             "Content-Security-Policy",
             "default-src 'self'; img-src 'self' data:; script-src 'self'; "
-            "style-src 'self'; connect-src 'self'",
+            "style-src 'self'; connect-src 'self'; media-src 'self' data:",
         )
         self.end_headers()
         self.wfile.write(data)
@@ -444,17 +660,26 @@ class RequestHandler(BaseHTTPRequestHandler):
             )
             self._json(status, result)
         elif path == "/api/presets":
+            image_presets = [
+                {
+                    "code": item.code,
+                    "output_size": item.output_size,
+                    "maximum_bytes": item.maximum_bytes,
+                }
+                for item in PRESETS
+            ]
             self._json(
                 HTTPStatus.OK,
                 {
-                    "presets": [
-                        {
-                            "code": item.code,
-                            "output_size": item.output_size,
-                            "maximum_bytes": item.maximum_bytes,
-                        }
-                        for item in PRESETS
-                    ]
+                    "presets": image_presets,
+                    "image_presets": image_presets,
+                    "audio": {
+                        "preset_pattern": "A1-E15-S<n>",
+                        "chunk_bytes": AUDIO_CHUNK_BYTES,
+                        "sample_rate": AUDIO_SAMPLES_PER_CHUNK,
+                        "maximum_seconds": AUDIO_MAXIMUM_SECONDS,
+                        "maximum_bytes": AUDIO_MAXIMUM_BYTES,
+                    },
                 },
             )
         else:
@@ -462,7 +687,7 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
-        if parsed.path != "/api/receive/image":
+        if parsed.path not in {"/api/receive/image", "/api/receive/audio"}:
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         if self.headers.get_content_type() != "application/octet-stream":
@@ -474,24 +699,32 @@ class RequestHandler(BaseHTTPRequestHandler):
         preset_values = parse_qs(parsed.query).get("preset", [])
         preset_code = preset_values[0] if len(preset_values) == 1 else ""
         try:
-            preset = _preset(preset_code)
             content_length = int(self.headers.get("Content-Length", "-1"))
-            if content_length < 0 or content_length > min(
-                preset.maximum_bytes, MAX_REQUEST_BYTES
-            ):
+            if parsed.path == "/api/receive/image":
+                preset = _preset(preset_code)
+                maximum_length = min(preset.maximum_bytes, MAX_REQUEST_BYTES)
+            else:
+                maximum_length = AUDIO_MAXIMUM_BYTES
+            if content_length < 0 or content_length > maximum_length:
                 raise UnoQError("Invalid payload Content-Length.")
             payload = self.rfile.read(content_length)
             if len(payload) != content_length:
                 raise UnoQError("Truncated HTTP request body.")
-            png, evidence = decode_payload(payload, preset.code)
-            self._json(
-                HTTPStatus.OK,
-                {
+            if parsed.path == "/api/receive/image":
+                png, evidence = decode_payload(payload, preset.code)
+                response = {
                     "status": "ok",
                     "png_base64": base64.b64encode(png).decode("ascii"),
                     "metrics": evidence,
-                },
-            )
+                }
+            else:
+                wav_data, evidence = decode_audio_payload(payload, preset_code)
+                response = {
+                    "status": "ok",
+                    "wav_base64": base64.b64encode(wav_data).decode("ascii"),
+                    "metrics": evidence,
+                }
+            self._json(HTTPStatus.OK, response)
         except (UnoQError, ValueError) as exc:
             self._json(
                 HTTPStatus.BAD_REQUEST,
@@ -511,6 +744,68 @@ def _decode_command(args: argparse.Namespace) -> int:
     png, evidence = decode_payload(payload, args.preset)
     _atomic_write(args.output.resolve(), png)
     _print_json({"status": "ok", "output": str(args.output.resolve()), **evidence})
+    return 0
+
+
+def _audio_decode_command(args: argparse.Namespace) -> int:
+    payload = args.payload.read_bytes()
+    wav_data, evidence = decode_audio_payload(payload, args.preset)
+    _atomic_write(args.output.resolve(), wav_data)
+    _print_json({"status": "ok", "output": str(args.output.resolve()), **evidence})
+    return 0
+
+
+def _audio_benchmark_command(args: argparse.Namespace) -> int:
+    if not 1 <= args.runs <= 20:
+        raise UnoQError("Benchmark runs must be between 1 and 20.")
+    if not 1 <= args.seconds <= AUDIO_MAXIMUM_SECONDS:
+        raise UnoQError("Audio benchmark duration must be between 1 and 5 seconds.")
+    fixture = RUNTIME_ROOT / "audio.payload.bin"
+    manifest = validate_installation(audio_seconds=args.seconds)
+    _verify_artifact(fixture, manifest)
+    one_second = fixture.read_bytes()
+    if len(one_second) != AUDIO_CHUNK_BYTES:
+        raise UnoQError("Audio benchmark fixture is not one raw chunk.")
+    payload = one_second * args.seconds
+    preset_code = f"A1-E15-S{args.seconds * AUDIO_SAMPLES_PER_CHUNK}"
+    observations = []
+    for _ in range(args.runs):
+        _, evidence = decode_audio_payload(payload, preset_code)
+        observations.append(evidence)
+    accelerator = [float(item["accelerator_seconds"]) for item in observations]
+    prefix = [float(item["cpu_prefix_seconds"]) for item in observations]
+    total = [float(item["total_seconds"]) for item in observations]
+
+    def p95(values: list[float]) -> float:
+        return (
+            statistics.quantiles(values, n=100, method="inclusive")[94]
+            if len(values) > 1
+            else values[0]
+        )
+
+    last = observations[-1]
+    _print_json(
+        {
+            "status": "ok",
+            "seconds": args.seconds,
+            "runs": args.runs,
+            "raw_bytes": len(payload),
+            "median_cpu_prefix_seconds": statistics.median(prefix),
+            "p95_cpu_prefix_seconds": p95(prefix),
+            "median_accelerator_seconds": statistics.median(accelerator),
+            "p95_accelerator_seconds": p95(accelerator),
+            "median_total_seconds": statistics.median(total),
+            "p95_total_seconds": p95(total),
+            "peak_child_rss_kib": max(
+                int(item.get("peak_child_rss_kib") or 0) for item in observations
+            ),
+            "backend": last["backend"],
+            "device": last["device"],
+            "selected_split": last["selected_split"],
+            "strict_suffix_no_fallback": last["strict_suffix_no_fallback"],
+            "vulkan_compute_layers": last["vulkan_compute_layers"],
+        }
+    )
     return 0
 
 
@@ -551,8 +846,7 @@ def _benchmark_command(args: argparse.Namespace) -> int:
                 "median_total_seconds": statistics.median(total),
                 "p95_total_seconds": total_p95,
                 "peak_child_rss_kib": max(
-                    int(item.get("peak_child_rss_kib") or 0)
-                    for item in observations
+                    int(item.get("peak_child_rss_kib") or 0) for item in observations
                 ),
                 "backend": observations[-1]["backend"],
                 "device": observations[-1]["device"],
@@ -590,6 +884,18 @@ def build_parser() -> argparse.ArgumentParser:
     decode_parser.add_argument("--output", "-o", type=Path, required=True)
     decode_parser.add_argument("--require-accelerator", action="store_true")
 
+    audio_parser = subparsers.add_parser("audio")
+    audio_subparsers = audio_parser.add_subparsers(dest="audio_command", required=True)
+    audio_decode = audio_subparsers.add_parser("decode")
+    audio_decode.add_argument("payload", type=Path)
+    audio_decode.add_argument("--preset", required=True)
+    audio_decode.add_argument("--output", "-o", type=Path, required=True)
+    audio_decode.add_argument("--require-accelerator", action="store_true")
+    audio_benchmark = audio_subparsers.add_parser("benchmark")
+    audio_benchmark.add_argument("--seconds", type=int, default=1)
+    audio_benchmark.add_argument("--runs", type=int, default=5)
+    audio_benchmark.add_argument("--json", action="store_true")
+
     benchmark_parser = subparsers.add_parser("benchmark")
     benchmark_parser.add_argument(
         "--preset", default="all", choices=("all", *PRESET_BY_CODE)
@@ -612,6 +918,10 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if result["status"] == "ok" else 2
         if args.command == "image" and args.image_command == "decode":
             return _decode_command(args)
+        if args.command == "audio" and args.audio_command == "decode":
+            return _audio_decode_command(args)
+        if args.command == "audio" and args.audio_command == "benchmark":
+            return _audio_benchmark_command(args)
         if args.command == "benchmark":
             return _benchmark_command(args)
         if args.command == "serve":

@@ -6,8 +6,8 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | UNO Q accelerated image receiver validated, packaged, and published |
-| Primary milestone | Header-free image reconstruction on UNO Q Adreno with no neural CPU fallback |
+| Phase | UNO Q accelerated image/audio receiver implemented and under final publication validation |
+| Primary milestone | Header-free image and audio reconstruction on UNO Q Adreno with fail-closed acceleration evidence |
 | Secondary milestone | Galaxy S25 delivery after the UNO Q receiver milestone |
 | Last updated | 2026-08-05 |
 | Approval gate | Application implementation explicitly approved on 2026-08-05 |
@@ -57,6 +57,9 @@ The implemented milestone assumes a reliable ordered byte pipe and includes:
   `RawByteSink`/`RawByteSource` adapter contracts for future hardware.
 - A native Android receiver prototype for direct UNO Q USB text/image display,
   with hardware-free framed demos and no Internet permission.
+- A native UNO Q receiver for all three raw image presets plus up to five
+  seconds of header-free EnCodec audio. Images run fully on Adreno; audio uses
+  a measured CPU/Adreno split with no fallback inside its Vulkan suffix.
 
 The following remain out of scope:
 
@@ -64,6 +67,7 @@ The following remain out of scope:
   firmware, and serial framing.
 - Galaxy S25 hardware validation, Android audio playback, WebSockets, and Cloud
   AI in the runtime path.
+- UNO Q encoding, optical/serial adapters, and MCU integration.
 - Medical, regulatory, safety, or absolute-security claims.
 - A packaged EXE/MSIX.
 
@@ -121,8 +125,18 @@ Adreno 702. The accepted backend is therefore ncnn Vulkan: one native runner
 executes every complete static `g_s` graph, audits Vulkan support for all 16
 compute layers, rejects llvmpipe/non-Adreno devices, and never selects a CPU
 neural path. CPU work is limited to rANS entropy decoding, PNG packaging, and
-application orchestration. On-board `g_a` compression is the next UNO Q phase;
-audio and Galaxy S25 HTP work remain deferred.
+application orchestration for images.
+
+UNO Q audio is now a validated, explicitly labeled CPU/Adreno hybrid. Native
+code unpacks the two 10-bit codebooks and runs one static CPU prefix across the
+complete clip so recurrent state is preserved. Candidate split 2 was rejected
+because its Adreno suffix returned non-finite values. Split 5 was the earliest
+passing candidate: decoder layers 0-4 run on CPU and all 39 compute layers in
+the fixed decoder 5-15 suffix run through ncnn Vulkan on Adreno 702. The same
+480-sample disclosed boundary correction is applied before exact trimming and
+atomic PCM16 WAV output. The owner reduced the first release from ten seconds
+to five: at most 940 bytes and 120,000 samples. UNO Q remains receiver-only;
+on-board encoding, optical/MCU integration, and Galaxy S25 HTP remain deferred.
 
 The repository should be the single source of source code, pinned manifests,
 payload contracts, validation vectors, and setup orchestration for all targets.
@@ -172,6 +186,8 @@ format for archival, diagnosis, integrity checking, and model negotiation.
   1,500 valid bits plus four zero pad bits, exactly 188 bytes. The receiver
   rejects non-multiples of 188, nonzero pad bits, and impossible sample counts,
   then uses the established truthful CPU/QNN hybrid and trims to `n`.
+  The UNO Q consumes the same bytes/code but limits clips to five seconds and
+  uses the separately evidenced CPU/Adreno split described above.
 
 ### Image path
 
@@ -295,7 +311,7 @@ and a later serial adapter can implement the same contract.
 | Audio reconstruction | Exact 48,000 samples; finite output; conditioned boundary jump 0.0 |
 | Audio strict QNN tail | `QNNExecutionProvider` only; 0 CPU nodes |
 
-The hardware-independent repository suite reports 51 passing Python tests.
+The hardware-independent repository suite reports 60 passing Python tests.
 Generated acceptance and offline-smoke reports remain ignored and reproducible.
 
 ### UNO Q image receiver acceptance
@@ -318,6 +334,25 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Board-local API | Status and real 128 by 128 reconstruction passed with strict evidence |
 | Runtime Docker dependency | None for the native CLI; App Lab uses the platform's existing container |
 | First native dependency build | About 27 minutes at two jobs; cached runner rebuild about 20 seconds |
+
+### UNO Q audio receiver acceptance
+
+| Check | Result |
+| --- | --- |
+| Raw contract | `A1-E15-S<n>` unchanged; 188 bytes/started second; five-second/940-byte maximum |
+| Native unpacking | Exact 150 code-index equality for the one-second fixture |
+| Native codebook reconstruction | Maximum absolute tensor error 0.0 against PyTorch |
+| Split selection | Split 2 rejected for non-finite Vulkan output; split 5 is earliest passing candidate |
+| CPU stage | Codebook summation plus complete-clip decoder layers 0-4; 24 ncnn compute layers |
+| Accelerator stage | Decoder layers 5-15; 39 Vulkan compute layers on Turnip Adreno 702 |
+| One-second board parity | 52.11 dB against PyTorch; exact 24,000 samples; finite PCM |
+| Five-second board parity | 52.07 dB against PyTorch; exact 120,000 samples; finite PCM |
+| Boundary correction | 480 samples disclosed; measured conditioned maximum jump 0.0 |
+| Five-second single-run latency/RSS | 0.0011 s codebook, 0.955 s CPU prefix, 6.233 s Adreno suffix, 8.474 s wrapper total; about 109.1 MiB peak child RSS |
+| Five-run median/p95 | One second: 1.306/1.317 s Adreno and 2.716/2.745 s total. Five seconds: 6.248/6.249 s Adreno and 8.483/8.487 s total |
+| Concurrent image/audio API | Balanced image and one-second audio both passed strict evidence; shared lock serialized Adreno use |
+| Browser App Lab workflow | WAV reached ready state 4 with exact one-second duration; audio metrics/playback/download link rendered; malformed-size error displayed; no console errors |
+| Disconnected runtime | One-second strict decode passed inside an ephemeral `--network none` acceptance container |
 
 ### Android receiver acceptance
 
@@ -351,6 +386,8 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Android text/image receiver | Debug APK, framed demos, unit tests, and lint pass; real UNO Q/S25 path pending |
 | UNO Q native receiver | All image profiles reconstruct on Adreno Vulkan with strict no-fallback and at least 36.34 dB accelerator/CPU parity |
 | UNO Q App Lab WebUI | Rendered browser upload/reconstruction/download and oversize error pass; balanced accelerator time about 524 ms; no console errors |
+| UNO Q audio receiver | One- and five-second raw payloads reconstruct through CPU plus a strict 39-layer Adreno suffix at 52.07 dB or better PyTorch parity |
+| UNO Q audio App Lab WebUI | Upload, settings-code validation, playback-ready WAV, download action, split timing/evidence, malformed-size error, and no-console-error checks pass |
 | Dashboard browser console | No errors |
 | Built wheel contents | Pass; CLI modules and all local HTML/CSS/JavaScript assets included |
 
@@ -387,8 +424,9 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Multi-size dashboard publication | Complete | Commit `9aee230`; GitHub Actions run `31057418505` passed |
 | Android text/image receiver | Complete locally; hardware pending | APK builds; 9 unit tests and lint pass; validate UNO Q CDC, S25 power, and decoded output next |
 | UNO Q accelerator feasibility | Complete | ncnn Vulkan executes all three complete graphs on Adreno 702; QNN/FastRPC is absent on the exercised image |
-| UNO Q native receiver | Complete locally | Native rANS, strict runner, CLI, rendered API/WebUI, manifest, SPDX SBOM, offline bundle, dry-run/idempotent installer, and 51-test repository suite pass |
+| UNO Q native receiver | Complete locally | Native rANS, strict runner, CLI, rendered API/WebUI, manifest, SPDX SBOM, offline bundle, dry-run/idempotent installer, and 60-test repository suite pass |
 | UNO Q receiver publication | Complete | Source/evidence commit `8074645` and Android-preservation commit `fa19c64` published to `origin/main` |
+| UNO Q audio receiver | Complete locally; publication pending | Native unpack/codebook parity, earliest valid split 5, strict 39-layer Adreno suffix, 1/5-second parity, CLI/API/WebUI, offline bundle, installer, and offline smoke pass |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
 | GitHub Actions unit CI | Complete | Corrected-history Windows Python 3.11 run `31034723025` passed; QNN gates stay local |
@@ -419,6 +457,9 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | UNO Q QNN/Hexagon availability | QNN/FastRPC was absent, so the accepted claim is Adreno Vulkan only; do not imply Hexagon execution |
 | UNO Q source build time and disk use | Use two compile jobs and preserve cache for iteration; native runtime does not require Docker or a compiler |
 | Repeated UNO Q quality runs can stress Turnip/MSM | FP16 arithmetic produced a kernel-reported GPU hang; final runner uses FP16 storage/packing with FP32 arithmetic, explicit Vulkan teardown, cross-process serialization, and a one-second cooldown; five runs of all profiles pass |
+| EnCodec recurrent decoder cannot run in the Vulkan suffix | Keep codebooks and complete-clip recurrent layers 0-4 on CPU; label the result CPU/Adreno hybrid and never imply full-GPU/NPU audio |
+| Earlier UNO Q audio split returned invalid output | Split 2 is permanently rejected; select the earliest later candidate only after finite-output, parity, support, and stability gates; split 5 passed |
+| UNO Q audio memory/latency grows with duration | First release is capped at five seconds/940 bytes; static 1-5 second prefixes share one weight file and all requests use the accelerator lock/cooldown |
 | USB stream loses boundaries or reconnects mid-result | `LWRX` length plus CRC32 framing rejects corruption and resynchronizes on magic |
 | Phone receives an unsafe image allocation | Reject payloads above 8 MiB and decoded dimensions above 16 megapixels |
 
@@ -445,10 +486,8 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
   at least 35 dB parity against the Windows CPU reference?
 - Can the pinned CompressAI rANS decoder and tables be ported to Android NDK
   while decoding existing raw `payload.bin` files byte-identically?
-- What are cold-start, median, p95, peak-memory, disk, and sustained thermal
-  measurements for the final UNO Q bundle across repeated runs?
-- Can the UNO Q `g_a` encoder also execute completely on Adreno Vulkan while a
-  native CPU rANS encoder preserves the existing raw payload contract?
+- Would a future, explicitly approved UNO Q encoding phase justify the extra
+  `g_a` model, native rANS encoder, storage, and accelerator-validation cost?
 
 ## Decision log
 
@@ -487,6 +526,9 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | D-031 | 2026-08-05 | Keep the UNO Q CLI native on the existing Debian OS. | Docker is limited to reproducible build preparation; the delivered CLI has no Docker runtime dependency. |
 | D-032 | 2026-08-05 | Copy Vulkan runtime files only from the target board into the installed App Lab app. | Arduino's generic App container omits the Vulkan loader/driver; target-local copying enables the WebUI without redistributing vendor binaries or modifying the base OS. |
 | D-033 | 2026-08-05 | Use FP16 storage/packing with FP32 arithmetic and serialize UNO Q accelerator calls across host and App Lab. | Repeated FP16-arithmetic quality runs triggered an MSM GPU hang; the stable configuration plus explicit teardown and one-second shared cooldown passed five runs of every profile. |
+| D-034 | 2026-08-05 | Keep UNO Q receiver-only while adding raw EnCodec audio reconstruction. | Owner explicitly limited the board to reconstruction; encoding, mobile, optical firmware, and MCU integration remain deferred. |
+| D-035 | 2026-08-05 | Select EnCodec decoder split 5 as the earliest valid UNO Q CPU/Adreno partition. | Split 2 produced non-finite Adreno output; split 5 passed 39-layer Vulkan support, strict no-fallback, finite output, and greater-than-35-dB parity gates. |
+| D-036 | 2026-08-05 | Cap the first UNO Q audio receiver at five seconds/940 bytes. | Owner approved the reduction; it halves worst-case work/memory and removes unneeded 6-10 second prefix variants. |
 
 ## Public references
 
@@ -532,3 +574,4 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-05 | Added a tracked SPDX SBOM and bundle notice, completed 51 Python tests, rebuilt the portable native entropy runner with exact latent equality, reinstalled the 24-file offline bundle, and confirmed the final board status and runner hash. |
 | 2026-08-05 | Committed the accelerated UNO Q receiver, source-build path, installer, WebUI, tests, manifest, and evidence as `8074645`; the separately preserved Android prototype is commit `fa19c64`. |
 | 2026-08-05 | Pushed the Android-preservation, UNO Q receiver, and milestone documentation commits directly to `origin/main` without force-pushing. |
+| 2026-08-05 | Added the receiver-only UNO Q EnCodec path, rejected split 2, selected the earliest passing split 5, proved exact native indices/zero-error codebook reconstruction and 52.07 dB or better board parity, reduced the limit to five seconds, and integrated the CLI/API/App Lab audio surface plus offline package. |

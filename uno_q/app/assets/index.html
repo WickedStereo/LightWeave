@@ -10,36 +10,60 @@
   <main>
     <header>
       <p class="eyebrow">LIGHTWEAVE / UNO Q</p>
-      <h1>Image receiver</h1>
-      <p>Decode a raw optical payload with the board's Adreno GPU.</p>
+      <h1>Media receiver</h1>
+      <p>Reconstruct raw image and audio payloads on the board.</p>
     </header>
 
     <section class="status" aria-live="polite">
       <span id="status-mark" aria-hidden="true">[ ]</span>
-      <span id="status-text">Checking accelerator...</span>
+      <span id="status-text">Checking accelerators...</span>
     </section>
 
-    <form id="receive-form">
-      <label for="preset">Preset</label>
-      <select id="preset" name="preset" required></select>
+    <section class="receiver-section">
+      <h2>Image / Adreno</h2>
+      <form id="image-form">
+        <label for="image-preset">Preset</label>
+        <select id="image-preset" name="preset" required></select>
 
-      <label for="payload">Received payload.bin</label>
-      <input id="payload" name="payload" type="file" accept=".bin,application/octet-stream" required>
-      <p id="budget" class="note"></p>
+        <label for="image-payload">Received payload.bin</label>
+        <input id="image-payload" name="payload" type="file" accept=".bin,application/octet-stream" required>
+        <p id="image-budget" class="note"></p>
 
-      <button type="submit">Reconstruct image</button>
-    </form>
+        <button type="submit">Reconstruct image</button>
+      </form>
+    </section>
+
+    <section class="receiver-section">
+      <h2>Audio / CPU + Adreno</h2>
+      <form id="audio-form">
+        <label for="audio-preset">Settings code</label>
+        <input id="audio-preset" name="preset" type="text" value="A1-E15-S24000" spellcheck="false" required>
+
+        <label for="audio-payload">Received payload.bin</label>
+        <input id="audio-payload" name="payload" type="file" accept=".bin,application/octet-stream" required>
+        <p class="note">188 bytes per started second / maximum 5 seconds and 940 bytes</p>
+
+        <button type="submit">Reconstruct audio</button>
+      </form>
+    </section>
 
     <p class="warning">
       Raw mode contains no integrity hash, version, or model negotiation. The sender and
       receiver must use the same preset and pinned model.
     </p>
 
-    <section id="result" hidden>
-      <h2>Reconstruction</h2>
+    <section id="image-result" hidden>
+      <h2>Reconstructed image</h2>
       <div class="image-frame"><img id="image" alt="Reconstructed LightWeave image"></div>
-      <a id="download" download="lightweave-reconstruction.png">Download PNG</a>
-      <dl id="metrics"></dl>
+      <a id="image-download" download="lightweave-reconstruction.png">Download PNG</a>
+      <dl id="image-metrics"></dl>
+    </section>
+
+    <section id="audio-result" hidden>
+      <h2>Reconstructed audio</h2>
+      <audio id="audio" controls preload="metadata"></audio>
+      <a id="audio-download" download="lightweave-reconstruction.wav">Download WAV</a>
+      <dl id="audio-metrics"></dl>
     </section>
 
     <section id="error" class="error" role="alert" hidden></section>
