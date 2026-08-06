@@ -6,10 +6,10 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | UNO Q accelerated image/audio receiver published; project paused before the next integration milestones |
-| Primary milestone | Android receiver UI and hardware validation |
-| Secondary milestone | Direct Windows transmitter-to-UNO Q receiver workflow |
-| Last updated | 2026-08-05 |
+| Phase | Windows-to-UNO Q transmitter integration discovery |
+| Primary milestone | Bridge LightWeave raw output into the existing UNO Q/App Lab transmitter |
+| Secondary milestone | Android receiver UI and hardware validation |
+| Last updated | 2026-08-06 |
 | Approval gate | Application implementation explicitly approved on 2026-08-05 |
 
 ## Required maintenance
@@ -167,6 +167,46 @@ retain its hardware/modulation logic while adding a binary-safe input/output
 boundary; base64 or hexadecimal on the optical wire is not the preferred final
 design because it increases the payload size. Its exact API, framing, and
 direction must be inspected before choosing the adapter.
+
+### Existing App Lab transmitter discovery
+
+Direct read-only inspection on 2026-08-06 confirmed that the connected
+transmitting UNO Q contains a stopped App Lab app named
+`image_transmitter_bkp`. No app or sketch was started, stopped, flashed, or
+modified during discovery.
+
+The app is an autonomous fixed-image transmitter, not currently a user-facing
+upload service:
+
+- `app.yaml` exposes no ports or Bricks. Its Python process reads the bundled
+  `python/images.jpg`; Windows cannot submit a payload to it as written.
+- Python uses Pillow to convert the bundled image to grayscale, resize it to
+  128 by 128 with Lanczos, threshold at 128, and pack monochrome pixels MSB
+  first into exactly 2,048 bytes.
+- Python calls RouterBridge `prepare_image_buffer`, then calls
+  `store_image_byte(index, value)` once for each byte, and finally notifies
+  `transmit_image`. Historical logs confirm all 2,048 bytes were loaded and the
+  transmit command was issued in an earlier run.
+- The STM32 sketch holds a fixed 2,048-byte buffer, drives the laser on pin 9,
+  and emits one high start bit, 16,384 raw data bits MSB first, and one low stop
+  bit. Each bit lasts 25 ms. There is no length, checksum, retry, Manchester
+  coding, or other framing.
+- The current optical rate is 40 bit/s (5 payload bytes/s), so one fixed frame
+  takes 409.65 seconds, about 6 minutes 50 seconds. This is substantially below
+  LightWeave's earlier 1-2 kbps transfer assumption.
+
+The internal Bridge and STM32 storage boundary is already binary-safe for byte
+values 0-255, so the laser/timing portion is reusable. The clean integration
+point is to replace the bundled-image producer with a binary upload/API that
+accepts LightWeave's exact raw `payload.bin`, while retaining a maximum
+2,048-byte buffer. A matching sketch change would transmit only the actual
+payload length rather than always emitting 2,048 bytes. The receiver must learn
+that exact length out of band or from a separately approved transport frame;
+the raw codec payload itself must remain unchanged. A chunked/bulk Bridge call
+should replace most per-byte calls. The installed MessagePack 0.4.2 layer
+supports `std::vector<unsigned char>`, but RouterBridge 0.4.3 derives a default
+RPC message buffer of only 256 bytes, so one 2,048-byte call will not fit and a
+conservative chunk size must be measured.
 
 ## Confirmed architecture
 
@@ -450,13 +490,13 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | UNO Q receiver publication | Complete | Source/evidence commit `8074645` and Android-preservation commit `fa19c64` published to `origin/main` |
 | UNO Q audio receiver | Complete and published | Commit `03b0bd7`; native unpack/codebook parity, earliest valid split 5, strict 39-layer Adreno suffix, 1/5-second parity, CLI/API/WebUI, offline bundle, installer, and offline smoke pass |
 | Android receiver UI and hardware path | Next milestone; deferred for now | Refine the existing prototype, then validate S25/UNO Q enumeration, power, text/image rendering, reconnects, throughput, and later WAV playback |
-| Windows-to-UNO Q direct flow | Next milestone; deferred for now | Implement a `RawByteSink` adapter to the board receiver; first inspect whether the existing App Lab text transmitter is binary-safe and reusable |
+| Windows-to-UNO Q transmitter flow | Discovery active | `image_transmitter_bkp` inspected read-only; fixed producer/API and fixed-length frame must be generalized, while its binary-safe STM32 buffer and laser loop can be reused |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
 | GitHub Actions unit CI | Complete | Corrected-history Windows Python 3.11 run `31034723025` passed; QNN gates stay local |
 | Second Snapdragon PC | Pending external device | Transfer the same `.lwv` plus generated artifacts and verify |
 | AI Hub/QAIRT Visualizer | Pending access/install | Compare only when account/SDK are available |
-| Arduino/optical adapter | Deferred | Must not change `.lwv` media format |
+| Arduino/optical adapter | Discovery active | Existing 40 bit/s fixed 2,048-byte transmitter is understood; no firmware or app change has been made |
 | GitHub push | Complete | Corrected history replaced `origin/main` with an exact force-with-lease and verified owner attribution |
 
 ## Risks and mitigations
@@ -512,10 +552,15 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
   while decoding existing raw `payload.bin` files byte-identically?
 - Would a future, explicitly approved UNO Q encoding phase justify the extra
   `g_a` model, native rANS encoder, storage, and accelerator-validation cost?
-- Does the owner's existing App Lab text transmitter accept and preserve
-  arbitrary binary data, or does it currently encode only UTF-8/text strings?
-- What local API and message-boundary contract does that transmitter expose to
-  the Windows host, and is it located on the transmitting or receiving UNO Q?
+- Should the first bridge expose raw `application/octet-stream` over a local
+  App Lab HTTP endpoint, or should Windows copy a file to a watched inbox?
+- How will the optical receiver obtain the exact variable payload length while
+  preserving LightWeave's header-free raw codec bytes: trusted out-of-band
+  configuration or a separately approved physical transport frame?
+- What binary chunk size below the installed 256-byte RouterBridge message
+  limit is reliable after MessagePack/RPC overhead is included?
+- Is the existing 25 ms bit duration intentional for the optical hardware, and
+  what faster rate passes sustained end-to-end tests?
 
 ## Decision log
 
@@ -558,6 +603,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | D-035 | 2026-08-05 | Select EnCodec decoder split 5 as the earliest valid UNO Q CPU/Adreno partition. | Split 2 produced non-finite Adreno output; split 5 passed 39-layer Vulkan support, strict no-fallback, finite output, and greater-than-35-dB parity gates. |
 | D-036 | 2026-08-05 | Cap the first UNO Q audio receiver at five seconds/940 bytes. | Owner approved the reduction; it halves worst-case work/memory and removes unneeded 6-10 second prefix variants. |
 | D-037 | 2026-08-05 | Make the Android receiver UI and direct Windows-to-UNO Q flow the next two milestones, with work paused for now. | Owner-defined follow-on order after completing the UNO Q image/audio receiver. |
+| D-038 | 2026-08-06 | Resume with transmitter-side integration discovery and inspect `image_transmitter_bkp` without modifying or starting it. | Owner connected the transmitting UNO Q and requested an explanation and bridge assessment before implementation. |
 
 ## Public references
 
@@ -605,3 +651,4 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-05 | Pushed the Android-preservation, UNO Q receiver, and milestone documentation commits directly to `origin/main` without force-pushing. |
 | 2026-08-05 | Added the receiver-only UNO Q EnCodec path, rejected split 2, selected the earliest passing split 5, proved exact native indices/zero-error codebook reconstruction and 52.07 dB or better board parity, reduced the limit to five seconds, and integrated the CLI/API/App Lab audio surface plus offline package. |
 | 2026-08-05 | Recorded publication of the UNO Q audio receiver and selected Android receiver UI plus direct Windows-to-UNO Q transfer as the next deferred milestones; identified the existing App Lab text transmitter as a reusable transport candidate pending a binary-safety and interface audit. |
+| 2026-08-06 | Inspected the connected transmitter and recorded that `image_transmitter_bkp` is a stopped, autonomous 128-by-128 monochrome app with a fixed 2,048-byte STM32 buffer, per-byte RouterBridge loading, and an unframed 40-bit/s laser stream; identified its binary-safe buffer/laser loop and Python input boundary as the reuse points. |

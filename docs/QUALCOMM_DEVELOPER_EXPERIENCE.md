@@ -341,6 +341,20 @@ private endpoints, and confidential material must never appear here.
 | Workaround | Export two codebooks plus one content-addressed shared prefix weight file, generate static 1-5 second prefix params, audit every suffix layer, pair assignment with finite/parity tests, reject split 2, cap the first release at five seconds, and retain the shared accelerator lock/cooldown. Docker is used only for the reproducible board build; the installed tool runs natively on Debian/App Lab. |
 | Suggested improvement | Publish a maintained QRB2210 audio-inference sample covering recurrent CPU/GPU partitioning, Vulkan numerical validation, shared accelerator arbitration, duration/memory tradeoffs, and packaging into App Lab without a Python ML runtime. |
 
+### DX-022 - Existing App Lab optical app has a reusable byte boundary but no host API
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-06; inspect the owner's connected transmitting UNO Q and determine whether `image_transmitter_bkp` can carry LightWeave raw payloads |
+| Environment | Arduino UNO Q/QRB2210; Linux 6.16.7 ARM64; Arduino App CLI and daemon 0.12.1; Arduino Zephyr core 0.90.0; Arduino RouterBridge 0.4.3; Python Apps base image 0.11.0; Pillow declared without a pinned version |
+| Tool/source | Read-only ADB device/app discovery, `arduino-app-cli app list` and historical logs, and direct inspection of the installed Python/App Lab manifest/STM32 sketch; the stopped app was not started, flashed, or modified |
+| Intended workflow | Find a binary-safe boundary between the Windows LightWeave `RawByteSink` and the existing laser transmitter without changing the raw codec bytes |
+| Actual result and evidence | The app has no ports or Bricks and autonomously converts bundled `images.jpg` into a thresholded 128-by-128 one-bit bitmap. Python makes 2,048 per-byte RouterBridge calls into a fixed STM32 buffer. The sketch accepts every byte value 0-255, then drives pin 9 with one high start bit, 16,384 MSB-first data bits, and one low stop bit at 25 ms/bit. Historical logs show all 2,048 bytes loaded and transmission requested. There is no length, checksum, retry, line coding, or variable-size input. The resulting rate is 40 bit/s and one frame takes about 409.65 seconds. Installed MessagePack 0.4.2 supports binary `std::vector<unsigned char>`, but RouterBridge's default RPC message buffer is 256 bytes, so payload loading can be chunked but cannot be one 2,048-byte call. |
+| Usefulness | The RouterBridge byte store, STM32 buffer, absolute bit schedule, and laser loop can be retained; LightWeave needs only a host-facing binary input plus variable-length transmission and a matching receive-length contract |
+| Friction and owner | App Lab makes MPU-to-MCU function calls straightforward, but the sample performs one RPC per byte and exposes no external application port. The app is tightly coupled to fixed image dimensions rather than a transport payload, and its Pillow dependency is unpinned. These are application-design issues; bulk binary RPC capability and App Lab host/API guidance are Arduino tooling/documentation questions. |
+| Workaround | Expose a local `application/octet-stream` endpoint or watched inbox, validate a maximum of 2,048 bytes, pass an explicit payload length to the sketch, preserve the byte array exactly, and configure the receiver length out of band unless a separate physical-frame change is approved. Measure a conservative binary chunk size below the 256-byte RPC limit instead of retaining 2,048 per-byte calls. |
+| Suggested improvement | Provide an App Lab binary-transfer example with chunked RouterBridge byte arrays, host-facing local upload/API patterns, backpressure, variable-length buffers, and explicit timing/throughput measurements. |
+
 ## Change log
 
 | Date | Change |
@@ -366,3 +380,4 @@ private endpoints, and confidential material must never appear here.
 | 2026-08-05 | Added repeated-run evidence: diagnosed an FP16-arithmetic quality-run MSM GPU hang, introduced explicit teardown and cross-process serialization with FP32 arithmetic/FP16 storage, and passed five runs of every profile while recording p95, RSS, and disk measurements. |
 | 2026-08-05 | Packaged the final runner with an SPDX SBOM and third-party notice, rebuilt the portable entropy reference with exact latent equality, and reinstalled the hash-verified 24-file App Lab bundle with healthy strict-Adreno status. |
 | 2026-08-05 | Implemented and exercised the UNO Q EnCodec receiver: split 2 failed numerically, split 5 passed strict 39-layer Adreno execution and 52.07 dB or better parity, native indices/codebooks matched exactly, the limit became five seconds, and App Lab playback/download/error plus offline-network tests passed. |
+| 2026-08-06 | Inspected the stopped `image_transmitter_bkp` App Lab application on the connected UNO Q, documented its fixed monochrome producer, binary-safe per-byte RouterBridge/STM32 boundary, unframed 40-bit/s laser loop, and the host API/variable-length changes needed to reuse it for LightWeave. |
