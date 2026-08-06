@@ -29,6 +29,9 @@ h2 { margin: 0 0 8px; font-size: 1.25rem; }
 
 .wire-warning { display: grid; grid-template-columns: 180px 1fr; gap: 18px; padding: 14px 0; border-top: 1px solid #555; border-bottom: 1px solid #555; color: #aaa; font-size: .82rem; line-height: 1.5; }
 .wire-warning strong { color: #fff; }
+.adapter-status { display: flex; justify-content: space-between; gap: 18px; padding: 12px 0; border-bottom: 1px solid #444; color: #888; font-size: .78rem; }
+.adapter-status strong, .adapter-status.ready { color: #fff; }
+.adapter-result { margin-top: 12px; padding: 12px; border: 1px solid #555; color: #bbb; font-size: .78rem; line-height: 1.5; white-space: pre-wrap; }
 .workflow-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; margin-top: 32px; border: 1px solid #555; }
 .workflow-card { min-width: 0; padding: 26px; }
 .workflow-card + .workflow-card { border-left: 1px solid #555; }

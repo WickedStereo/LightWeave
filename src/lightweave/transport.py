@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
@@ -12,6 +13,7 @@ class SendReceipt:
 
     bytes_sent: int
     adapter: str
+    evidence: Mapping[str, object] | None = None
 
 
 @runtime_checkable

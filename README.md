@@ -110,6 +110,42 @@ Raw mode intentionally has no integrity or model-negotiation bytes. Corruption,
 wrong message boundaries, or mismatched pinned artifacts may fail decoding or
 produce incorrect media; use `.lwv` when those protections are required.
 
+### Send a generated payload to UNO Q
+
+The repository includes the complete App Lab transmitter source in
+[`uno_q/transmitter_app`](uno_q/transmitter_app). It is deployed as a new app
+named `lightweave_transmitter`; the owner's `image_transmitter_bkp` project is
+hashed before and after installation and is never edited or started.
+
+Connect one transmitting UNO Q by USB, then run:
+
+```powershell
+# Inspect the board and backup without changing anything.
+.\scripts\install_uno_q_transmitter.ps1 -DryRun
+
+# Clone the backup, install the tracked source, compile, and start the new app.
+.\scripts\install_uno_q_transmitter.ps1
+
+# If App Lab reports that another app is running, stop it reversibly and start
+# the transmitter. No app is deleted.
+.\scripts\install_uno_q_transmitter.ps1 -StopRunningApp
+
+# Open the Windows transmitter UI.
+lightweave dashboard
+```
+
+After generating an image or audio `payload.bin`, use **Send to Arduino**. The
+dashboard pushes the exact bytes through an atomic ADB inbox; no Wi-Fi or
+remote service is involved. If ADB is installed elsewhere, set
+`LIGHTWEAVE_ADB_PATH`. With multiple ADB devices, set
+`LIGHTWEAVE_UNO_Q_SERIAL` to the desired board for the current shell.
+
+The first hardware adapter retains the existing pin-9 waveform: 25 ms per bit,
+MSB first, one high start bit, and one low stop bit. It transmits the generated
+payload length without padding, so the UI shows a separate 40-bit/s estimate.
+The accepted result proves buffer count and launch; it does not claim optical
+completion or receiver reconstruction.
+
 ## Android text/image receiver
 
 The [`android/`](android/) Android Studio project prepares the phone side of a
@@ -160,10 +196,11 @@ API details.
 
 ## Scope and records
 
-Laser/LED hardware, photodiodes, Arduino firmware, physical USB-to-phone
+Photodiodes, optical reception, faster modulation, physical USB-to-phone
 validation, Galaxy audio playback, and Cloud AI remain outside the verified
-software milestone. A later hardware adapter can carry `.lwv` or raw codec
-bytes without changing their existing formats.
+milestone. The tracked UNO Q transmitter adapter carries raw codec bytes
+without changing their existing format; its receiver and performance work are
+later phases.
 
 - [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) is the living source of truth.
 - [docs/QUALCOMM_DEVELOPER_EXPERIENCE.md](docs/QUALCOMM_DEVELOPER_EXPERIENCE.md)

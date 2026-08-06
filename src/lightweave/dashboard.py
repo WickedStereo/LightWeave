@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import io
 import tempfile
+from collections.abc import Callable
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Annotated, Literal
@@ -36,6 +37,12 @@ from .raw import (
     parse_raw_image_preset,
 )
 from .service import roundtrip_image
+from .transport import RawByteSink
+from .uno_q_transport import (
+    UnoQAdbSink,
+    UnoQTransportError,
+    validate_uno_q_payload,
+)
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 STATIC_DIR = Path(__file__).with_name("static")
@@ -120,7 +127,12 @@ def _runtime_status() -> dict[str, object]:
     }
 
 
-def create_app() -> FastAPI:
+UnoQSinkFactory = Callable[..., RawByteSink]
+
+
+def create_app(
+    *, uno_q_sink_factory: UnoQSinkFactory = UnoQAdbSink
+) -> FastAPI:
     app = FastAPI(
         title="LightWeave",
         docs_url=None,
@@ -148,6 +160,26 @@ def create_app() -> FastAPI:
     @app.get("/api/status")
     def status() -> dict[str, object]:
         return _runtime_status()
+
+    @app.get("/api/adapters/uno-q/status")
+    def uno_q_transmitter_status() -> dict[str, object]:
+        try:
+            sink = uno_q_sink_factory(
+                media_type="image", preset_code=DEFAULT_RAW_IMAGE_PRESET
+            )
+            status_method = getattr(sink, "status", None)
+            if not callable(status_method):
+                raise RuntimeError("UNO Q adapter does not expose status.")
+            return dict(status_method())
+        except (OSError, RuntimeError, UnoQTransportError) as exc:
+            return {
+                "connected": False,
+                "ready": False,
+                "device": "Arduino UNO Q",
+                "transport": "usb-adb-inbox",
+                "app_status": "unavailable",
+                "error": str(exc),
+            }
 
     @app.get("/api/samples/image/{sample_name}")
     def sample_image(sample_name: str) -> Response:
@@ -255,6 +287,32 @@ def create_app() -> FastAPI:
         except (LightWeaveError, ValueError, OSError) as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except (FileNotFoundError, RuntimeError) as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    @app.post("/api/adapters/uno-q/transmit")
+    def transmit_to_uno_q(
+        file: Annotated[UploadFile, File()],
+        media_type: Annotated[Literal["image", "audio"], Form()],
+        preset_code: Annotated[str, Form()],
+    ) -> dict[str, object]:
+        payload = file.file.read(MAX_UPLOAD_BYTES + 1)
+        try:
+            validate_uno_q_payload(payload, media_type, preset_code)
+        except UnoQTransportError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        try:
+            sink = uno_q_sink_factory(
+                media_type=media_type, preset_code=preset_code
+            )
+            receipt = sink.send(payload)
+            evidence = dict(receipt.evidence or {})
+            return {
+                "accepted": True,
+                "bytes_sent": receipt.bytes_sent,
+                "adapter": receipt.adapter,
+                **evidence,
+            }
+        except (OSError, RuntimeError, UnoQTransportError) as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     @app.post("/api/receive/image")

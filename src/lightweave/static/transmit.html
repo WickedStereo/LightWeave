@@ -32,6 +32,11 @@
         <span><code>payload.bin</code> has no hash, length, version, or model identifier. Delivery must be exact and both machines must use matching model artifacts.</span>
       </aside>
 
+      <div class="adapter-status" id="arduino-status">
+        <strong>UNO Q / USB</strong>
+        <span>checking the App Lab transmitter...</span>
+      </div>
+
       <div class="workflow-grid">
         <section class="workflow-card">
           <div class="card-heading">
@@ -73,7 +78,9 @@
             <div class="action-row">
               <a class="download-button" id="image-download" download="payload.bin">download payload.bin</a>
               <button class="secondary" id="image-verify" type="button">verify locally / NPU</button>
+              <button class="secondary" id="image-arduino" type="button" disabled>send to Arduino</button>
             </div>
+            <div class="adapter-result" id="image-arduino-result" hidden></div>
             <div id="image-verification" hidden>
               <div class="comparison">
                 <figure><img id="image-reference" alt="Encoded image target"><figcaption id="image-reference-caption">encoded target</figcaption></figure>
@@ -111,7 +118,9 @@
             <div class="action-row">
               <a class="download-button" id="audio-download" download="payload.bin">download payload.bin</a>
               <button class="secondary" id="audio-verify" type="button">verify locally / hybrid</button>
+              <button class="secondary" id="audio-arduino" type="button" disabled>send to Arduino</button>
             </div>
+            <div class="adapter-result" id="audio-arduino-result" hidden></div>
             <div id="audio-verification" hidden>
               <audio id="audio-reconstructed" controls></audio>
               <div class="metrics compact" id="audio-verify-metrics"></div>

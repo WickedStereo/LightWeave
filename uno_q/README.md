@@ -27,6 +27,27 @@ Raw audio uses `A1-E15-S<n>`, where `n` is the exact output sample count at
 limit is five seconds: at most 940 bytes and 120,000 output samples. The
 settings code is communicated out of band and is not part of `payload.bin`.
 
+## Transmitter companion
+
+The separately tracked [`transmitter_app`](transmitter_app) project connects
+the Windows dashboard to the transmitting UNO Q over USB/ADB. It is installed
+as `lightweave_transmitter`, cloned from but independent of the board's
+`image_transmitter_bkp` app. Its atomic inbox accepts image or audio raw bytes,
+loads the exact variable length into the STM32, and retains the existing pin-9,
+25-ms, MSB-first laser waveform.
+
+```powershell
+.\scripts\install_uno_q_transmitter.ps1 -DryRun
+.\scripts\install_uno_q_transmitter.ps1 -StopRunningApp
+lightweave dashboard
+```
+
+The installer stages only repository-tracked source, refuses to overwrite an
+unrelated target, verifies the backup hashes before and after deployment, and
+supports `-NoStart`. The dashboard never starts or flashes an app when Send is
+clicked. See [`transmitter_app/README.md`](transmitter_app/README.md) for the
+wire behavior and milestone boundary.
+
 ## Runtime architecture
 
 `lightweave-uno` is a native host CLI and does not need Docker at runtime. Its

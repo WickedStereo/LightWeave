@@ -6,8 +6,8 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | Windows-to-UNO Q transmitter integration discovery |
-| Primary milestone | Bridge LightWeave raw output into the existing UNO Q/App Lab transmitter |
+| Phase | Windows-to-UNO Q transmitter implementation and publication |
+| Primary milestone | Send generated raw image/audio payloads from the Windows dashboard to the UNO Q transmitter |
 | Secondary milestone | Android receiver UI and hardware validation |
 | Last updated | 2026-08-06 |
 | Approval gate | Application implementation explicitly approved on 2026-08-05 |
@@ -60,14 +60,18 @@ The implemented milestone assumes a reliable ordered byte pipe and includes:
 - A native UNO Q receiver for all three raw image presets plus up to five
   seconds of header-free EnCodec audio. Images run fully on Adreno; audio uses
   a measured CPU/Adreno split with no fallback inside its Vulkan suffix.
+- A USB/ADB `RawByteSink` that hands generated image and audio payloads to a
+  tracked `lightweave_transmitter` App Lab application, which buffers the exact
+  variable byte count on the STM32 and launches the existing laser waveform.
 
 The following remain out of scope:
 
-- Laser/LED, photodiode, analog circuitry, modulation, clock recovery, Arduino
-  firmware, and serial framing.
+- Photodiode/receiver circuitry, optical decoding, clock recovery, serial
+  framing, retransmission, and changes to the existing laser waveform/timing.
 - Galaxy S25 hardware validation, Android audio playback, WebSockets, and Cloud
   AI in the runtime path.
-- UNO Q encoding, optical/serial adapters, and MCU integration.
+- UNO Q media encoding, optical receive integration, and MCU performance
+  optimization beyond the approved variable-length transmit loop.
 - Medical, regulatory, safety, or absolute-security claims.
 - A packaged EXE/MSIX.
 
@@ -148,25 +152,11 @@ download/verification scripts are tracked.
 
 ### Deferred next milestones
 
-The owner selected the following next milestones and paused further work for
-now:
-
-1. Finish and hardware-validate the Android receiver UI for presentation of
-   text, reconstructed images, and later audio received from UNO Q.
-2. Add a direct Windows transmitter-to-UNO Q workflow so the Windows dashboard
-   can hand generated raw payload bytes to a receiver adapter without the
-   current manual download/upload step.
-
-The Windows-to-UNO Q integration should preserve the existing
-`RawByteSink`/`RawByteSource` boundary and header-free codec payloads. The
-board's existing App Lab text-transmission program is a candidate transport
-adapter, not a codec component. It can be reused directly only if its internal
-path accepts arbitrary binary bytes, preserves every byte including `0x00`,
-and supplies reliable message boundaries. If it is text-only, LightWeave should
-retain its hardware/modulation logic while adding a binary-safe input/output
-boundary; base64 or hexadecimal on the optical wire is not the preferred final
-design because it increases the payload size. Its exact API, framing, and
-direction must be inspected before choosing the adapter.
+The direct Windows transmitter-to-UNO Q workflow is now implemented. The next
+selected milestone remains finishing and hardware-validating the Android
+receiver UI for presentation of text, reconstructed images, and later audio
+received from UNO Q. Optical reception and end-to-end reconstruction remain
+deferred until the receiving hardware/application is ready.
 
 ### Existing App Lab transmitter discovery
 
@@ -196,17 +186,44 @@ upload service:
   LightWeave's earlier 1-2 kbps transfer assumption.
 
 The internal Bridge and STM32 storage boundary is already binary-safe for byte
-values 0-255, so the laser/timing portion is reusable. The clean integration
-point is to replace the bundled-image producer with a binary upload/API that
-accepts LightWeave's exact raw `payload.bin`, while retaining a maximum
-2,048-byte buffer. A matching sketch change would transmit only the actual
-payload length rather than always emitting 2,048 bytes. The receiver must learn
-that exact length out of band or from a separately approved transport frame;
-the raw codec payload itself must remain unchanged. A chunked/bulk Bridge call
-should replace most per-byte calls. The installed MessagePack 0.4.2 layer
-supports `std::vector<unsigned char>`, but RouterBridge 0.4.3 derives a default
-RPC message buffer of only 256 bytes, so one 2,048-byte call will not fit and a
-conservative chunk size must be measured.
+values 0-255, so the laser/timing portion is reusable. The implemented
+integration replaces the bundled-image producer in a clone with an atomic
+binary inbox, retains the 2,048-byte maximum and per-byte RouterBridge loading,
+and changes only the active payload length used by buffer-completeness checks
+and the transmit loop. The receiver must learn that exact length out of band or
+from a separately approved transport frame; the raw codec payload itself
+remains unchanged.
+
+### Dashboard-to-UNO Q transmitter
+
+The repository tracks the complete App Lab source under
+`uno_q/transmitter_app/` and a hash-checking installer. Installation clones
+`image_transmitter_bkp` into `lightweave_transmitter`, then replaces source only
+inside the clone. The backup's important source hashes were identical before
+and after installation. The installer refuses unrelated targets, supports
+dry-run/no-start operation, and stops another running App Lab app only through
+the explicit `-StopRunningApp` option because App Lab permits one active app.
+
+The Windows `UnoQAdbSink` discovers ADB, selects the single device exposing
+Arduino App CLI even when an Android phone is also attached, and uses an atomic
+USB inbox: payload and metadata are pushed to partial paths, renamed, and the
+request descriptor is published last. SHA-256, request ID, media type, preset,
+and byte length protect only this USB control-plane handoff; the laser receives
+the exact raw `payload.bin` bytes and no metadata or padding. The App Lab worker
+validates the image/audio contracts, acknowledges every byte stored on the
+STM32, then launches transmission. Since the existing sketch has no completion
+callback, the dashboard reports launch acceptance and an estimated busy window,
+not physical completion.
+
+Board acceptance on 2026-08-06 used App CLI 0.12.1, Python 3.13.14, Arduino
+Zephyr core 0.90.0, and RouterBridge 0.4.3. The App Lab build/flash took about
+93 seconds and used 86,468 bytes of flash plus 35,070 bytes of global RAM. A
+124-byte image and 188-byte one-second audio payload were buffered exactly and
+completed the unchanged 25 ms/bit laser loop in 24.85 and 37.65 seconds. A
+second request was rejected during the active window. A browser-generated
+104-byte image then passed the inline two-step confirmation, USB handoff, exact
+104-byte buffer acknowledgement, and 20.85-second launch estimate with no
+browser console errors.
 
 ## Confirmed architecture
 
@@ -490,13 +507,13 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | UNO Q receiver publication | Complete | Source/evidence commit `8074645` and Android-preservation commit `fa19c64` published to `origin/main` |
 | UNO Q audio receiver | Complete and published | Commit `03b0bd7`; native unpack/codebook parity, earliest valid split 5, strict 39-layer Adreno suffix, 1/5-second parity, CLI/API/WebUI, offline bundle, installer, and offline smoke pass |
 | Android receiver UI and hardware path | Next milestone; deferred for now | Refine the existing prototype, then validate S25/UNO Q enumeration, power, text/image rendering, reconnects, throughput, and later WAV playback |
-| Windows-to-UNO Q transmitter flow | Discovery active | `image_transmitter_bkp` inspected read-only; fixed producer/API and fixed-length frame must be generalized, while its binary-safe STM32 buffer and laser loop can be reused |
+| Windows-to-UNO Q transmitter flow | Complete locally; publication pending | Dashboard image/audio Send actions, USB/ADB sink, atomic App Lab inbox, variable-length STM32 loop, tracked clone source, installer, and real 104/124/188-byte board acceptance pass |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
 | GitHub Actions unit CI | Complete | Corrected-history Windows Python 3.11 run `31034723025` passed; QNN gates stay local |
 | Second Snapdragon PC | Pending external device | Transfer the same `.lwv` plus generated artifacts and verify |
 | AI Hub/QAIRT Visualizer | Pending access/install | Compare only when account/SDK are available |
-| Arduino/optical adapter | Discovery active | Existing 40 bit/s fixed 2,048-byte transmitter is understood; no firmware or app change has been made |
+| Arduino/optical adapter | Transmitter complete; receiver deferred | Existing 40 bit/s waveform is unchanged; the cloned app now transmits the exact 1-2,048-byte length and rejects concurrent work |
 | GitHub push | Complete | Corrected history replaced `origin/main` with an exact force-with-lease and verified owner attribution |
 
 ## Risks and mitigations
@@ -526,6 +543,10 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | UNO Q audio memory/latency grows with duration | First release is capped at five seconds/940 bytes; static 1-5 second prefixes share one weight file and all requests use the accelerator lock/cooldown |
 | USB stream loses boundaries or reconnects mid-result | `LWRX` length plus CRC32 framing rejects corruption and resynchronizes on magic |
 | Phone receives an unsafe image allocation | Reject payloads above 8 MiB and decoded dimensions above 16 megapixels |
+| Multiple ADB devices are connected | Select only the device exposing Arduino App CLI; fail if zero or more than one UNO Q candidate remains, unless a serial is configured |
+| App Lab allows only one active application | Installer does not stop anything by default; the explicit `-StopRunningApp` option performs the reversible stop before starting `lightweave_transmitter` |
+| USB inbox is interrupted or stale | Publish payload/metadata atomically, publish the descriptor last, verify SHA-256/length/request ID, ignore partial files, and return per-request result files |
+| Transmitter has no physical completion callback | Report only exact buffering plus launch acceptance; enforce an estimated busy window and never claim optical completion from the dashboard |
 
 ## Open questions
 
@@ -552,13 +573,9 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
   while decoding existing raw `payload.bin` files byte-identically?
 - Would a future, explicitly approved UNO Q encoding phase justify the extra
   `g_a` model, native rANS encoder, storage, and accelerator-validation cost?
-- Should the first bridge expose raw `application/octet-stream` over a local
-  App Lab HTTP endpoint, or should Windows copy a file to a watched inbox?
 - How will the optical receiver obtain the exact variable payload length while
   preserving LightWeave's header-free raw codec bytes: trusted out-of-band
   configuration or a separately approved physical transport frame?
-- What binary chunk size below the installed 256-byte RouterBridge message
-  limit is reliable after MessagePack/RPC overhead is included?
 - Is the existing 25 ms bit duration intentional for the optical hardware, and
   what faster rate passes sustained end-to-end tests?
 
@@ -604,6 +621,9 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | D-036 | 2026-08-05 | Cap the first UNO Q audio receiver at five seconds/940 bytes. | Owner approved the reduction; it halves worst-case work/memory and removes unneeded 6-10 second prefix variants. |
 | D-037 | 2026-08-05 | Make the Android receiver UI and direct Windows-to-UNO Q flow the next two milestones, with work paused for now. | Owner-defined follow-on order after completing the UNO Q image/audio receiver. |
 | D-038 | 2026-08-06 | Resume with transmitter-side integration discovery and inspect `image_transmitter_bkp` without modifying or starting it. | Owner connected the transmitting UNO Q and requested an explanation and bridge assessment before implementation. |
+| D-039 | 2026-08-06 | Use USB/ADB plus an atomic watched inbox as the Windows-dashboard-to-App-Lab transport. | Works offline, preserves the existing `RawByteSink` boundary, handles multiple attached ADB devices safely, and does not alter optical bytes. |
+| D-040 | 2026-08-06 | Clone the backup as `lightweave_transmitter`, retain per-byte RouterBridge loading and the existing waveform, and change only the active payload length on the STM32. | Owner explicitly prohibited backup edits and approved variable-length transmission without hardware/timing changes. |
+| D-041 | 2026-08-06 | Keep SHA-256 and request metadata in the local USB control plane and report launch acceptance rather than physical completion. | Raw optical mode stays header-free and the unchanged MCU interface exposes no completion callback. |
 
 ## Public references
 
@@ -652,3 +672,4 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-05 | Added the receiver-only UNO Q EnCodec path, rejected split 2, selected the earliest passing split 5, proved exact native indices/zero-error codebook reconstruction and 52.07 dB or better board parity, reduced the limit to five seconds, and integrated the CLI/API/App Lab audio surface plus offline package. |
 | 2026-08-05 | Recorded publication of the UNO Q audio receiver and selected Android receiver UI plus direct Windows-to-UNO Q transfer as the next deferred milestones; identified the existing App Lab text transmitter as a reusable transport candidate pending a binary-safety and interface audit. |
 | 2026-08-06 | Inspected the connected transmitter and recorded that `image_transmitter_bkp` is a stopped, autonomous 128-by-128 monochrome app with a fixed 2,048-byte STM32 buffer, per-byte RouterBridge loading, and an unframed 40-bit/s laser stream; identified its binary-safe buffer/laser loop and Python input boundary as the reuse points. |
+| 2026-08-06 | Implemented the tracked `lightweave_transmitter` App Lab clone, variable-length STM32 transmit loop, atomic USB/ADB sink, dashboard status/Send flow, hash-preserving installer, and setup documentation; verified exact real image/audio byte counts, busy rejection, unchanged 25 ms waveform completion, and browser acceptance without modifying the backup. |

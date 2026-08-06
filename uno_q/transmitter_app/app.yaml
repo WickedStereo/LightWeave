@@ -1,0 +1,5 @@
+name: lightweave_transmitter
+description: Send LightWeave raw payloads through the existing laser byte link.
+ports: []
+bricks: []
+icon: "💡"

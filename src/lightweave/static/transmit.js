@@ -1,4 +1,8 @@
-const state = { image: null, audio: null };
+const state = {
+  image: null,
+  audio: null,
+  arduino: { ready: false, busy: false, confirming: null, confirmUntil: 0 },
+};
 const formatSeconds = (value) => `${Number(value).toFixed(3)} s`;
 
 function renderMetrics(target, entries) {
@@ -42,6 +46,96 @@ async function loadStatus() {
     box.title = JSON.stringify(status, null, 2);
   } catch {
     box.textContent = "Local runtime unavailable";
+  }
+}
+
+function setArduinoButtons() {
+  document.querySelector("#image-arduino").disabled =
+    !state.image || !state.arduino.ready || state.arduino.busy;
+  document.querySelector("#audio-arduino").disabled =
+    !state.audio || !state.arduino.ready || state.arduino.busy;
+}
+
+function clearArduinoConfirmation() {
+  state.arduino.confirming = null;
+  state.arduino.confirmUntil = 0;
+  document.querySelector("#image-arduino").textContent = "send to Arduino";
+  document.querySelector("#audio-arduino").textContent = "send to Arduino";
+}
+
+async function loadArduinoStatus() {
+  const box = document.querySelector("#arduino-status");
+  try {
+    const status = await responseBody(await fetch("/api/adapters/uno-q/status"));
+    state.arduino.ready = Boolean(status.ready);
+    state.arduino.busy = Boolean(status.busy);
+    const remaining = Number(status.busy_remaining_seconds || 0);
+    let message = `${status.app_status} / ${status.transport}`;
+    if (status.busy) message += ` / busy for about ${remaining.toFixed(1)} s`;
+    if (status.error) message = status.error;
+    box.querySelector("span").textContent = message;
+    box.classList.toggle("ready", status.ready && !status.busy);
+  } catch (caught) {
+    state.arduino.ready = false;
+    state.arduino.busy = false;
+    box.querySelector("span").textContent = caught.message;
+    box.classList.remove("ready");
+  }
+  setArduinoButtons();
+}
+
+async function sendToArduino(mediaType) {
+  const current = state[mediaType];
+  const button = document.querySelector(`#${mediaType}-arduino`);
+  const result = document.querySelector(`#${mediaType}-arduino-result`);
+  const error = document.querySelector(`#${mediaType}-error`);
+  const seconds = (current.payload.length * 8 + 2) * 0.025;
+  const now = Date.now();
+  if (state.arduino.confirming !== mediaType || now > state.arduino.confirmUntil) {
+    clearArduinoConfirmation();
+    state.arduino.confirming = mediaType;
+    state.arduino.confirmUntil = now + 10000;
+    button.textContent = `confirm send / ${current.payload.length} B / ${seconds.toFixed(2)} s`;
+    window.setTimeout(() => {
+      if (state.arduino.confirming === mediaType && Date.now() > state.arduino.confirmUntil) {
+        clearArduinoConfirmation();
+      }
+    }, 10100);
+    return;
+  }
+  clearArduinoConfirmation();
+
+  state.arduino.busy = true;
+  setArduinoButtons();
+  button.textContent = "buffering on Arduino...";
+  result.hidden = true;
+  error.hidden = true;
+  try {
+    const form = new FormData();
+    form.append("file", new Blob([current.payload]), "payload.bin");
+    form.append("media_type", mediaType);
+    form.append("preset_code", current.preset_code);
+    const body = await responseBody(await fetch("/api/adapters/uno-q/transmit", {
+      method: "POST", body: form,
+    }));
+    result.textContent = [
+      `accepted / ${body.adapter}`,
+      `${body.buffered_bytes} bytes buffered without optical padding`,
+      `${body.optical_bits} optical bits / ${Number(body.estimated_transmission_seconds).toFixed(2)} s estimated`,
+      `request ${body.request_id}`,
+      "launch accepted; physical completion is not claimed",
+    ].join("\n");
+    result.hidden = false;
+    const delay = Math.max(1000, Number(body.estimated_transmission_seconds) * 1000 + 1000);
+    window.setTimeout(loadArduinoStatus, delay);
+  } catch (caught) {
+    error.textContent = caught.message;
+    error.hidden = false;
+    state.arduino.busy = false;
+  } finally {
+    button.textContent = "send to Arduino";
+    setArduinoButtons();
+    loadArduinoStatus();
   }
 }
 
@@ -89,6 +183,7 @@ document.querySelector("#image-transmit-form").addEventListener("submit", async 
     document.querySelector("#image-verification").hidden = true;
     document.querySelector("#image-reference-caption").textContent = `${body.output_size} x ${body.output_size} encoded target`;
     result.hidden = false;
+    setArduinoButtons();
   } catch (caught) {
     error.textContent = caught.message;
     error.hidden = false;
@@ -160,6 +255,7 @@ document.querySelector("#audio-transmit-form").addEventListener("submit", async 
     ]);
     document.querySelector("#audio-verification").hidden = true;
     result.hidden = false;
+    setArduinoButtons();
   } catch (caught) {
     error.textContent = caught.message;
     error.hidden = false;
@@ -170,6 +266,8 @@ document.querySelector("#audio-transmit-form").addEventListener("submit", async 
 });
 
 document.querySelector("#audio-copy").addEventListener("click", () => navigator.clipboard.writeText(state.audio.preset_code));
+document.querySelector("#image-arduino").addEventListener("click", () => sendToArduino("image"));
+document.querySelector("#audio-arduino").addEventListener("click", () => sendToArduino("audio"));
 document.querySelector("#audio-verify").addEventListener("click", async (event) => {
   const button = event.currentTarget;
   const error = document.querySelector("#audio-error");
@@ -231,3 +329,4 @@ for (const button of document.querySelectorAll("[data-sample]")) {
   });
 }
 loadStatus();
+loadArduinoStatus();
