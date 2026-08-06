@@ -6,8 +6,8 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | Windows-to-UNO Q transmitter implementation and publication |
-| Primary milestone | Send generated raw image/audio payloads from the Windows dashboard to the UNO Q transmitter |
+| Phase | Windows-to-UNO Q transmitter milestone complete; Android receiver deferred |
+| Primary milestone | Generated raw image/audio payloads now reach the UNO Q transmitter from the Windows dashboard |
 | Secondary milestone | Android receiver UI and hardware validation |
 | Last updated | 2026-08-06 |
 | Approval gate | Application implementation explicitly approved on 2026-08-05 |
@@ -507,14 +507,14 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | UNO Q receiver publication | Complete | Source/evidence commit `8074645` and Android-preservation commit `fa19c64` published to `origin/main` |
 | UNO Q audio receiver | Complete and published | Commit `03b0bd7`; native unpack/codebook parity, earliest valid split 5, strict 39-layer Adreno suffix, 1/5-second parity, CLI/API/WebUI, offline bundle, installer, and offline smoke pass |
 | Android receiver UI and hardware path | Next milestone; deferred for now | Refine the existing prototype, then validate S25/UNO Q enumeration, power, text/image rendering, reconnects, throughput, and later WAV playback |
-| Windows-to-UNO Q transmitter flow | Complete locally; publication pending | Dashboard image/audio Send actions, USB/ADB sink, atomic App Lab inbox, variable-length STM32 loop, tracked clone source, installer, and real 104/124/188-byte board acceptance pass |
+| Windows-to-UNO Q transmitter flow | Complete and published | Commit `028f9d9`; dashboard image/audio Send actions, USB/ADB sink, atomic App Lab inbox, variable-length STM32 loop, tracked clone source, installer, and real 104/124/188-byte board acceptance pass |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
 | GitHub Actions unit CI | Complete | Corrected-history Windows Python 3.11 run `31034723025` passed; QNN gates stay local |
 | Second Snapdragon PC | Pending external device | Transfer the same `.lwv` plus generated artifacts and verify |
 | AI Hub/QAIRT Visualizer | Pending access/install | Compare only when account/SDK are available |
 | Arduino/optical adapter | Transmitter complete; receiver deferred | Existing 40 bit/s waveform is unchanged; the cloned app now transmits the exact 1-2,048-byte length and rejects concurrent work |
-| GitHub push | Complete | Corrected history replaced `origin/main` with an exact force-with-lease and verified owner attribution |
+| GitHub push | Complete | Transmitter implementation commit `028f9d9` was pushed directly to `origin/main` without force-pushing |
 
 ## Risks and mitigations
 
@@ -673,3 +673,4 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-05 | Recorded publication of the UNO Q audio receiver and selected Android receiver UI plus direct Windows-to-UNO Q transfer as the next deferred milestones; identified the existing App Lab text transmitter as a reusable transport candidate pending a binary-safety and interface audit. |
 | 2026-08-06 | Inspected the connected transmitter and recorded that `image_transmitter_bkp` is a stopped, autonomous 128-by-128 monochrome app with a fixed 2,048-byte STM32 buffer, per-byte RouterBridge loading, and an unframed 40-bit/s laser stream; identified its binary-safe buffer/laser loop and Python input boundary as the reuse points. |
 | 2026-08-06 | Implemented the tracked `lightweave_transmitter` App Lab clone, variable-length STM32 transmit loop, atomic USB/ADB sink, dashboard status/Send flow, hash-preserving installer, and setup documentation; verified exact real image/audio byte counts, busy rejection, unchanged 25 ms waveform completion, and browser acceptance without modifying the backup. |
+| 2026-08-06 | Published the complete Windows-dashboard-to-UNO Q transmitter milestone as commit `028f9d9` on `origin/main` without force-pushing. |
