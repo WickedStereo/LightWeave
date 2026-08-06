@@ -223,7 +223,10 @@ completed the unchanged 25 ms/bit laser loop in 24.85 and 37.65 seconds. A
 second request was rejected during the active window. A browser-generated
 104-byte image then passed the inline two-step confirmation, USB handoff, exact
 104-byte buffer acknowledgement, and 20.85-second launch estimate with no
-browser console errors.
+browser console errors. The owner subsequently initiated a dashboard send and
+visually observed the physical laser blinking. This proves the commanded laser
+activity reached the hardware; it does not yet prove optical byte correctness
+or receiver reconstruction.
 
 ## Confirmed architecture
 
@@ -674,3 +677,4 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-06 | Inspected the connected transmitter and recorded that `image_transmitter_bkp` is a stopped, autonomous 128-by-128 monochrome app with a fixed 2,048-byte STM32 buffer, per-byte RouterBridge loading, and an unframed 40-bit/s laser stream; identified its binary-safe buffer/laser loop and Python input boundary as the reuse points. |
 | 2026-08-06 | Implemented the tracked `lightweave_transmitter` App Lab clone, variable-length STM32 transmit loop, atomic USB/ADB sink, dashboard status/Send flow, hash-preserving installer, and setup documentation; verified exact real image/audio byte counts, busy rejection, unchanged 25 ms waveform completion, and browser acceptance without modifying the backup. |
 | 2026-08-06 | Published the complete Windows-dashboard-to-UNO Q transmitter milestone as commit `028f9d9` on `origin/main` without force-pushing. |
+| 2026-08-06 | Recorded the owner's independent visual observation that a dashboard-initiated request made the physical laser blink; optical byte correctness and reception remain the next gate. |
