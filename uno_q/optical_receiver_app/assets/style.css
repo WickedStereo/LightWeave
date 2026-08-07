@@ -43,7 +43,7 @@ h2 { font-size: 14px; }
   gap: 10px;
 }
 
-form { display: grid; gap: 12px; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
 select, input, button, a { font: inherit; }
 
@@ -69,6 +69,8 @@ button, a {
   text-decoration: none;
 }
 
+button.secondary { background: #000; color: #fff; }
+
 button:disabled { opacity: .45; cursor: wait; }
 
 .warning { line-height: 1.55; }
@@ -88,6 +90,12 @@ img {
   max-height: 512px;
   object-fit: contain;
   image-rendering: pixelated;
+}
+
+audio {
+  display: block;
+  width: 100%;
+  margin: 14px 0;
 }
 
 dl {
@@ -111,4 +119,3 @@ dt { color: #999; }
   dl { grid-template-columns: 1fr; }
   dd { padding-top: 0; }
 }
-

@@ -15,6 +15,12 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from .optical_frame import (
+    FRAME_OVERHEAD_BYTES,
+    build_header,
+    crc16_ccitt_false,
+    profile_for_preset,
+)
 from .raw import (
     RAW_AUDIO_CHUNK_BYTES,
     parse_raw_audio_preset,
@@ -27,6 +33,7 @@ MAX_PAYLOAD_BYTES = 2_048
 MAX_AUDIO_BYTES = 940
 SAMPLES_PER_AUDIO_CHUNK = 24_000
 RESULT_TIMEOUT_SECONDS = 240.0
+REQUEST_SCHEMA_VERSION = 2
 REQUEST_ID = re.compile(
     r"[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-"
     r"[89ab][0-9a-f]{3}-[0-9a-f]{12}"
@@ -129,6 +136,7 @@ class UnoQAdbSink:
         sleep: Callable[[float], None] = time.sleep,
         clock: Callable[[], float] = time.monotonic,
         timeout_seconds: float = RESULT_TIMEOUT_SECONDS,
+        wire_mode: str = "lwf1",
     ) -> None:
         self.media_type = media_type
         self.preset_code = preset_code
@@ -140,6 +148,9 @@ class UnoQAdbSink:
         self.sleep = sleep
         self.clock = clock
         self.timeout_seconds = timeout_seconds
+        if wire_mode not in {"lwf1", "raw-v0"}:
+            raise UnoQTransportError("Wire mode must be lwf1 or raw-v0.")
+        self.wire_mode = wire_mode
 
     def _run(self, arguments: Sequence[str], *, check: bool = True) -> str:
         completed = self.runner(
@@ -193,12 +204,66 @@ class UnoQAdbSink:
             )
             if probe.returncode == 0 and "Arduino App CLI version" in probe.stdout:
                 uno_devices.append(serial)
-        if len(uno_devices) != 1:
-            raise UnoQTransportError(
-                "Expected exactly one connected UNO Q; configure "
-                "LIGHTWEAVE_UNO_Q_SERIAL when multiple UNO Q boards are attached."
+        if len(uno_devices) == 1:
+            return uno_devices[0]
+        transmitter_devices: list[str] = []
+        for serial in uno_devices:
+            marker = self.runner(
+                [
+                    str(self.adb_path),
+                    "-s",
+                    serial,
+                    "shell",
+                    "test",
+                    "-f",
+                    f"{TRANSMITTER_PATH}/transmitter.manifest.json",
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=30,
+                check=False,
             )
-        return uno_devices[0]
+            if marker.returncode != 0:
+                continue
+            app_list = self.runner(
+                [
+                    str(self.adb_path),
+                    "-s",
+                    serial,
+                    "shell",
+                    "arduino-app-cli",
+                    "--format",
+                    "json",
+                    "app",
+                    "list",
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=30,
+                check=False,
+            )
+            if app_list.returncode:
+                continue
+            try:
+                applications = json.loads(app_list.stdout)["apps"]
+            except (json.JSONDecodeError, KeyError, TypeError):
+                continue
+            if any(
+                entry.get("name") == "lightweave_transmitter"
+                and entry.get("status") == "running"
+                for entry in applications
+            ):
+                transmitter_devices.append(serial)
+        if len(transmitter_devices) != 1:
+            raise UnoQTransportError(
+                "Could not uniquely identify a running lightweave_transmitter; "
+                "configure LIGHTWEAVE_UNO_Q_SERIAL to resolve the ambiguity."
+            )
+        return transmitter_devices[0]
 
     def _device(
         self, serial: str, arguments: Sequence[str], *, check: bool = True
@@ -293,6 +358,8 @@ class UnoQAdbSink:
             "transport": "usb-adb-inbox",
             "app_status": app.get("status", "unknown"),
             "maximum_payload_bytes": MAX_PAYLOAD_BYTES,
+            "default_wire_mode": "lwf1",
+            "frame_overhead_bytes": FRAME_OVERHEAD_BYTES,
             "busy": busy_remaining > 0,
             "busy_remaining_seconds": busy_remaining,
             "active_request": active_request is not None,
@@ -316,13 +383,22 @@ class UnoQAdbSink:
         if REQUEST_ID.fullmatch(request_id) is None:  # pragma: no cover
             raise UnoQTransportError("Could not create a safe request ID.")
         digest = hashlib.sha256(value).hexdigest()
+        profile, media_parameter = profile_for_preset(self.preset_code)
+        header = build_header(self.preset_code, len(value))
+        crc = crc16_ccitt_false(header + value)
         metadata = {
-            "schema_version": 1,
+            "schema_version": REQUEST_SCHEMA_VERSION,
             "request_id": request_id,
             "media_type": self.media_type,
             "preset_code": self.preset_code,
             "payload_bytes": len(value),
             "payload_sha256": digest,
+            "wire_mode": self.wire_mode,
+            "frame_version": 1 if self.wire_mode == "lwf1" else 0,
+            "profile_id": profile.profile_id,
+            "media_parameter": media_parameter,
+            "expected_header_hex": header.hex() if self.wire_mode == "lwf1" else "",
+            "expected_crc16": crc if self.wire_mode == "lwf1" else None,
         }
         inbox = f"{TRANSMITTER_PATH}/data/inbox"
         results = f"{TRANSMITTER_PATH}/data/results"
@@ -406,10 +482,13 @@ class UnoQAdbSink:
                 str(result.get("error", "UNO Q rejected the payload."))
             )
         if (
-            result.get("payload_sha256") != digest
+            result.get("schema_version") != REQUEST_SCHEMA_VERSION
+            or result.get("payload_sha256") != digest
             or result.get("buffered_bytes") != len(value)
+            or result.get("wire_mode") != self.wire_mode
         ):
             raise UnoQTransportError(
-                "UNO Q acceptance evidence does not match the payload."
+                "UNO Q acceptance evidence does not match the request schema or "
+                "payload."
             )
         return SendReceipt(len(value), "uno-q-app-lab-adb", result)

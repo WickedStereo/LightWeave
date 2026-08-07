@@ -20,7 +20,7 @@
 
       <header class="page-hero">
         <div>
-          <p class="eyebrow">TX / RAW BYTE PIPE</p>
+          <p class="eyebrow">TX / LWF1 OPTICAL LINK</p>
           <h1>Transmit</h1>
           <p class="lede">Turn an image or WAV into the exact bytes sent by the future optical adapter. Keep the printed settings code with the payload.</p>
         </div>
@@ -28,8 +28,8 @@
       </header>
 
       <aside class="wire-warning">
-        <strong>RAW MODE</strong>
-        <span><code>payload.bin</code> has no hash, length, version, or model identifier. Delivery must be exact and both machines must use matching model artifacts.</span>
+        <strong>PAYLOAD / WIRE DISTINCTION</strong>
+        <span><code>payload.bin</code> stays header-free. Send to Arduino wraps those exact bytes in a 12-byte LWF1 optical frame carrying profile, length, audio samples, and CRC.</span>
       </aside>
 
       <div class="adapter-status" id="arduino-status">

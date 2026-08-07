@@ -88,7 +88,7 @@ lightweave inspect audio.lwv
 lightweave audio decode audio.lwv --output reconstructed.wav
 lightweave audio roundtrip input.wav --work-dir out\audio
 
-# Header-free raw optical payloads
+# Header-free raw codec payloads
 lightweave raw image encode input.png --preset I128-Q1-B768 --output payload.bin
 lightweave raw image decode payload.bin --preset I128-Q1-B768 --output image.png --require-npu
 lightweave raw audio encode input.wav --output payload.bin
@@ -106,9 +106,10 @@ balanced 128 x 128 profile, includes tiny and quality alternatives plus three
 local test patterns, and shows transfer estimates, quality/latency metrics,
 playable media, QNN device selection, and strict provider evidence.
 
-Raw mode intentionally has no integrity or model-negotiation bytes. Corruption,
-wrong message boundaries, or mismatched pinned artifacts may fail decoding or
-produce incorrect media; use `.lwv` when those protections are required.
+Downloaded raw `payload.bin` files intentionally have no integrity or
+model-negotiation bytes. The production laser path adds the small `LWF1`
+length/profile/CRC wrapper at transmission time; use `.lwv` when SHA-256 and
+model-fingerprint protections are required.
 
 ### Send a generated payload to UNO Q
 
@@ -137,14 +138,16 @@ lightweave dashboard
 After generating an image or audio `payload.bin`, use **Send to Arduino**. The
 dashboard pushes the exact bytes through an atomic ADB inbox; no Wi-Fi or
 remote service is involved. If ADB is installed elsewhere, set
-`LIGHTWEAVE_ADB_PATH`. With multiple ADB devices, set
-`LIGHTWEAVE_UNO_Q_SERIAL` to the desired board for the current shell.
+`LIGHTWEAVE_ADB_PATH`. With two UNO Q boards attached, LightWeave selects the
+single board running the tracked transmitter. `LIGHTWEAVE_UNO_Q_SERIAL` remains
+available as an explicit override.
 
-The first hardware adapter retains the existing pin-9 waveform: 25 ms per bit,
-MSB first, one high start bit, and one low stop bit. It transmits the generated
-payload length without padding, so the UI shows a separate 40-bit/s estimate.
-The accepted result proves buffer count and launch; it does not claim optical
-completion or receiver reconstruction.
+The hardware adapter retains pin 9, 25 ms per bit, MSB-first ordering, one high
+start bit, and one low stop bit. Its default `LWF1` wire frame adds a ten-byte
+version/profile/length/media header and two-byte CRC around the unchanged raw
+payload. The UI distinguishes payload bytes from total optical bytes and shows
+the 40-bit/s estimate. Acceptance proves buffer count and launch; receiver
+evidence proves physical completion separately.
 
 ### Verify optical bytes on a second UNO Q
 
@@ -172,15 +175,16 @@ $env:LIGHTWEAVE_UNO_Q_RECEIVER_SERIAL = "371371094"
 
 Success requires `exact_match: true`, matching sent/received SHA-256 values,
 and `stop_bit_valid: true`. The expected byte count travels only through the
-local ADB control plane; the optical payload remains unchanged and header-free.
-The original receiver projects are not edited.
+local ADB control plane. This test explicitly selects legacy `raw-v0`; normal
+dashboard sends use `LWF1`. The original receiver projects are not edited.
 
-### Reconstruct an optically received image
+### Reconstruct optically received images and audio
 
 The production [`uno_q/optical_receiver_app`](uno_q/optical_receiver_app)
-combines the proven A0/25-ms receiver with the installed native LightWeave
-decoder. It receives the exact raw image bytes, then runs the complete image
-synthesis graph on UNO Q's Adreno 702 with CPU fallback disabled.
+combines the A0 receiver with the installed native LightWeave decoders. It
+parses `LWF1`, automatically identifies media and settings, and reconstructs
+all three image profiles or up to five seconds of EnCodec audio. Image graphs
+run completely on Adreno 702; audio is accurately labeled CPU/Adreno hybrid.
 
 Install the accelerated base once, then deploy the lightweight optical app:
 
@@ -190,10 +194,10 @@ $env:LIGHTWEAVE_UNO_Q_RECEIVER_SERIAL = "371371094"
 .\scripts\install_uno_q_optical_receiver.ps1 -DeviceSerial 371371094 -StopRunningApp
 ```
 
-Open **LightWeave Optical Receiver** in App Lab, select the same image preset,
-enter the exact `payload.bin` byte count, and arm it before pressing **Send to
-Arduino** in the Windows transmitter dashboard. For an automated physical
-acceptance run using a prepared raw payload:
+Open **LightWeave Optical Receiver** in App Lab and press **Listen for
+transfer**, then press **Send to Arduino** in the Windows dashboard. No receiver
+preset or byte count is entered. For automated physical acceptance with a
+prepared image payload:
 
 ```powershell
 .\.venv-x64\Scripts\python.exe scripts\verify_uno_q_optical_image.py `
@@ -204,10 +208,21 @@ acceptance run using a prepared raw payload:
   --receiver-serial 371371094
 ```
 
-Success requires matching optical SHA-256, a valid stop bit, exact output
-dimensions, an Adreno device, and `strict_no_fallback: true`. The diagnostic,
-original `image_receiver`, and installed base decoder remain separate and
-unchanged.
+For a short one-second audio fixture, use the companion command:
+
+```powershell
+.\.venv-x64\Scripts\python.exe scripts\verify_uno_q_optical_audio.py `
+  artifacts\generated\uno_q\audio-1s.payload.bin `
+  --preset A1-E15-S24000 `
+  --output artifacts\generated\uno_q\optical-reconstruction.wav `
+  --transmitter-serial 123900964 `
+  --receiver-serial 371371094
+```
+
+Success requires a valid `LWF1` header/CRC/stop bit, exact output dimensions or
+sample count, an Adreno device, and strict no-fallback evidence for the image
+graph or audio suffix. The diagnostic, original `image_receiver`, and installed
+base decoder remain separate and unchanged.
 
 ## Android text/image receiver
 
@@ -259,10 +274,12 @@ API details.
 
 ## Scope and records
 
-Analog/optical redesign, faster modulation, optical audio reception, physical
+Analog redesign, transition-based clock recovery, faster modulation, physical
 USB-to-phone validation, Galaxy audio playback, and Cloud AI remain outside the
-verified milestone. The tracked UNO Q pair now carries and reconstructs raw
-image codec bytes without changing their existing format.
+verified milestone. The tracked UNO Q pair now automatically carries and
+reconstructs image and one-second audio fixtures through `LWF1`; the supported
+five-second audio decoder was not subjected to the intentionally long optical
+stress transfer.
 
 - [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) is the living source of truth.
 - [docs/QUALCOMM_DEVELOPER_EXPERIENCE.md](docs/QUALCOMM_DEVELOPER_EXPERIENCE.md)

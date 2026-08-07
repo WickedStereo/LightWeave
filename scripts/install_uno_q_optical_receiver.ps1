@@ -19,6 +19,8 @@ param(
 $ErrorActionPreference = "Stop"
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $trackedRoot = (Resolve-Path (Join-Path $projectRoot "uno_q\optical_receiver_app")).Path
+$framePython = (Resolve-Path (Join-Path $projectRoot "src\lightweave\optical_frame.py")).Path
+$frameHeader = (Resolve-Path (Join-Path $projectRoot "uno_q\common\lightweave_optical_frame.h")).Path
 $noticePath = (Resolve-Path (Join-Path $projectRoot "uno_q\native\THIRD_PARTY_NOTICES.md")).Path
 $decoderSource = "/home/arduino/ArduinoApps/lightweave-uno"
 $receiverSource = "/home/arduino/ArduinoApps/image_receiver"
@@ -47,6 +49,11 @@ foreach ($relative in $requiredFiles) {
 }
 if (-not (Test-Path -LiteralPath $noticePath -PathType Leaf)) {
     throw "Tracked UNO Q third-party notice is missing."
+}
+foreach ($shared in @($framePython, $frameHeader)) {
+    if (-not (Test-Path -LiteralPath $shared -PathType Leaf)) {
+        throw "Shared LWF1 protocol source is missing: $shared"
+    }
 }
 
 if (-not $AdbPath) {
@@ -101,6 +108,15 @@ $requiredBoardFiles = @(
     "$decoderSource/runtime/balanced.ncnn.bin",
     "$decoderSource/runtime/quality.ncnn.param",
     "$decoderSource/runtime/quality.ncnn.bin",
+    "$decoderSource/runtime/audio-codebooks.bin",
+    "$decoderSource/runtime/audio-prefix.ncnn.bin",
+    "$decoderSource/runtime/audio-prefix-1s.ncnn.param",
+    "$decoderSource/runtime/audio-prefix-2s.ncnn.param",
+    "$decoderSource/runtime/audio-prefix-3s.ncnn.param",
+    "$decoderSource/runtime/audio-prefix-4s.ncnn.param",
+    "$decoderSource/runtime/audio-prefix-5s.ncnn.param",
+    "$decoderSource/runtime/audio-tail.ncnn.param",
+    "$decoderSource/runtime/audio-tail.ncnn.bin",
     "$receiverSource/sketch/sketch.ino",
     "$uiSource/assets/libs/socket.io.min.js"
 )
@@ -156,6 +172,10 @@ foreach ($relative in $requiredFiles) {
         throw "Could not upload tracked optical-receiver source: $relative"
     }
 }
+& $AdbPath -s $DeviceSerial push $framePython "$stage/source/python/lightweave_optical_frame.py"
+if ($LASTEXITCODE -ne 0) { throw "Could not upload the shared LWF1 Python contract." }
+& $AdbPath -s $DeviceSerial push $frameHeader "$stage/source/sketch/lightweave_optical_frame.h"
+if ($LASTEXITCODE -ne 0) { throw "Could not upload the shared LWF1 C++ contract." }
 & $AdbPath -s $DeviceSerial push $noticePath "$stage/source/THIRD_PARTY_NOTICES.md"
 if ($LASTEXITCODE -ne 0) { throw "Could not upload the UNO Q third-party notice." }
 
@@ -172,8 +192,10 @@ install -m 0644 '$stage/source/assets/style.css' '$targetApp/assets/style.css'
 install -m 0644 '$stage/source/python/lightweave_optical_receiver.py' '$targetApp/python/lightweave_optical_receiver.py'
 install -m 0644 '$stage/source/python/main.py' '$targetApp/python/main.py'
 install -m 0644 '$stage/source/python/requirements.txt' '$targetApp/python/requirements.txt'
+install -m 0644 '$stage/source/python/lightweave_optical_frame.py' '$targetApp/python/lightweave_optical_frame.py'
 install -m 0644 '$stage/source/sketch/sketch.ino' '$targetApp/sketch/sketch.ino'
 install -m 0644 '$stage/source/sketch/sketch.yaml' '$targetApp/sketch/sketch.yaml'
+install -m 0644 '$stage/source/sketch/lightweave_optical_frame.h' '$targetApp/sketch/lightweave_optical_frame.h'
 install -m 0644 '$uiSource/assets/libs/socket.io.min.js' '$targetApp/assets/libs/socket.io.min.js'
 test -x '$targetApp/runtime/lightweave-uno-runner'
 test -f '$targetApp/uno_q.manifest.json'

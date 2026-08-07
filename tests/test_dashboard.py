@@ -32,8 +32,12 @@ class FakeUnoQSink:
                 "preset_code": self.preset_code,
                 "payload_bytes": len(payload),
                 "buffered_bytes": len(payload),
-                "optical_bits": len(payload) * 8 + 2,
-                "estimated_transmission_seconds": (len(payload) * 8 + 2) * 0.025,
+                "wire_mode": "lwf1",
+                "total_optical_bytes": len(payload) + 12,
+                "header_hex": "fixture",
+                "wire_crc_hex": "fixture",
+                "optical_bits": (len(payload) + 12) * 8 + 2,
+                "estimated_transmission_seconds": ((len(payload) + 12) * 8 + 2) * 0.025,
             },
         )
 
@@ -83,7 +87,7 @@ def test_dashboard_exposes_uno_q_status_and_transmit_contract() -> None:
         )
         assert response.status_code == 200
         assert response.json()["buffered_bytes"] == 80
-        assert response.json()["optical_bits"] == 642
+        assert response.json()["optical_bits"] == 738
 
 
 def test_dashboard_serves_small_local_test_patterns() -> None:

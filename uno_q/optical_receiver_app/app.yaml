@@ -1,7 +1,6 @@
 name: LightWeave Optical Receiver
-description: Receive raw optical image payloads and reconstruct them on Adreno.
+description: Receive LWF1 image/audio frames and reconstruct them on CPU/Adreno.
 ports: []
 bricks:
 - arduino:web_ui: {}
 icon: "🔦"
-

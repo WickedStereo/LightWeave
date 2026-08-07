@@ -89,7 +89,7 @@ async function sendToArduino(mediaType) {
   const button = document.querySelector(`#${mediaType}-arduino`);
   const result = document.querySelector(`#${mediaType}-arduino-result`);
   const error = document.querySelector(`#${mediaType}-error`);
-  const seconds = (current.payload.length * 8 + 2) * 0.025;
+  const seconds = ((current.payload.length + 12) * 8 + 2) * 0.025;
   const now = Date.now();
   if (state.arduino.confirming !== mediaType || now > state.arduino.confirmUntil) {
     clearArduinoConfirmation();
@@ -120,8 +120,10 @@ async function sendToArduino(mediaType) {
     }));
     result.textContent = [
       `accepted / ${body.adapter}`,
-      `${body.buffered_bytes} bytes buffered without optical padding`,
-      `${body.optical_bits} optical bits / ${Number(body.estimated_transmission_seconds).toFixed(2)} s estimated`,
+      `${body.buffered_bytes} raw payload bytes buffered unchanged`,
+      `${body.wire_mode} / ${body.total_optical_bytes} framed bytes / ${body.optical_bits} optical bits`,
+      `header ${body.header_hex} / CRC ${body.wire_crc_hex}`,
+      `${Number(body.estimated_transmission_seconds).toFixed(2)} s estimated at 25 ms/bit`,
       `request ${body.request_id}`,
       "launch accepted; physical completion is not claimed",
     ].join("\n");

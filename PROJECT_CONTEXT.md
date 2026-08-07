@@ -6,9 +6,9 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | End-to-end optical image reconstruction complete; automatic framing approved next |
-| Primary milestone | Raw image bytes now cross the laser link and reconstruct through the complete Adreno graph |
-| Secondary milestone | Self-describing optical image framing, then Android and optical audio |
+| Phase | Self-describing optical image/audio reception complete on the two UNO Q boards |
+| Primary milestone | `LWF1` automatically routes image/audio bytes into the Qualcomm-accelerated receiver |
+| Secondary milestone | Galaxy S25 receiver UI and hardware validation |
 | Last updated | 2026-08-06 |
 | Approval gate | Application implementation explicitly approved on 2026-08-05 |
 
@@ -48,7 +48,8 @@ The implemented milestone assumes a reliable ordered byte pipe and includes:
   fallback disabled, and profile evidence.
 - A localhost-only offline dashboard for images and playable audio.
 - An optional runtime guard that blocks DNS and non-loopback networking.
-- A header-free raw mode that preserves `.lwv` while sending only codec bytes.
+- A header-free raw codec-file mode that preserves `.lwv`; `LWF1` framing is
+  generated only for the production laser wire.
 - Three raw image profiles: 64 by 64 at 128 bytes, 128 by 128 at 768 bytes,
   and 256 by 256 at 2,048 bytes, with the balanced profile as the UI default.
 - Raw `A1-E15-S<n>` audio with exact 188-byte independently packed chunks and
@@ -63,12 +64,15 @@ The implemented milestone assumes a reliable ordered byte pipe and includes:
 - A USB/ADB `RawByteSink` that hands generated image and audio payloads to a
   tracked `lightweave_transmitter` App Lab application, which buffers the exact
   variable byte count on the STM32 and launches the existing laser waveform.
+- A 12-byte `LWF1` optical wrapper that carries version, media/profile, payload
+  length, exact audio sample count, and CRC-16 without changing `payload.bin`.
 - A separate `lightweave_byte_receiver` diagnostic that accepts an out-of-band
   expected length, captures the matching raw optical bytes, and reports binary,
   SHA-256, length, and stop-bit evidence without invoking media reconstruction.
-- A separate `lightweave_optical_receiver` production App Lab application that
-  receives variable-length raw image payloads and passes them unchanged into
-  the installed strict-Adreno LightWeave decoder.
+- A separate `lightweave_optical_receiver` production App Lab application with
+  one-shot Listen/Cancel controls. It validates `LWF1`, automatically routes all
+  three image presets and one- to five-second audio, then reconstructs through
+  the installed strict image-Adreno or truthful CPU/Adreno audio path.
 
 The following remain out of scope:
 
@@ -76,8 +80,8 @@ The following remain out of scope:
   faster modulation, and changes to the existing laser waveform/timing.
 - Galaxy S25 hardware validation, Android audio playback, WebSockets, and Cloud
   AI in the runtime path.
-- UNO Q media encoding, optical audio receive integration, and MCU performance
-  optimization beyond the approved variable-length image receive/transmit loop.
+- UNO Q media encoding and MCU performance optimization beyond the approved
+  variable-length framed receive/transmit loop.
 - Medical, regulatory, safety, or absolute-security claims.
 - A packaged EXE/MSIX.
 
@@ -146,7 +150,8 @@ the fixed decoder 5-15 suffix run through ncnn Vulkan on Adreno 702. The same
 480-sample disclosed boundary correction is applied before exact trimming and
 atomic PCM16 WAV output. The owner reduced the first release from ten seconds
 to five: at most 940 bytes and 120,000 samples. UNO Q remains receiver-only;
-on-board encoding, optical/MCU integration, and Galaxy S25 HTP remain deferred.
+on-board encoding and Galaxy S25 HTP remain deferred. Image and audio optical
+receive integration are now complete.
 
 The repository should be the single source of source code, pinned manifests,
 payload contracts, validation vectors, and setup orchestration for all targets.
@@ -158,11 +163,12 @@ download/verification scripts are tracked.
 
 ### Deferred next milestones
 
-The direct Windows-to-UNO-Q optical image workflow is now implemented and
-physically validated. The next selected milestone remains finishing and
-hardware-validating the Android receiver UI for presentation of text and
-reconstructed images from UNO Q. Optical EnCodec audio reception can then reuse
-the same variable-length byte boundary with `A1-E15-S<n>` validation.
+The direct Windows-to-UNO-Q optical image and audio workflows are implemented
+and physically validated with automatic `LWF1` metadata. The next selected
+milestone is finishing and hardware-validating the Android receiver UI for
+presentation of text and reconstructed media from UNO Q. Faster modulation,
+transition-based clock recovery, retries, and sustained adverse-light testing
+remain later transport work.
 
 ### Existing App Lab transmitter discovery
 
@@ -210,12 +216,13 @@ and after installation. The installer refuses unrelated targets, supports
 dry-run/no-start operation, and stops another running App Lab app only through
 the explicit `-StopRunningApp` option because App Lab permits one active app.
 
-The Windows `UnoQAdbSink` discovers ADB, selects the single device exposing
-Arduino App CLI even when an Android phone is also attached, and uses an atomic
+The Windows `UnoQAdbSink` discovers ADB, automatically selects the single UNO Q
+running the tracked transmitter when two boards are attached, and uses an atomic
 USB inbox: payload and metadata are pushed to partial paths, renamed, and the
 request descriptor is published last. SHA-256, request ID, media type, preset,
-and byte length protect only this USB control-plane handoff; the laser receives
-the exact raw `payload.bin` bytes and no metadata or padding. The App Lab worker
+and byte length protect only this USB control-plane handoff. The default laser
+mode wraps the exact raw `payload.bin` in `LWF1`; explicit `raw-v0` remains only
+for the byte diagnostic. The App Lab worker
 validates the image/audio contracts, acknowledges every byte stored on the
 STM32, then launches transmission. Since the existing sketch has no completion
 callback, the dashboard reports launch acceptance and an estimated busy window,
@@ -237,8 +244,8 @@ or receiver reconstruction.
 The first receiver-connection attempt exposed only the transmitter, but a
 subsequent cable/port reconnect resolved enumeration. Two boards are now mapped
 without stopping either app: transmitter `123900964`/`UNOQ-1`/COM3 and receiver
-`371371094`/`unoq2`/COM4. The transmitter continues running
-`lightweave_transmitter`; all receiver-side apps remain stopped.
+`371371094`/`unoq2`/COM4. The transmitter runs `lightweave_transmitter`; the
+receiver is left running `lightweave_optical_receiver` after validation.
 
 Read-only inspection found that `image_receiver` is the closest optical
 receiver base. Its STM32 sketch already matches the transmitter's 25 ms/bit,
@@ -275,55 +282,57 @@ and a valid stop bit. This proves byte correctness for that diagnostic pattern,
 not general reliability under adverse optical conditions. The same diagnostic
 passed a second time before production integration began.
 
-### Production optical image receiver
+### Production optical image/audio receiver
 
-The repository now tracks `uno_q/optical_receiver_app/`, installed on receiver
+The repository tracks `uno_q/optical_receiver_app/`, installed on receiver
 `371371094` as `lightweave_optical_receiver`. It remains separate from the byte
-diagnostic and all original apps. Its installer clones the already installed
-`lightweave-uno` runtime/models, verifies the installed decoder source against
-the repository, reuses the platform-local WebUI library, and deploys the proven
-A0/threshold-800, 25-ms, MSB-first variable-length sketch. The expensive native
-runtime preparation is not repeated; the App Lab build/flash took 92.4 seconds
-and used 87,764 bytes of flash plus 33,678 bytes of global RAM.
+diagnostic and all original apps. Its installer clones the installed
+`lightweave-uno` runtime/models, verifies decoder source, reuses the board-local
+WebUI/Vulkan files, and deploys the A0/threshold-800, MSB-first framing sketch.
+The expensive native runtime preparation is not repeated. The final sketch uses
+92,732 bytes of flash and 35,054 bytes of global RAM with Arduino Zephyr 0.90.0
+and RouterBridge 0.4.3.
 
-Two physical 80-byte `I64-Q1-B128` transfers passed. The automated run received
-the exact SHA-256
-`17493ea32aee4d0e615cf7f49ef678c78198de716f5cf31247e2b7d89a30033f`,
-validated the low stop bit, entropy-decoded in about 0.15 ms, and reconstructed
-64 by 64 through all 16 compute layers on Turnip Adreno 702 with strict CPU
-fallback disabled. Accelerator time was about 214 ms and total serialized
-runner time about 1.97 seconds. A second run armed from the live App Lab page,
-rendered the PNG and download link, reported about 175 ms Adreno inference, and
-produced no browser console errors. Preset and exact length remain trusted
-out-of-band settings; the optical bytes remain header-free. A subsequent
-idempotent reinstall stopped only its own display-named target, rebuilt the
-same sketch, preserved reusable source hashes, and restarted successfully.
-
-### Approved self-describing optical image frame
-
-The owner approved automatic length/preset negotiation as the next change, but
-will test the current manually configured receiver before implementation. The
-downloaded/generated `payload.bin` remains the unchanged raw CompressAI entropy
-string. Only the optical transport wraps it:
+The production receiver accepts a self-describing image/audio frame. The
+downloaded/generated `payload.bin` remains the unchanged raw codec output; only
+the laser wire wraps it:
 
 ```text
 start bit
-magic "LW"            2 bytes
-frame version          1 byte
-image preset ID        1 byte
-payload length         2 bytes, little-endian
-raw payload            N bytes
-CRC-16                 2 bytes over fixed header plus payload
+magic "LW"             2 bytes
+frame version           1 byte
+codec/profile ID        1 byte
+payload length          2 bytes, little-endian
+media parameter         4 bytes, little-endian
+raw payload             N bytes
+CRC-16/CCITT-FALSE      2 bytes, little-endian
 stop bit
 ```
 
-The eight transport bytes add 1.6 seconds at the current 25-ms/bit waveform.
-The receiver will expose one Listen action, validate magic/version/preset,
-enforce the preset budget and 2,048-byte buffer bound, receive the declared
-payload, verify CRC-16 and stop bit, strip the frame, and pass only the raw
-payload into the existing strict-Adreno decoder. The current manual receiver
-and byte diagnostic remain preserved until the new physical gate passes. Audio
-framing will later add the exact output sample count needed by `A1-E15-S<n>`.
+Images use profile IDs `0x01` through `0x03` and a zero media parameter. Audio
+uses `0x10` and places the exact 24 kHz sample count in the media parameter. The
+CRC covers the ten-byte header plus raw payload. The common wrapper adds 12
+bytes/2.4 seconds at 25 ms per bit. The one-shot WebUI exposes **Listen for
+transfer** and **Cancel**, derives decoder settings automatically, and does not
+reconstruct invalid magic, version, profile, length, media parameter, audio
+padding, CRC, or stop bit.
+
+Physical `LWF1` acceptance passed for 80-byte/64-pixel, 216-byte/128-pixel, and
+716-byte/256-pixel image payloads. Every image reconstructed at the exact size
+through all 16 compute layers on Turnip Adreno 702 with strict fallback
+disabled. One 188-byte `A1-E15-S24000` frame produced an exact 24,000-sample,
+24 kHz mono PCM16 WAV through CPU codebooks/layers 0-4 and the strict 39-layer
+Adreno suffix; the conditioned boundary jump was zero. The five-second optical
+case was deliberately not run after the owner chose to skip further long
+transfers; five-second codec/board reconstruction remains validated separately.
+
+An initial 216-byte frame consistently slipped one bit around optical bit 1,389
+because the two STM32 free-running clocks accumulated phase error. A receiver
+sample interval of 24,991 microseconds, while retaining the transmitter's
+25,000-microsecond wire timing, passed all three image sizes plus audio. This is
+a measured board-pair calibration, not general clock recovery. CRC rejection
+preserved failed-frame evidence and prevented reconstruction. Explicit
+`raw-v0` also passed the `00 FF AA 55` exact-byte diagnostic after the upgrade.
 
 ## Confirmed architecture
 
@@ -342,14 +351,15 @@ Parsers reject unsupported versions/profiles/flags, invalid dimensions,
 impossible metadata, truncation, trailing bytes, hash failure, payload-length
 mismatch, and model mismatch before reconstruction.
 
-### Raw optical mode
+### Raw payload and optical wire modes
 
-Raw mode assumes the byte pipe supplies reliable ordered delivery and exact
-message boundaries, and that both hosts have the same pinned model artifacts.
-The transmitted bytes contain no magic, version, media type, length, hash, or
-model fingerprint. The short settings code is trusted out-of-band
-configuration and is not counted toward payload size. `.lwv` remains the safer
-format for archival, diagnosis, integrity checking, and model negotiation.
+Generated `payload.bin` files remain header-free codec bytes and can be decoded
+with an out-of-band preset on Windows or UNO Q. The production optical wire mode
+is `LWF1`, which supplies the minimum routing and integrity fields required by
+automatic reception but no model fingerprint or cryptographic hash. Explicit
+`raw-v0` sends no header and is retained only for the exact-byte diagnostic.
+`.lwv` remains the safer format for archival, diagnosis, SHA-256 integrity, and
+model negotiation.
 
 - Raw image presets are `I64-Q1-B128`, `I128-Q1-B768`, and
   `I256-Q1-B2048`. They reconstruct to fixed 64, 128, and 256 pixel square
@@ -610,14 +620,14 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Windows-to-UNO Q transmitter flow | Complete and published | Commit `028f9d9`; dashboard image/audio Send actions, USB/ADB sink, atomic App Lab inbox, variable-length STM32 loop, tracked clone source, installer, and real 104/124/188-byte board acceptance pass |
 | UNO Q optical byte diagnostic | Complete and published | Commit `80ba103`; exact `00 FF AA 55` received twice with matching SHA-256 and valid stop bit |
 | UNO Q optical image receiver | Complete and published | Commit `506eee9`; two 80-byte physical image transfers passed exact-byte, stop-bit, 64-by-64 PNG, 16-layer Adreno, strict-no-fallback, App Lab UI, and zero-console-error gates |
-| Self-describing optical image framing | Approved; implementation pending current receiver test | Add version/preset/length/CRC around unchanged `payload.bin`, eliminate manual receiver configuration, and preserve diagnostic compatibility |
+| Self-describing optical image/audio framing | Complete; publication pending | `LWF1` carries profile, length, audio sample count, and CRC; all three image routes plus one-second audio passed physical reconstruction |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
 | GitHub Actions unit CI | Complete | Corrected-history Windows Python 3.11 run `31034723025` passed; QNN gates stay local |
 | Second Snapdragon PC | Pending external device | Transfer the same `.lwv` plus generated artifacts and verify |
 | AI Hub/QAIRT Visualizer | Pending access/install | Compare only when account/SDK are available |
-| Arduino/optical adapter | Image path complete and published | Diagnostic commit `80ba103`; production image-receiver commit `506eee9`. Optical audio remains deferred |
-| GitHub push | Complete | Latest production image-receiver commit `506eee9` was pushed directly to `origin/main` without force-pushing |
+| Arduino/optical adapter | Image/audio implementation complete | Default `LWF1`, explicit `raw-v0` diagnostic, automatic routing, strict image Adreno and truthful audio hybrid verified physically |
+| GitHub push | Pending current publication | Push the focused `LWF1` implementation and evidence commit directly to `origin/main` without force-pushing |
 
 ## Risks and mitigations
 
@@ -646,12 +656,13 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | UNO Q audio memory/latency grows with duration | First release is capped at five seconds/940 bytes; static 1-5 second prefixes share one weight file and all requests use the accelerator lock/cooldown |
 | USB stream loses boundaries or reconnects mid-result | `LWRX` length plus CRC32 framing rejects corruption and resynchronizes on magic |
 | Phone receives an unsafe image allocation | Reject payloads above 8 MiB and decoded dimensions above 16 megapixels |
-| Multiple ADB devices are connected | Select only the device exposing Arduino App CLI; fail if zero or more than one UNO Q candidate remains, unless a serial is configured |
+| Multiple ADB devices are connected | Automatically select the only UNO Q running the tracked transmitter marker; fail on ambiguity and retain the serial override |
 | App Lab allows only one active application | Installer does not stop anything by default; the explicit `-StopRunningApp` option performs the reversible stop before starting `lightweave_transmitter` |
 | USB inbox is interrupted or stale | Publish payload/metadata atomically, publish the descriptor last, verify SHA-256/length/request ID, ignore partial files, and return per-request result files |
 | Transmitter has no physical completion callback | Report only exact buffering plus launch acceptance; enforce an estimated busy window and never claim optical completion from the dashboard |
-| Fixed analog threshold and open-loop timing may be environment-sensitive | Byte test passed at threshold 800 and 25 ms/bit in the current alignment; repeat longer/stress payloads and measure errors before claiming general reliability |
-| Raw optical receiver depends on trusted preset and length | App Lab UI/ADB requires both settings before arming, validates the selected budget, and fails on an invalid stop bit; future framing may carry control metadata without changing codec bytes |
+| Fixed analog threshold and open-loop timing may be environment-sensitive | CRC caught a repeatable long-frame bit slip; a 24,991-us receiver interval passes this board pair while the transmitter stays at 25 ms, but true clock recovery and broader alignment/light testing remain necessary |
+| `LWF1` is not cryptographically self-describing | It supplies routing, bounds, sample count, and CRC but no model hash; pinned artifacts remain required and `.lwv` is used where model negotiation/SHA-256 matter |
+| Five-second optical audio is slow | Codec/board decode is validated to five seconds, but the owner elected not to spend 190.45 seconds on the optical stress transfer; one-second optical audio is the physical acceptance evidence |
 
 ## Open questions
 
@@ -663,8 +674,6 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
   narrowed split?
 - Should future work add QNN context caching to reduce the audio tail's session
   preparation time?
-- Which serial reliability/framing adapter will carry `.lwv` over the physical
-  optical link without altering the media format?
 - Will Android match the observed UNO Q composite device as CDC/ACM through
   `usb-serial-for-android`, or will a custom probe/device interface be needed?
 - Can the S25 reliably power the UNO Q during sustained receive, or is a
@@ -678,10 +687,10 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
   while decoding existing raw `payload.bin` files byte-identically?
 - Would a future, explicitly approved UNO Q encoding phase justify the extra
   `g_a` model, native rANS encoder, storage, and accelerator-validation cost?
-- What sustained frame-error rate does the new magic/version/length/CRC framing
-  achieve across longer balanced and quality payloads under varied light?
-- Can the same receiver boundary carry one- to five-second EnCodec payloads
-  reliably before invoking the existing CPU/Adreno audio decoder?
+- What sustained frame-error rate does `LWF1` achieve under varied alignment and
+  ambient light, beyond the passing current-board image/audio fixtures?
+- Would transition-based clock recovery remove the board-pair-specific 24,991-us
+  receiver calibration while preserving the simple 25-ms waveform?
 - Is the existing 25 ms bit duration intentional for the optical hardware, and
   what faster rate passes sustained end-to-end tests?
 
@@ -729,10 +738,13 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | D-038 | 2026-08-06 | Resume with transmitter-side integration discovery and inspect `image_transmitter_bkp` without modifying or starting it. | Owner connected the transmitting UNO Q and requested an explanation and bridge assessment before implementation. |
 | D-039 | 2026-08-06 | Use USB/ADB plus an atomic watched inbox as the Windows-dashboard-to-App-Lab transport. | Works offline, preserves the existing `RawByteSink` boundary, handles multiple attached ADB devices safely, and does not alter optical bytes. |
 | D-040 | 2026-08-06 | Clone the backup as `lightweave_transmitter`, retain per-byte RouterBridge loading and the existing waveform, and change only the active payload length on the STM32. | Owner explicitly prohibited backup edits and approved variable-length transmission without hardware/timing changes. |
-| D-041 | 2026-08-06 | Keep SHA-256 and request metadata in the local USB control plane and report launch acceptance rather than physical completion. | Raw optical mode stays header-free and the unchanged MCU interface exposes no completion callback. |
+| D-041 | 2026-08-06 | Keep SHA-256 and request metadata in the local USB control plane and report launch acceptance rather than physical completion. | `payload.bin` and explicit `raw-v0` stay header-free; D-045 later adds only a wire-time routing/CRC wrapper. The MCU still exposes no completion callback. |
 | D-042 | 2026-08-06 | Add a separate variable-length optical byte diagnostic before connecting the accelerated media receiver. | Preserves all existing receiver apps, proves the transport independently, and keeps expected length as out-of-band control data. |
 | D-043 | 2026-08-06 | Keep the byte diagnostic separate and add `lightweave_optical_receiver` by composing the proven `image_receiver` sampling logic with the installed strict-Adreno decoder. | Preserves original apps, avoids repeating the long runtime build, and makes optical transport evidence distinct from reconstruction evidence. |
-| D-044 | 2026-08-06 | Add an eight-byte self-describing optical wrapper carrying magic, version, image preset, payload length, and CRC-16 around the unchanged raw payload. | Eliminates manual preset/length entry while preserving `payload.bin`; implementation starts after the owner tests the current receiver. |
+| D-044 | 2026-08-06 | Add an eight-byte image-only self-describing optical wrapper. | Superseded by D-045 before implementation so image and audio share one format. |
+| D-045 | 2026-08-06 | Use the common 12-byte `LWF1` image/audio wrapper and keep `payload.bin` unchanged. | Carries profile, payload length, exact audio sample count, and CRC-16 while preserving raw codec compatibility. |
+| D-046 | 2026-08-06 | Calibrate this receiver to a 24,991-us sample interval while retaining 25-ms transmitter bits. | Removed a measured long-frame phase slip; this is board-pair evidence, not general clock recovery. |
+| D-047 | 2026-08-06 | Stop additional long optical acceptance transfers. | Owner accepted existing evidence; the five-second audio wire test is intentionally skipped while the supported decoder limit remains five seconds. |
 
 ## Public references
 
@@ -790,3 +802,6 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-06 | Published the byte diagnostic as commit `80ba103`, then installed and exercised the separate production optical image receiver: two exact 80-byte transfers reconstructed to 64 by 64 through all 16 Adreno layers with strict fallback disabled, including a live App Lab UI run with PNG download and no browser errors. |
 | 2026-08-06 | Published the production optical image receiver, installer, acceptance harness, tests, setup instructions, and evidence as commit `506eee9` on `origin/main` without force-pushing. |
 | 2026-08-06 | Approved self-describing optical image framing as the next implementation: eight transport bytes provide magic/version/preset/length/CRC while the generated raw payload remains unchanged; current manual receiver testing comes first. |
+| 2026-08-06 | Replaced the image-only proposal with common 12-byte `LWF1` framing for images/audio, automatic two-board transmitter selection, one-shot Listen/Cancel reception, CRC-gated routing, and preserved explicit `raw-v0` diagnostics. |
+| 2026-08-06 | Diagnosed a repeatable long-frame free-running-clock slip, calibrated this receiver to 24,991 us against the unchanged 25-ms transmitter, and physically passed 80/216/716-byte images plus 188-byte one-second audio with strict Adreno evidence. |
+| 2026-08-06 | Honored the owner's request to skip further long transfers, omitted the five-second optical audio run, revalidated exact `00 FF AA 55` in `raw-v0`, and left the production optical receiver running. |

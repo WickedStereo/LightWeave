@@ -12,12 +12,31 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+try:
+    from lightweave_optical_frame import (
+        FRAME_OVERHEAD_BYTES,
+        build_header,
+        crc16_ccitt_false,
+        optical_bits,
+        profile_for_preset,
+        transmission_seconds,
+    )
+except ModuleNotFoundError:  # Repository test environment.
+    from lightweave.optical_frame import (
+        FRAME_OVERHEAD_BYTES,
+        build_header,
+        crc16_ccitt_false,
+        optical_bits,
+        profile_for_preset,
+        transmission_seconds,
+    )
+
 MAX_PAYLOAD_BYTES = 2_048
 AUDIO_CHUNK_BYTES = 188
 MAX_AUDIO_BYTES = 940
 SAMPLES_PER_AUDIO_CHUNK = 24_000
 BIT_DURATION_MS = 25
-WIRE_OVERHEAD_BITS = 2
+REQUEST_SCHEMA_VERSION = 2
 IMAGE_PRESETS = {
     "I64-Q1": 128,
     "I64-Q1-B128": 128,
@@ -48,6 +67,9 @@ class Request:
     preset_code: str
     payload_bytes: int
     payload_sha256: str
+    wire_mode: str
+    profile_id: int
+    media_parameter: int
 
 
 def _canonical_request_id(value: object) -> str:
@@ -79,7 +101,7 @@ def _validate_audio(payload: bytes, preset_code: str) -> None:
 
 
 def validate_request(metadata: dict[str, Any], payload: bytes) -> Request:
-    if metadata.get("schema_version") != 1:
+    if metadata.get("schema_version") != REQUEST_SCHEMA_VERSION:
         raise TransmitterError("Unsupported request schema version.")
     request = Request(
         request_id=_canonical_request_id(metadata.get("request_id")),
@@ -87,6 +109,9 @@ def validate_request(metadata: dict[str, Any], payload: bytes) -> Request:
         preset_code=str(metadata.get("preset_code", "")),
         payload_bytes=int(metadata.get("payload_bytes", -1)),
         payload_sha256=str(metadata.get("payload_sha256", "")).lower(),
+        wire_mode=str(metadata.get("wire_mode", "")),
+        profile_id=int(metadata.get("profile_id", -1)),
+        media_parameter=int(metadata.get("media_parameter", -1)),
     )
     if not payload:
         raise TransmitterError("Payload is empty.")
@@ -97,6 +122,27 @@ def validate_request(metadata: dict[str, Any], payload: bytes) -> Request:
     digest = hashlib.sha256(payload).hexdigest()
     if request.payload_sha256 != digest:
         raise TransmitterError("Payload SHA-256 does not match the request.")
+    if request.wire_mode not in {"lwf1", "raw-v0"}:
+        raise TransmitterError("Wire mode must be lwf1 or raw-v0.")
+    try:
+        profile, media_parameter = profile_for_preset(request.preset_code)
+        header = build_header(request.preset_code, len(payload))
+    except ValueError as exc:
+        raise TransmitterError(str(exc)) from exc
+    if request.profile_id != profile.profile_id:
+        raise TransmitterError("Profile ID does not match the preset code.")
+    if request.media_parameter != media_parameter:
+        raise TransmitterError("Media parameter does not match the preset code.")
+    if request.wire_mode == "lwf1":
+        if metadata.get("frame_version") != 1:
+            raise TransmitterError("LWF1 request must declare frame version 1.")
+        expected_crc = crc16_ccitt_false(header + payload)
+        if metadata.get("expected_header_hex") != header.hex():
+            raise TransmitterError("Expected LWF1 header does not match the request.")
+        if metadata.get("expected_crc16") != expected_crc:
+            raise TransmitterError("Expected LWF1 CRC does not match the request.")
+    elif metadata.get("frame_version") != 0:
+        raise TransmitterError("raw-v0 request must declare frame version 0.")
     if request.media_type == "image":
         maximum = IMAGE_PRESETS.get(request.preset_code)
         if maximum is None:
@@ -108,10 +154,6 @@ def validate_request(metadata: dict[str, Any], payload: bytes) -> Request:
     else:
         raise TransmitterError("Media type must be image or audio.")
     return request
-
-
-def transmission_seconds(payload_bytes: int) -> float:
-    return (payload_bytes * 8 + WIRE_OVERHEAD_BITS) * BIT_DURATION_MS / 1_000
 
 
 class InboxWorker:
@@ -146,7 +188,11 @@ class InboxWorker:
     def _write_result(self, request_id: str, value: dict[str, Any]) -> None:
         self._write_atomic(
             self.results / f"{request_id}.json",
-            {"schema_version": 1, "request_id": request_id, **value},
+            {
+                "schema_version": REQUEST_SCHEMA_VERSION,
+                "request_id": request_id,
+                **value,
+            },
         )
 
     def status(self, now: float | None = None) -> dict[str, Any]:
@@ -196,7 +242,14 @@ class InboxWorker:
                     f"{status['busy_remaining_seconds']:.1f} more seconds."
                 )
 
-            if not self.bridge.call("prepare_image_buffer", len(payload)):
+            wire_mode_id = 1 if request.wire_mode == "lwf1" else 0
+            if not self.bridge.call(
+                "prepare_transmission",
+                len(payload),
+                wire_mode_id,
+                request.profile_id,
+                request.media_parameter,
+            ):
                 raise TransmitterError("STM32 rejected the payload length.")
             for index, byte_value in enumerate(payload):
                 if not self.bridge.call("store_image_byte", index, byte_value):
@@ -207,7 +260,9 @@ class InboxWorker:
                     f"STM32 reports {buffered} buffered bytes; expected {len(payload)}."
                 )
 
-            duration = transmission_seconds(len(payload))
+            header = build_header(request.preset_code, len(payload))
+            crc = crc16_ccitt_false(header + payload)
+            duration = transmission_seconds(len(payload), request.wire_mode)
             launch_time = current if now is not None else time.time()
             busy_until = launch_time + duration
             self.bridge.notify("transmit_image")
@@ -220,7 +275,27 @@ class InboxWorker:
                 "payload_bytes": len(payload),
                 "payload_sha256": request.payload_sha256,
                 "buffered_bytes": buffered,
-                "optical_bits": len(payload) * 8 + WIRE_OVERHEAD_BITS,
+                "wire_mode": request.wire_mode,
+                "frame_version": 1 if request.wire_mode == "lwf1" else 0,
+                "profile_id": request.profile_id,
+                "media_parameter": request.media_parameter,
+                "header_bytes": 10 if request.wire_mode == "lwf1" else 0,
+                "header_hex": header.hex() if request.wire_mode == "lwf1" else "",
+                "crc16": crc if request.wire_mode == "lwf1" else None,
+                "wire_crc_hex": (
+                    crc.to_bytes(2, "little").hex()
+                    if request.wire_mode == "lwf1"
+                    else ""
+                ),
+                "frame_overhead_bytes": (
+                    FRAME_OVERHEAD_BYTES if request.wire_mode == "lwf1" else 0
+                ),
+                "total_optical_bytes": (
+                    len(payload) + FRAME_OVERHEAD_BYTES
+                    if request.wire_mode == "lwf1"
+                    else len(payload)
+                ),
+                "optical_bits": optical_bits(len(payload), request.wire_mode),
                 "bit_duration_ms": BIT_DURATION_MS,
                 "estimated_transmission_seconds": duration,
                 "busy_until_epoch": busy_until,

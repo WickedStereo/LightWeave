@@ -3,57 +3,79 @@
 const socket = io(window.location.origin, { path: "/socket.io" });
 const connection = document.querySelector("#connection");
 const receiverStatus = document.querySelector("#receiver-status");
-const form = document.querySelector("#arm-form");
-const preset = document.querySelector("#preset-code");
-const expectedBytes = document.querySelector("#expected-bytes");
-const budget = document.querySelector("#budget");
+const listen = document.querySelector("#listen");
+const cancel = document.querySelector("#cancel");
 const result = document.querySelector("#result");
+const resultTitle = document.querySelector("#result-title");
+const imageResult = document.querySelector("#image-result");
 const image = document.querySelector("#image");
-const download = document.querySelector("#download");
+const imageDownload = document.querySelector("#image-download");
+const audioResult = document.querySelector("#audio-result");
+const audio = document.querySelector("#audio");
+const audioDownload = document.querySelector("#audio-download");
 const metrics = document.querySelector("#metrics");
 const error = document.querySelector("#error");
-const submit = form.querySelector("button");
-const budgets = {
-  "I64-Q1-B128": 128,
-  "I128-Q1-B768": 768,
-  "I256-Q1-B2048": 2048,
-};
-let imageUrl = null;
-
-function updateBudget() {
-  const maximum = budgets[preset.value];
-  expectedBytes.max = maximum;
-  if (Number(expectedBytes.value) > maximum) expectedBytes.value = maximum;
-  budget.textContent = `Enter the exact payload size; ${preset.value} allows 1–${maximum} bytes.`;
-}
+let mediaUrl = null;
 
 function showError(message) {
   error.textContent = message;
   error.hidden = false;
 }
 
+function makeMediaUrl(encoded, type) {
+  const raw = atob(encoded);
+  const bytes = Uint8Array.from(raw, (character) => character.charCodeAt(0));
+  return URL.createObjectURL(new Blob([bytes], { type }));
+}
+
+function milliseconds(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? `${(number * 1000).toFixed(2)} ms` : "n/a";
+}
+
 function renderMetrics(values) {
   const reconstruction = values.reconstruction || {};
   const rows = [
+    ["media", values.media_type],
     ["preset", values.preset_code],
-    ["optical payload", `${values.received_bytes} bytes`],
-    ["payload SHA-256", values.payload_sha256],
+    ["profile ID", `0x${Number(values.profile_id).toString(16).padStart(2, "0")}`],
+    ["raw payload", `${values.payload_bytes} bytes`],
+    ["LWF1 header", values.header_hex],
+    ["wire CRC", `${values.wire_crc_hex} / valid`],
     ["stop bit", values.stop_bit_valid ? "valid" : "INVALID"],
-    ["entropy decode", `${(reconstruction.entropy_seconds * 1000).toFixed(2)} ms`],
-    ["Adreno inference", `${(reconstruction.inference_seconds * 1000).toFixed(2)} ms`],
-    ["backend", reconstruction.backend],
-    ["device", reconstruction.device],
-    ["Vulkan compute layers", reconstruction.compute_layers],
-    ["CPU fallback", reconstruction.strict_no_fallback ? "disabled" : "ERROR"],
-    ["output", `${reconstruction.output_width} × ${reconstruction.output_height}`],
-    ["model SHA-256", reconstruction.model_sha256],
+    ["payload SHA-256", values.payload_sha256],
   ];
+  if (values.media_type === "image") {
+    rows.push(
+      ["entropy decode", milliseconds(reconstruction.entropy_seconds)],
+      ["Adreno inference", milliseconds(reconstruction.inference_seconds)],
+      ["backend", reconstruction.backend],
+      ["device", reconstruction.device],
+      ["Vulkan compute layers", reconstruction.compute_layers],
+      ["CPU neural fallback", reconstruction.strict_no_fallback ? "disabled" : "ERROR"],
+      ["output", `${reconstruction.output_width} × ${reconstruction.output_height}`],
+      ["model SHA-256", reconstruction.model_sha256],
+    );
+  } else {
+    rows.push(
+      ["output samples", values.media_parameter],
+      ["CPU codebook", milliseconds(reconstruction.cpu_codebook_seconds)],
+      ["CPU prefix", milliseconds(reconstruction.cpu_prefix_seconds)],
+      ["Adreno suffix", milliseconds(reconstruction.accelerator_seconds)],
+      ["selected split", reconstruction.selected_split],
+      ["Vulkan suffix layers", reconstruction.vulkan_compute_layers],
+      ["device", reconstruction.device],
+      ["CPU suffix fallback", reconstruction.strict_suffix_no_fallback ? "disabled" : "ERROR"],
+      ["boundary correction", reconstruction.boundary_correction],
+      ["model SHA-256", reconstruction.model_sha256],
+    );
+  }
   metrics.replaceChildren();
   for (const [name, value] of rows) {
     const term = document.createElement("dt");
     const definition = document.createElement("dd");
     term.textContent = name;
-    definition.textContent = String(value);
+    definition.textContent = String(value ?? "n/a");
     metrics.append(term, definition);
   }
 }
@@ -66,45 +88,53 @@ socket.on("connect", () => {
 socket.on("disconnect", () => {
   connection.textContent = "disconnected";
   receiverStatus.textContent = "board connection lost";
-  submit.disabled = true;
+  listen.disabled = true;
+  cancel.disabled = true;
 });
 
 socket.on("receiver_status", (data) => {
-  receiverStatus.textContent = data.expected_bytes
-    ? `${data.status} / ${data.preset_code} / ${data.expected_bytes} bytes`
-    : data.status;
-  submit.disabled = ["arming", "armed", "reconstructing"].includes(data.status);
+  receiverStatus.textContent = data.status;
+  const active = ["arming", "listening", "cancelling", "reconstructing"].includes(data.status);
+  listen.disabled = active;
+  cancel.disabled = !["arming", "listening"].includes(data.status);
 });
 
 socket.on("receiver_error", (data) => {
   showError(data.error);
-  submit.disabled = false;
+  listen.disabled = false;
+  cancel.disabled = true;
 });
 
 socket.on("receiver_result", (data) => {
-  if (imageUrl) URL.revokeObjectURL(imageUrl);
-  const raw = atob(data.png_base64);
-  const bytes = Uint8Array.from(raw, (character) => character.charCodeAt(0));
-  imageUrl = URL.createObjectURL(new Blob([bytes], { type: "image/png" }));
-  image.src = imageUrl;
-  download.href = imageUrl;
+  if (mediaUrl) URL.revokeObjectURL(mediaUrl);
+  imageResult.hidden = true;
+  audioResult.hidden = true;
+  if (data.media_type === "image") {
+    mediaUrl = makeMediaUrl(data.png_base64, "image/png");
+    image.src = mediaUrl;
+    imageDownload.href = mediaUrl;
+    imageResult.hidden = false;
+    resultTitle.textContent = "Reconstructed image";
+  } else {
+    mediaUrl = makeMediaUrl(data.wav_base64, "audio/wav");
+    audio.src = mediaUrl;
+    audioDownload.href = mediaUrl;
+    audioResult.hidden = false;
+    resultTitle.textContent = "Reconstructed audio";
+  }
   renderMetrics(data);
   result.hidden = false;
   error.hidden = true;
-  submit.disabled = false;
 });
 
-form.addEventListener("submit", (event) => {
-  event.preventDefault();
+listen.addEventListener("click", () => {
   error.hidden = true;
   result.hidden = true;
-  submit.disabled = true;
-  socket.emit("arm_receiver", {
-    preset_code: preset.value,
-    expected_bytes: Number(expectedBytes.value),
-  });
+  listen.disabled = true;
+  socket.emit("listen_receiver", {});
 });
 
-preset.addEventListener("change", updateBudget);
-updateBudget();
-
+cancel.addEventListener("click", () => {
+  cancel.disabled = true;
+  socket.emit("cancel_receiver", {});
+});

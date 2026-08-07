@@ -10,43 +10,39 @@
   <main>
     <header>
       <p class="eyebrow">LIGHTWEAVE / UNO Q</p>
-      <h1>Optical image receiver</h1>
-      <p>Receive raw codec bytes through light, then reconstruct on Adreno 702.</p>
+      <h1>Optical receiver</h1>
+      <p>Receive a self-describing LWF1 image or audio frame, then reconstruct it on this board.</p>
     </header>
 
     <section class="status" aria-live="polite">
-      <span id="connection">connecting</span>
-      <span>/</span>
+      <span id="connection">connecting</span><span>/</span>
       <span id="receiver-status">checking receiver</span>
     </section>
 
     <section>
-      <h2>Arm receiver</h2>
-      <form id="arm-form">
-        <label for="preset-code">Image preset</label>
-        <select id="preset-code" required>
-          <option value="I64-Q1-B128">I64-Q1-B128 / 64 × 64 / max 128 bytes</option>
-          <option value="I128-Q1-B768" selected>I128-Q1-B768 / 128 × 128 / max 768 bytes</option>
-          <option value="I256-Q1-B2048">I256-Q1-B2048 / 256 × 256 / max 2,048 bytes</option>
-        </select>
-
-        <label for="expected-bytes">Exact payload.bin size</label>
-        <input id="expected-bytes" type="number" min="1" max="768" value="104" required>
-        <p id="budget" class="note">Enter the exact byte count shown by the transmitter.</p>
-
-        <button type="submit">Arm optical receiver</button>
-      </form>
+      <h2>One-shot receive</h2>
+      <p>No preset or length is needed. Start listening, then send from the Windows dashboard.</p>
+      <div class="actions">
+        <button id="listen" type="button">Listen for transfer</button>
+        <button id="cancel" class="secondary" type="button" disabled>Cancel</button>
+      </div>
     </section>
 
     <p class="warning">
-      Arm this page before pressing Send to Arduino on the transmitter dashboard.
-      Raw mode sends no length, preset, hash, or model identifier through the laser.
+      LWF1 adds profile, length, audio sample count, and CRC on the laser wire.
+      The saved payload.bin remains the unchanged raw codec payload.
     </p>
 
     <section id="result" hidden>
-      <h2>Reconstructed image</h2>
-      <div class="image-frame"><img id="image" alt="Reconstructed LightWeave image"></div>
-      <a id="download" download="lightweave-optical-reconstruction.png">Download PNG</a>
+      <h2 id="result-title">Reconstruction</h2>
+      <div id="image-result" hidden>
+        <div class="image-frame"><img id="image" alt="Reconstructed LightWeave image"></div>
+        <a id="image-download" download="lightweave-optical-reconstruction.png">Download PNG</a>
+      </div>
+      <div id="audio-result" hidden>
+        <audio id="audio" controls></audio>
+        <a id="audio-download" download="lightweave-optical-reconstruction.wav">Download WAV</a>
+      </div>
       <dl id="metrics"></dl>
     </section>
 
@@ -56,4 +52,3 @@
   <script src="/app.js"></script>
 </body>
 </html>
-

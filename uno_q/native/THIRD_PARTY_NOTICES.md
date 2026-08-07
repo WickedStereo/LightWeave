@@ -29,6 +29,9 @@ does not vendor or redistribute those platform files. Review the licenses
 shipped with the installed Arduino platform before redistributing a complete
 board image or App Lab runtime.
 
+The tracked `LWF1` framing and CRC implementation is LightWeave project code
+and adds no external protocol or checksum dependency.
+
 The byte and optical receiver installers retain the board's platform-supplied
 Socket.IO browser asset. That asset is not vendored here; the installed Arduino
 runtime carries its corresponding notice.

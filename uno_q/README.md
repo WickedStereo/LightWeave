@@ -1,8 +1,9 @@
 # LightWeave UNO Q media receiver
 
 This target reconstructs existing header-free LightWeave image and EnCodec
-audio payloads on the Arduino UNO Q. It is receiver-only: encoding, optical
-audio reception, waveform redesign, and mobile delivery remain deferred.
+audio payloads on the Arduino UNO Q. Its production App Lab path now receives
+both media types through self-describing `LWF1` optical frames. It remains
+receiver-only: encoding, waveform redesign, and mobile delivery are deferred.
 
 For images, entropy decoding and PNG packaging run on the ARM64 CPU. The
 complete CompressAI `g_s` graph runs through ncnn Vulkan on Turnip Adreno 702;
@@ -19,13 +20,16 @@ Supported presets are unchanged:
 | `I128-Q1-B768` | 768 | 128 x 128 |
 | `I256-Q1-B2048` | 2,048 | 256 x 256 |
 
-The payload contains only the CompressAI entropy string. The preset is local
-control-plane information and must match on sender and receiver.
+The saved payload contains only the CompressAI entropy string. Standalone decode
+still takes an out-of-band preset; the production optical frame supplies its
+profile automatically.
 
 Raw audio uses `A1-E15-S<n>`, where `n` is the exact output sample count at
 24 kHz mono. Each started second is exactly 188 raw bytes. The initial board
 limit is five seconds: at most 940 bytes and 120,000 output samples. The
-settings code is communicated out of band and is not part of `payload.bin`.
+settings code is communicated out of band for standalone files and is not part
+of `payload.bin`; `LWF1` carries the equivalent profile/sample metadata on the
+laser wire.
 
 ## Transmitter companion
 
@@ -34,7 +38,8 @@ the Windows dashboard to the transmitting UNO Q over USB/ADB. It is installed
 as `lightweave_transmitter`, cloned from but independent of the board's
 `image_transmitter_bkp` app. Its atomic inbox accepts image or audio raw bytes,
 loads the exact variable length into the STM32, and retains the existing pin-9,
-25-ms, MSB-first laser waveform.
+25-ms, MSB-first laser waveform. The STM32 adds `LWF1` only while transmitting;
+the saved raw payload is never rewritten or padded.
 
 ```powershell
 .\scripts\install_uno_q_transmitter.ps1 -DryRun
@@ -69,12 +74,12 @@ This diagnostic does not invoke CompressAI, EnCodec, ncnn, or the accelerated
 receiver. Length remains trusted out-of-band data. It is kept as a focused
 transport troubleshooting tool.
 
-## Production optical image receiver
+## Production optical image/audio receiver
 
-[`optical_receiver_app`](optical_receiver_app) joins the diagnostic's proven
-variable-length optical sampling with the already installed native image
-decoder. The tracked app is installed as `lightweave_optical_receiver`; the
-diagnostic and original `image_receiver` projects are not modified.
+[`optical_receiver_app`](optical_receiver_app) joins optical sampling with the
+installed native image and audio decoders. The tracked app is installed as
+`lightweave_optical_receiver`; the diagnostic and original `image_receiver`
+projects are not modified.
 
 Install the base decoder once with `install_uno_q.ps1`, then deploy only the
 small optical integration layer:
@@ -90,11 +95,11 @@ clones its hash-verified models/runtime, preserves the original receiver source
 hashes, installs tracked App Lab/STM32 code, and supports `-NoStart`. It never
 rebuilds ncnn or regenerates models.
 
-In App Lab, select the same image preset used by the transmitter, enter the
-exact payload byte count, and arm the receiver before sending. The page
-automatically displays/downloads the reconstructed PNG and reports payload
-SHA-256, stop-bit state, entropy time, Adreno time, device, model hash, compute
-layers, and no-fallback evidence.
+In App Lab, press **Listen for transfer**, then send from the Windows dashboard.
+The receiver reads the `LWF1` profile, length, and audio sample count, validates
+CRC/stop bit, and routes the raw bytes automatically. It displays/downloads the
+PNG or playable WAV and reports frame, CPU, Adreno, model, and strict-assignment
+evidence. **Cancel** returns an armed receiver to idle without auto-rearming.
 
 Automated two-board acceptance:
 
@@ -105,12 +110,26 @@ Automated two-board acceptance:
   --output artifacts\generated\uno_q\optical-reconstruction.png `
   --transmitter-serial 123900964 `
   --receiver-serial 371371094
+
+.\.venv-x64\Scripts\python.exe scripts\verify_uno_q_optical_audio.py `
+  artifacts\generated\uno_q\audio-1s.payload.bin `
+  --preset A1-E15-S24000 `
+  --output artifacts\generated\uno_q\optical-reconstruction.wav `
+  --transmitter-serial 123900964 `
+  --receiver-serial 371371094
 ```
 
-The exercised 80-byte fixture arrived with an exact SHA-256 and valid stop bit,
-then reconstructed to 64 by 64 through all 16 image compute layers on Turnip
-Adreno 702 with strict CPU fallback disabled. Optical audio reception remains a
-later extension of the same boundary.
+Physical acceptance passed 80-, 216-, and 716-byte image fixtures through the
+64-, 128-, and 256-pixel strict Adreno graphs. A 188-byte one-second audio frame
+produced exactly 24,000 finite PCM samples using the truthful CPU plus strict
+39-layer Adreno suffix. Further long optical transfers, including the
+190.45-second five-second audio case, were intentionally skipped at the owner's
+request; native five-second decode validation remains recorded separately.
+
+The transmitter remains at 25,000 microseconds per bit. The receiver currently
+samples at 24,991 microseconds after CRC evidence isolated cumulative phase
+drift on the workshop board pair. This is calibration, not general clock
+recovery; future transport work should replace it with transition-based timing.
 
 ## Runtime architecture
 

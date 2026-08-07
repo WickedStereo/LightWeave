@@ -107,11 +107,9 @@ def main() -> int:
     result_json = f"{RECEIVER_PATH}/data/results/{request_id}.json"
     result_png = f"{RECEIVER_PATH}/data/results/{request_id}.png"
     descriptor = {
-        "schema_version": 1,
+        "schema_version": 2,
         "request_id": request_id,
-        "media_type": "image",
-        "preset_code": args.preset,
-        "expected_bytes": len(payload),
+        "action": "listen-lwf1",
     }
     with tempfile.TemporaryDirectory(prefix="lightweave-optical-image-") as temporary:
         local = Path(temporary) / "arm.json"
@@ -130,7 +128,7 @@ def main() -> int:
         args.receiver_serial,
         state_path,
         request_id,
-        {"armed"},
+        {"listening"},
         15.0,
     )
     send_receipt = UnoQAdbSink(
@@ -139,7 +137,7 @@ def main() -> int:
         adb_path=adb,
         device_serial=args.transmitter_serial,
     ).send(payload)
-    timeout = max(120.0, (len(payload) * 8 + 2) * 0.025 + 110.0)
+    timeout = max(120.0, ((len(payload) + 12) * 8 + 2) * 0.025 + 110.0)
     result = wait_for_status(
         adb,
         args.receiver_serial,
@@ -164,6 +162,8 @@ def main() -> int:
             result.get("payload_sha256") == expected_hash,
             result.get("received_bytes") == len(payload),
             result.get("stop_bit_valid") is True,
+            result.get("crc_valid") is True,
+            result.get("profile_id") in {1, 2, 3},
             (width, height) == (output_size, output_size),
             reconstruction.get("backend") == "ncnn-vulkan",
             reconstruction.get("strict_no_fallback") is True,
@@ -190,4 +190,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

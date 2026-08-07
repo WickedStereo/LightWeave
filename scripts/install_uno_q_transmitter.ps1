@@ -19,6 +19,8 @@ param(
 $ErrorActionPreference = "Stop"
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $sourceRoot = (Resolve-Path (Join-Path $projectRoot "uno_q\transmitter_app")).Path
+$framePython = (Resolve-Path (Join-Path $projectRoot "src\lightweave\optical_frame.py")).Path
+$frameHeader = (Resolve-Path (Join-Path $projectRoot "uno_q\common\lightweave_optical_frame.h")).Path
 $sourceApp = "/home/arduino/ArduinoApps/image_transmitter_bkp"
 $targetApp = "/home/arduino/ArduinoApps/lightweave_transmitter"
 $requiredFiles = @(
@@ -36,6 +38,11 @@ foreach ($relative in $requiredFiles) {
     $local = Join-Path $sourceRoot $relative.Replace("/", [IO.Path]::DirectorySeparatorChar)
     if (-not (Test-Path -LiteralPath $local -PathType Leaf)) {
         throw "Tracked transmitter source is missing: $relative"
+    }
+}
+foreach ($shared in @($framePython, $frameHeader)) {
+    if (-not (Test-Path -LiteralPath $shared -PathType Leaf)) {
+        throw "Shared LWF1 protocol source is missing: $shared"
     }
 }
 
@@ -121,6 +128,10 @@ foreach ($relative in $requiredFiles) {
         throw "Could not upload tracked transmitter source: $relative"
     }
 }
+& $AdbPath -s $DeviceSerial push $framePython "$stage/source/python/lightweave_optical_frame.py"
+if ($LASTEXITCODE -ne 0) { throw "Could not upload the shared LWF1 Python contract." }
+& $AdbPath -s $DeviceSerial push $frameHeader "$stage/source/sketch/lightweave_optical_frame.h"
+if ($LASTEXITCODE -ne 0) { throw "Could not upload the shared LWF1 C++ contract." }
 
 $installCommand = @"
 set -eu
@@ -131,11 +142,13 @@ install -m 0644 '$stage/source/transmitter.manifest.json' '$targetApp/transmitte
 install -m 0644 '$stage/source/python/lightweave_transmitter.py' '$targetApp/python/lightweave_transmitter.py'
 install -m 0644 '$stage/source/python/main.py' '$targetApp/python/main.py'
 install -m 0644 '$stage/source/python/requirements.txt' '$targetApp/python/requirements.txt'
+install -m 0644 '$stage/source/python/lightweave_optical_frame.py' '$targetApp/python/lightweave_optical_frame.py'
 install -m 0644 '$stage/source/sketch/sketch.ino' '$targetApp/sketch/sketch.ino'
 install -m 0644 '$stage/source/sketch/sketch.yaml' '$targetApp/sketch/sketch.yaml'
+install -m 0644 '$stage/source/sketch/lightweave_optical_frame.h' '$targetApp/sketch/lightweave_optical_frame.h'
 rm -f '$targetApp/python/image.jpg' '$targetApp/python/images.jpg'
-rm -f '$stage/source/python/lightweave_transmitter.py' '$stage/source/python/main.py' '$stage/source/python/requirements.txt'
-rm -f '$stage/source/sketch/sketch.ino' '$stage/source/sketch/sketch.yaml'
+rm -f '$stage/source/python/lightweave_transmitter.py' '$stage/source/python/main.py' '$stage/source/python/requirements.txt' '$stage/source/python/lightweave_optical_frame.py'
+rm -f '$stage/source/sketch/sketch.ino' '$stage/source/sketch/sketch.yaml' '$stage/source/sketch/lightweave_optical_frame.h'
 rm -f '$stage/source/app.yaml' '$stage/source/README.md' '$stage/source/transmitter.manifest.json'
 rmdir '$stage/source/python' '$stage/source/sketch' '$stage/source' '$stage'
 "@

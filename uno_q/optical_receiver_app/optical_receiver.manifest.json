@@ -1,21 +1,32 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "application_id": "lightweave_optical_receiver",
-  "media_types": ["image"],
+  "media_types": ["image", "audio"],
   "source_runtime": "lightweave-uno",
+  "wire_format": "LWF1",
   "optical_contract": {
     "sensor_pin": "A0",
     "sensor_threshold": 800,
     "bit_duration_ms": 25,
+    "receiver_sampling_interval_us": 24991,
     "bit_order": "msb-first",
     "start_bit": 1,
     "stop_bit": 0,
-    "maximum_payload_bytes": 2048
+    "header_bytes": 10,
+    "crc_bytes": 2,
+    "maximum_payload_bytes": 2048,
+    "crc": "CRC-16/CCITT-FALSE"
   },
-  "presets": {
-    "I64-Q1-B128": 128,
-    "I128-Q1-B768": 768,
-    "I256-Q1-B2048": 2048
+  "profiles": {
+    "0x01": "I64-Q1-B128",
+    "0x02": "I128-Q1-B768",
+    "0x03": "I256-Q1-B2048",
+    "0x10": "A1-E15-S<n>"
+  },
+  "audio": {
+    "chunk_bytes": 188,
+    "maximum_bytes": 940,
+    "maximum_samples": 120000,
+    "decoder": "CPU layers 0-4 plus strict Adreno Vulkan layers 5-15"
   }
 }
-
