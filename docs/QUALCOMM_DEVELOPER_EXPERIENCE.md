@@ -579,6 +579,34 @@ private endpoints, and confidential material must never appear here.
 | Workaround | Keep the production single-lane apps installed, use separate parallel clones, provide explicit laser-mask and sensor-reading Bridge diagnostics, require isolated masks 1/2/4 before transmission, retain threshold 800 and CRC rejection, and run a short exact text frame before attempting media. |
 | Suggested improvement | App Lab should provide a low-latency pin/ADC diagnostics panel, retain compile caches across sketch-only clone updates, display the active/default app clearly, and offer a standard multi-channel timing/capture example with synchronized GPIO output and ADC threshold visualization. |
 
+### DX-039 - The unchanged Galaxy presentation path accepts the parallel clone
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-07; verify that changing only the two STM32 optical sketches still delivers decoded data to the standalone Galaxy S25 application |
+| Environment | Transmitter UNO Q `123900964` over Windows USB/ADB; receiver UNO Q `371371094` powered directly by the Galaxy S25 Ultra host path; Qualcomm QRB2210 Debian ARM64 plus STM32U585; LightWeave Mobile 1.0.0/code 2 on Android 15; boot-managed Arduino Router monitor |
+| Tool/source | `arduino-app-cli properties set default`, parallel App Lab receiver clone, unchanged receiver Python/Router `mon/read`/`mon/write` transport, unchanged `LWCT/1`/`LWRX/2`, and owner-observed LightWeave Mobile UI |
+| Intended workflow | Power-cycle the receiver during the laptop-to-phone cable move, let the parallel clone boot automatically, arm it from the existing phone Listen control, reconstruct/route text through the existing Linux service, and display the result without Android or codec changes |
+| Actual result and evidence | The receiver default was changed reversibly from `/home/arduino/ArduinoApps/lightweave_receiver` to `/home/arduino/ArduinoApps/lightweave_parallel_receiver`; App CLI reported the parallel clone running and `default: true`. With the receiver connected directly to the S25, the phone reported listening. The transmitter buffered and launched exact ASCII `PHONE 3-LANE`: 12 payload bytes, 24 total LWF1 bytes, eight parallel byte slots, and 1.65 seconds. The owner then confirmed the exact text appeared in LightWeave Mobile. This builds on direct Bridge evidence for matching CRC and stop-bit behavior from the immediately preceding `3-LANE`/`HELLO` tests; no Android, Python, model, GPU, or NPU source changed for the phone test. |
+| Usefulness | Confirms the Qualcomm Linux host and boot-safe Router transport remain stable abstractions above a different STM32 physical implementation. The QRB2210 continues orchestration/persistence while the phone remains presentation-only; the optical speedup does not require a second mobile build. |
+| Friction and owner | App Lab's one-active-app rule and separate default-app property mean a running parallel clone can silently revert to the standard clone after a cable-induced reboot unless default identity is checked explicitly. This is Arduino lifecycle observability friction rather than a Qualcomm compute limitation. |
+| Workaround | Set and verify the intended clone as default before moving the receiver cable, keep the standard app installed, and restore it with `arduino-app-cli properties set default /home/arduino/ArduinoApps/lightweave_receiver` when returning to the single-lane setup. |
+| Suggested improvement | App Lab should show RUNNING and BOOT DEFAULT as distinct persistent badges, offer an atomic “start and make default” action with rollback, and surface the active sketch pin contract so multi-app hardware configurations are harder to confuse. |
+
+### DX-040 - One Windows executable can select the active App Lab transmitter clone
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-07; run the three-lane transmitter from the same Windows dashboard executable used by the standard app |
+| Environment | Snapdragon X Elite Windows 11 x64 host; LightWeave x64 Python environment; ADB platform-tools; transmitter UNO Q `123900964` with **LightWeave Parallel Transmitter** running |
+| Tool/source | Existing `lightweave.exe dashboard`, `UnoQAdbSink`, Arduino App CLI JSON status, tracked standard/parallel manifest markers, and live USB/ADB probe |
+| Intended workflow | Avoid a second Windows product while safely targeting either installed transmitter clone by name/path/manifest |
+| Actual result and evidence | A constrained `LIGHTWEAVE_UNO_Q_TRANSMITTER_APP` selector now accepts only `standard` or `parallel`, defaults to the existing standard target, and maps the parallel value to `/home/arduino/ArduinoApps/lightweave_parallel_transmitter`, display name **LightWeave Parallel Transmitter**, and its dedicated manifest. With the parallel value plus serial `123900964`, the real dashboard status API returned HTTP 200, connected/ready, app status running, and `app_variant: parallel`. Focused dashboard/transmitter tests passed. The App Lab Python worker remains unchanged, so its reported busy duration is intentionally conservative. |
+| Usefulness | Preserves one Windows installation and dashboard for text/image/audio generation while keeping clone selection explicit and preventing arbitrary remote paths. This is host orchestration only; it does not change QNN, models, payloads, or STM32 framing. |
+| Friction and owner | App Lab app identity is split among filesystem path, display name, manifest, running state, and default state. A hard-coded host adapter works for one clone but becomes invisible when an equally valid parallel clone is active. This is Arduino lifecycle/discovery friction. |
+| Workaround | Map a small allow-list of known tracked app identities, verify its manifest plus running display name through App CLI, retain serial override for multiple boards, and expose the selected variant in status evidence. |
+| Suggested improvement | App CLI should expose a stable machine-readable application capability/role identifier independent of display name and path, allowing host tools to discover “LightWeave transmitter” implementations without duplicating identity rules. |
+
 ## Change log
 
 | Date | Change |
@@ -629,3 +657,5 @@ private endpoints, and confidential material must never appear here.
 | 2026-08-07 | Replaced direct container gadget access with the boot-managed Arduino Router monitor, removed the unsupported Compose override, passed direct S25 Status/Listen/Cancel, and rendered an exact nine-byte optical text result with matching CRC/hash/stop-bit evidence and no receiver laptop. |
 | 2026-08-07 | Exercised separate three-lane STM32 sketch clones, used live per-lane ADC/mask diagnostics to resolve alignment and crosstalk, passed a 60-second threshold hold plus isolated masks 1/2/4/7, and received exact `3-LANE` LWF1 bytes with matching CRC and valid stop bit in 1.25 seconds while preserving standard app hashes. |
 | 2026-08-07 | Published the three-lane App Lab sketches, hash-preserving clone installers, exact-text verifier, tests, setup instructions, and evidence as commit `2e50e0a`. |
+| 2026-08-07 | Made the parallel receiver the reversible boot default, moved it to the direct S25 host path, and confirmed owner-observed `PHONE 3-LANE` display through the unchanged Android/Router service after a 1.65-second optical send. |
+| 2026-08-07 | Added and live-tested the existing Windows executable's constrained standard/parallel App Lab selector; the real dashboard status API identified the running parallel transmitter as ready without changing its Python worker or media pipeline. |

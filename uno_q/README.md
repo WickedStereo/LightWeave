@@ -155,6 +155,10 @@ existing `LWF1` frame is striped over D5/D7/D9 and reassembled from A0/A2/A5.
 .\scripts\install_uno_q_parallel_transmitter.ps1 -DeviceSerial 123900964 -StopRunningApp
 .\scripts\install_uno_q_parallel_receiver.ps1 -DeviceSerial 371371094 -StopRunningApp
 
+$env:LIGHTWEAVE_UNO_Q_TRANSMITTER_APP = "parallel"
+$env:LIGHTWEAVE_UNO_Q_SERIAL = "123900964"
+.\.venv-x64\Scripts\lightweave.exe dashboard
+
 .\.venv-x64\Scripts\python.exe scripts\verify_uno_q_parallel_text.py `
   --text "3-LANE" `
   --transmitter-serial 123900964 `
@@ -167,6 +171,11 @@ high masks 1, 2, 4, and 7, a 60-second D5/A0 hold, and exact six-byte LWF1 text
 reassembly with matching CRC and valid stop bit. App Lab permits one active app
 per board; the installers preserve the standard app sources and stop another
 app only when `-StopRunningApp` is explicitly supplied.
+
+The parallel receiver can also be selected as the reversible App Lab boot
+default before moving its cable to the S25. That path displayed exact
+`PHONE 3-LANE` through the unchanged LightWeave Mobile app after a 1.65-second
+parallel optical send.
 
 ## Runtime architecture
 

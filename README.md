@@ -294,6 +294,10 @@ then install the separate clones:
 .\scripts\install_uno_q_parallel_receiver.ps1 `
   -DeviceSerial 371371094 -StopRunningApp
 
+$env:LIGHTWEAVE_UNO_Q_TRANSMITTER_APP = "parallel"
+$env:LIGHTWEAVE_UNO_Q_SERIAL = "123900964"
+.\.venv-x64\Scripts\lightweave.exe dashboard
+
 .\.venv-x64\Scripts\python.exe scripts\verify_uno_q_parallel_text.py `
   --text "3-LANE" `
   --transmitter-serial 123900964 `
@@ -307,6 +311,19 @@ received exact `3-LANE` bytes in six parallel byte slots: 1.25 seconds versus
 60-second alignment hold with all 60 readings above threshold. Isolate the
 three optical paths before media tests; a lane seeing another laser can corrupt
 symbols even though CRC prevents reconstruction of a bad frame.
+
+Open `http://127.0.0.1:8765/transmit` after starting the executable. The
+`LIGHTWEAVE_UNO_Q_TRANSMITTER_APP` selector is restricted to `standard` or
+`parallel`; omitting it preserves the original standard-app behavior. Because
+the cloned Python service is intentionally unchanged, its dashboard busy timer
+and displayed optical estimate remain the conservative single-lane values even
+though the three lasers physically finish sooner.
+
+For the standalone display gate, the parallel receiver was selected as the
+board's reversible boot default and connected directly to the S25. The existing
+LightWeave Mobile Listen control armed it, and exact `PHONE 3-LANE` appeared in
+the unchanged Android app after a 12-byte payload/24-byte frame crossed eight
+parallel slots in 1.65 seconds.
 
 ## Standalone Galaxy receiver/display
 

@@ -292,6 +292,31 @@ class TwoBoardAdb(FakeAdb):
         return super().__call__(command, **kwargs)
 
 
+class ParallelAdb(FakeAdb):
+    def __call__(
+        self, command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        if command[-6:] == [
+            "shell",
+            "arduino-app-cli",
+            "--format",
+            "json",
+            "app",
+            "list",
+        ]:
+            self.commands.append(command)
+            value = {
+                "apps": [
+                    {
+                        "name": "LightWeave Parallel Transmitter",
+                        "status": "running",
+                    }
+                ]
+            }
+            return subprocess.CompletedProcess(command, 0, json.dumps(value), "")
+        return super().__call__(command, **kwargs)
+
+
 def test_adb_sink_pushes_exact_binary_payload(tmp_path: Path) -> None:
     adb = tmp_path / "adb.exe"
     adb.write_bytes(b"stub")
@@ -344,3 +369,51 @@ def test_adb_sink_selects_running_transmitter_from_two_uno_q_boards(
 
     assert status["ready"] is True
     assert any(command[1:3] == ["-s", "tx"] for command in runner.commands)
+
+
+def test_adb_sink_targets_parallel_app_variant(tmp_path: Path) -> None:
+    adb = tmp_path / "adb.exe"
+    adb.write_bytes(b"stub")
+    runner = ParallelAdb(b"payload")
+    sink = UnoQAdbSink(
+        media_type="text",
+        preset_code="T1-ASCII-B100",
+        adb_path=adb,
+        runner=runner,
+        app_variant="parallel",
+    )
+
+    status = sink.status()
+
+    assert status["ready"] is True
+    assert status["app_variant"] == "parallel"
+    commands = [" ".join(command) for command in runner.commands]
+    assert any("lightweave_parallel_transmitter" in command for command in commands)
+    assert any("parallel_transmitter.manifest.json" in command for command in commands)
+
+
+def test_adb_sink_reads_parallel_variant_from_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    adb = tmp_path / "adb.exe"
+    adb.write_bytes(b"stub")
+    monkeypatch.setenv("LIGHTWEAVE_UNO_Q_TRANSMITTER_APP", "parallel")
+    sink = UnoQAdbSink(
+        media_type="text",
+        preset_code="T1-ASCII-B100",
+        adb_path=adb,
+        runner=ParallelAdb(b"payload"),
+    )
+    assert sink.app_variant == "parallel"
+
+
+def test_adb_sink_rejects_unknown_app_variant(tmp_path: Path) -> None:
+    adb = tmp_path / "adb.exe"
+    adb.write_bytes(b"stub")
+    with pytest.raises(UnoQTransportError, match="standard or parallel"):
+        UnoQAdbSink(
+            media_type="text",
+            preset_code="T1-ASCII-B100",
+            adb_path=adb,
+            app_variant="unknown",
+        )

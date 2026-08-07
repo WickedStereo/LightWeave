@@ -6,8 +6,8 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | Three-lane UNO Q optical sketch pair physically accepted and published |
-| Primary milestone | Complete: separate three-lane apps preserve the proven single-lane pair |
+| Phase | Three-lane UNO Q plus direct Galaxy receiver display physically accepted |
+| Primary milestone | Complete: parallel optical text reaches the unchanged S25 application |
 | Secondary milestone | Submission hardening and presentation evidence |
 | Last updated | 2026-08-07 |
 | Approval gate | Application implementation explicitly approved on 2026-08-05 |
@@ -686,7 +686,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Direct S25 UNO Q enumeration | Pass through the exercised USB-C host hub: `UNO Q - unoq2`, `2341:0078`, ADB plus CDC/ACM interfaces |
 | Android CDC open/control transmit | Pass: app reported receiver ready and sent exact 12-byte Status/Listen/Cancel controls |
 | UNO Q boot-started CDC service | Pass: Router and serial services are active/enabled, live `mon/connected` succeeds, and direct S25 control/results work with an empty container device list |
-| Direct decoded-media delivery/power/reconnect | Text pass: `S25 PROOF`, 9 payload bytes, 21 frame bytes, CRC `f8f8`, valid stop bit, 4.25 seconds, rendered with evidence; PNG/WAV, reconnect, and longer power remain pending |
+| Direct decoded-media delivery/power/reconnect | Text passes on both links: single-lane `S25 PROOF` and parallel `PHONE 3-LANE`. The latter used 12 payload/24 frame bytes, eight three-lane slots, and 1.65 seconds; the owner confirmed it rendered in LightWeave Mobile. PNG/WAV, reconnect, and longer power remain pending |
 
 ### Product surface and packaging
 
@@ -701,7 +701,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Monochrome dashboard refresh | Pass; text-first square layout, no gradients/shadows, responsive at 390 px without horizontal overflow |
 | Multi-size browser workflow | Pass; balanced sample transmit/verify and separate receiver upload both reconstructed 128 by 128 with 0 CPU profile nodes |
 | Raw disconnected-runtime smoke | Pass for balanced strict image QNN and audio hybrid; 216/376 raw bytes and exact outputs |
-| Android standalone receiver | Fresh APK, text/image/audio/status, Listen/Cancel, save/playback, evidence UI, tests/lint, S25 install/render, direct enumeration, CDC open, and control writes pass; board response blocked by boot container permissions |
+| Android standalone receiver | Fresh APK, text/image/audio/status, Listen/Cancel, save/playback, evidence UI, tests/lint, direct S25 enumeration/control, boot-safe Router response, single-lane text, and three-lane text display pass; direct PNG/WAV remain |
 | UNO Q native receiver | All image profiles reconstruct on Adreno Vulkan with strict no-fallback and at least 36.34 dB accelerator/CPU parity |
 | UNO Q App Lab WebUI | Rendered browser upload/reconstruction/download and oversize error pass; balanced accelerator time about 524 ms; no console errors |
 | UNO Q audio receiver | One- and five-second raw payloads reconstruct through CPU plus a strict 39-layer Adreno suffix at 52.07 dB or better PyTorch parity |
@@ -740,18 +740,18 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Raw 128 by 128 strict QNN decoder | Complete locally | QUInt16 QDQ, 66.74 dB minimum CPU parity, no fallback, 0 CPU nodes, 51.29 dB minimum NPU/CPU parity |
 | Raw milestone publication | Complete | Commit `140f9ae`; GitHub Actions run `31047777514` passed |
 | Multi-size dashboard publication | Complete | Commit `9aee230`; GitHub Actions run `31057418505` passed |
-| Android standalone receiver | Direct standalone text receive passes | Router transport, S25 Status/Listen/Cancel, 9-byte optical text result, CRC/stop-bit/hash evidence, and decoded display pass; direct PNG/WAV and reconnect remain |
+| Android standalone receiver | Direct single- and three-lane text receive passes | Router transport, S25 Status/Listen/Cancel, `S25 PROOF`, and `PHONE 3-LANE` decoded display pass; direct PNG/WAV and reconnect remain |
 | UNO Q accelerator feasibility | Complete | ncnn Vulkan executes all three complete graphs on Adreno 702; QNN/FastRPC is absent on the exercised image |
 | UNO Q native receiver | Complete locally | Native rANS, strict runner, CLI, rendered API/WebUI, manifest, SPDX SBOM, offline bundle, dry-run/idempotent installer, and 60-test repository suite pass |
 | UNO Q receiver publication | Complete | Source/evidence commit `8074645` and Android-preservation commit `fa19c64` published to `origin/main` |
 | UNO Q audio receiver | Complete and published | Commit `03b0bd7`; native unpack/codebook parity, earliest valid split 5, strict 39-layer Adreno suffix, 1/5-second parity, CLI/API/WebUI, offline bundle, installer, and offline smoke pass |
 | Android receiver UI and hardware path | Installed; direct optical text accepted | Commit `81c8888`; boot-safe Router update adds S25 Status/Listen/Cancel and exact optical text display with no receiver laptop; publish focused update next |
-| Windows-to-UNO Q transmitter flow | Complete and published | Commit `028f9d9`; dashboard image/audio Send actions, USB/ADB sink, atomic App Lab inbox, variable-length STM32 loop, tracked clone source, installer, and real 104/124/188-byte board acceptance pass |
+| Windows-to-UNO Q transmitter flow | Standard and parallel targets pass | Commit `028f9d9` provides the original dashboard/ADB flow; the same `lightweave.exe` now selects the parallel clone through constrained `LIGHTWEAVE_UNO_Q_TRANSMITTER_APP=parallel`, and live status reports ready on transmitter `123900964` |
 | UNO Q optical byte diagnostic | Complete and published | Commit `80ba103`; exact `00 FF AA 55` received twice with matching SHA-256 and valid stop bit |
 | UNO Q optical image receiver | Complete and published | Commit `506eee9`; two 80-byte physical image transfers passed exact-byte, stop-bit, 64-by-64 PNG, 16-layer Adreno, strict-no-fallback, App Lab UI, and zero-console-error gates |
 | Self-describing optical image/audio framing | Complete and published | Commit `c8600c7`; `LWF1` carries profile, length, audio sample count, and CRC; all image routes plus one-second audio passed physical reconstruction |
 | Integrated text transport | Complete and published | Commit `62c540d`; exact 16-byte optical transfer passed profile `0x20`, CRC/stop-bit, TXT persistence, no-AI evidence, paired App Lab names, local browser UI, and protected legacy-source hashes |
-| Three-lane optical sketch pair | Complete and published | Commit `2e50e0a`; separate clones compile on Zephyr 0.90.0, isolated lane masks pass at threshold 800, and exact `3-LANE` plus partial-slot `HELLO` frames arrived with matching CRC and valid stop bits |
+| Three-lane optical sketch pair | Complete, published, and displayed on S25 | Commit `2e50e0a`; isolated masks and exact `3-LANE`/`HELLO` pass, then `PHONE 3-LANE` traversed the same pair in 1.65 seconds and rendered through the unchanged phone app |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
 | GitHub Actions unit CI | Complete | Windows run `31147024146` passed on text-integration head `62c540d`; accelerator/hardware gates stay local |
@@ -794,6 +794,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | App Lab allows only one active application | Installer does not stop anything by default; the explicit `-StopRunningApp` option performs the reversible stop before starting `lightweave_transmitter` |
 | USB inbox is interrupted or stale | Publish payload/metadata atomically, publish the descriptor last, verify SHA-256/length/request ID, ignore partial files, and return per-request result files |
 | Transmitter has no physical completion callback | Report only exact buffering plus launch acceptance; enforce an estimated busy window and never claim optical completion from the dashboard |
+| Parallel clone reuses the single-lane busy estimate | Intentional consequence of leaving the App Lab Python worker unchanged. The physical sketch finishes in about one third the bit periods, while the dashboard remains conservatively busy for the original estimate; do not present that UI value as measured parallel duration. |
 | Fixed analog threshold and open-loop timing may be environment-sensitive | CRC caught a repeatable long-frame bit slip; a 24,991-us receiver interval passes this board pair while the transmitter stays at 25 ms, but true clock recovery and broader alignment/light testing remain necessary |
 | `LWF1` is not cryptographically self-describing | It supplies routing, bounds, sample count, and CRC but no model hash; pinned artifacts remain required and `.lwv` is used where model negotiation/SHA-256 matter |
 | Five-second optical audio is slow | Codec/board decode is validated to five seconds, but the owner elected not to spend 190.45 seconds on the optical stress transfer; one-second optical audio is the physical acceptance evidence |
@@ -894,6 +895,8 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | D-055 | 2026-08-07 | Use the existing fresh `android/` Android Studio project as the canonical mobile project and install that build on the S25 Ultra. | The earlier prototype was already replaced; creating a second project would duplicate the supported app and break the repository's single-source installation model. |
 | D-056 | 2026-08-07 | Route phone CDC bytes through UNO Q's boot-managed Arduino Router monitor instead of opening `/dev/ttyGS0` in the App Lab container. | Official `mon/read`/`mon/write` reuse the enabled system serial bridge, eliminate the unsupported Compose override and cgroup failure, preserve default-app startup, and pass direct S25 Status/Listen/Cancel plus decoded optical text delivery. |
 | D-057 | 2026-08-07 | Add a separate three-lane sketch pair that byte-stripes the unchanged complete `LWF1` frame over D5/D7/D9 and reassembles it from A0/A2/A5. | The owner required the working single-lane apps and all codec/UI/reconstruction logic to remain unchanged. Round-robin frame bytes balance lane work, preserve the existing header/CRC contract, and reduce elapsed bit periods to approximately one third; only clone/install metadata, sketch tests, and documentation accompany the two new sketches. |
+| D-058 | 2026-08-07 | Make `lightweave_parallel_receiver` the receiver UNO Q's reversible default app for the direct S25 acceptance test. | The phone cable move power-cycles the board; selecting the already-installed clone preserves three-lane reception across boot while leaving `lightweave_receiver` installed for one-command restoration. |
+| D-059 | 2026-08-07 | Reuse the existing Windows `lightweave.exe` and add a constrained standard/parallel transmitter-app selector. | The dashboard, codecs, and payload APIs remain one application; `LIGHTWEAVE_UNO_Q_TRANSMITTER_APP=parallel` changes only the validated ADB app path/name/manifest, defaults to standard, and rejects arbitrary targets. |
 
 ## Public references
 
@@ -971,3 +974,5 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-07 | Replaced direct gadget-node access with the boot-managed Arduino Router monitor, removed the unsupported Compose override, deployed the default-started receiver, passed 15 focused tests, direct S25 Status/Listen/Cancel, and a complete 9-byte optical text transfer rendered with matching CRC/hash/stop-bit evidence. |
 | 2026-08-07 | Added and exercised separate three-lane App Lab sketch clones: D5/D7/D9 and A0/A2/A5 passed isolated threshold-800 sensor masks, D5/A0 remained above threshold for 60 seconds, and the receiver reassembled exact text `3-LANE` with matching CRC and a valid stop bit in 1.25 seconds while the original single-lane app hashes remained unchanged. |
 | 2026-08-07 | Published the three-lane sketches, clone installers, reproducible verifier, portable tests, setup guidance, and physical evidence as commit `2e50e0a`; a second exact `HELLO` transfer proved partial final-slot handling. |
+| 2026-08-07 | Set the parallel receiver clone as the reversible boot default, connected it directly to the Galaxy S25 Ultra, armed reception from LightWeave Mobile, and sent `PHONE 3-LANE` as a 12-byte payload/24-byte frame in eight parallel slots (1.65 seconds); the owner confirmed the unchanged phone app displayed the decoded text. |
+| 2026-08-07 | Added a constrained parallel-app selector to the existing Windows executable; live dashboard status against transmitter `123900964` returned connected/ready/running with `app_variant: parallel`, while omission retains the standard target. |

@@ -31,6 +31,18 @@ from .transport import SendReceipt
 
 TRANSMITTER_PATH = "/home/arduino/ArduinoApps/lightweave_transmitter"
 TRANSMITTER_DISPLAY_NAME = "LightWeave Transmitter"
+TRANSMITTER_TARGETS = {
+    "standard": {
+        "path": TRANSMITTER_PATH,
+        "display_name": TRANSMITTER_DISPLAY_NAME,
+        "manifest": "transmitter.manifest.json",
+    },
+    "parallel": {
+        "path": "/home/arduino/ArduinoApps/lightweave_parallel_transmitter",
+        "display_name": "LightWeave Parallel Transmitter",
+        "manifest": "parallel_transmitter.manifest.json",
+    },
+}
 MAX_PAYLOAD_BYTES = 2_048
 MAX_AUDIO_BYTES = 940
 SAMPLES_PER_AUDIO_CHUNK = 24_000
@@ -146,6 +158,7 @@ class UnoQAdbSink:
         clock: Callable[[], float] = time.monotonic,
         timeout_seconds: float = RESULT_TIMEOUT_SECONDS,
         wire_mode: str = "lwf1",
+        app_variant: str | None = None,
     ) -> None:
         self.media_type = media_type
         self.preset_code = preset_code
@@ -155,6 +168,20 @@ class UnoQAdbSink:
         self.sleep = sleep
         self.clock = clock
         self.timeout_seconds = timeout_seconds
+        variant = (
+            app_variant
+            or os.environ.get("LIGHTWEAVE_UNO_Q_TRANSMITTER_APP")
+            or "standard"
+        ).strip().lower()
+        if variant not in TRANSMITTER_TARGETS:
+            raise UnoQTransportError(
+                "Transmitter app variant must be standard or parallel."
+            )
+        target = TRANSMITTER_TARGETS[variant]
+        self.app_variant = variant
+        self.transmitter_path = target["path"]
+        self.transmitter_display_name = target["display_name"]
+        self.transmitter_manifest = target["manifest"]
         if wire_mode not in {"lwf1", "raw-v0"}:
             raise UnoQTransportError("Wire mode must be lwf1 or raw-v0.")
         self.wire_mode = wire_mode
@@ -223,7 +250,7 @@ class UnoQAdbSink:
                     "shell",
                     "test",
                     "-f",
-                    f"{TRANSMITTER_PATH}/transmitter.manifest.json",
+                    f"{self.transmitter_path}/{self.transmitter_manifest}",
                 ],
                 capture_output=True,
                 text=True,
@@ -260,7 +287,7 @@ class UnoQAdbSink:
             except (json.JSONDecodeError, KeyError, TypeError):
                 continue
             if any(
-                entry.get("name") == TRANSMITTER_DISPLAY_NAME
+                entry.get("name") == self.transmitter_display_name
                 and entry.get("status") == "running"
                 for entry in applications
             ):
@@ -298,7 +325,7 @@ class UnoQAdbSink:
             (
                 entry
                 for entry in applications
-                if entry.get("name") == TRANSMITTER_DISPLAY_NAME
+                if entry.get("name") == self.transmitter_display_name
             ),
             None,
         )
@@ -319,7 +346,7 @@ class UnoQAdbSink:
                 "shell",
                 "test",
                 "-f",
-                f"{TRANSMITTER_PATH}/transmitter.manifest.json",
+                f"{self.transmitter_path}/{self.transmitter_manifest}",
             ],
             capture_output=True,
             text=True,
@@ -339,7 +366,7 @@ class UnoQAdbSink:
                     serial,
                     "exec-out",
                     "cat",
-                    f"{TRANSMITTER_PATH}/data/transmitter-state.json",
+                    f"{self.transmitter_path}/data/transmitter-state.json",
                 ],
                 capture_output=True,
                 text=True,
@@ -366,6 +393,7 @@ class UnoQAdbSink:
             "app_status": app.get("status", "unknown"),
             "maximum_payload_bytes": MAX_PAYLOAD_BYTES,
             "default_wire_mode": "lwf1",
+            "app_variant": self.app_variant,
             "frame_overhead_bytes": FRAME_OVERHEAD_BYTES,
             "busy": busy_remaining > 0,
             "busy_remaining_seconds": busy_remaining,
@@ -407,8 +435,8 @@ class UnoQAdbSink:
             "expected_header_hex": header.hex() if self.wire_mode == "lwf1" else "",
             "expected_crc16": crc if self.wire_mode == "lwf1" else None,
         }
-        inbox = f"{TRANSMITTER_PATH}/data/inbox"
-        results = f"{TRANSMITTER_PATH}/data/results"
+        inbox = f"{self.transmitter_path}/data/inbox"
+        results = f"{self.transmitter_path}/data/results"
         payload_partial = f"{inbox}/{request_id}.bin.partial"
         payload_final = f"{inbox}/{request_id}.bin"
         request_partial = f"{inbox}/{request_id}.json.partial"
