@@ -6,8 +6,8 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | Three-lane UNO Q optical sketch pair passes exact text transfer; publication remains |
-| Primary milestone | Publish the separate three-lane sketch apps without changing the proven single-lane pair |
+| Phase | Three-lane UNO Q optical sketch pair physically accepted and published |
+| Primary milestone | Complete: separate three-lane apps preserve the proven single-lane pair |
 | Secondary milestone | Submission hardening and presentation evidence |
 | Last updated | 2026-08-07 |
 | Approval gate | Application implementation explicitly approved on 2026-08-05 |
@@ -751,7 +751,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | UNO Q optical image receiver | Complete and published | Commit `506eee9`; two 80-byte physical image transfers passed exact-byte, stop-bit, 64-by-64 PNG, 16-layer Adreno, strict-no-fallback, App Lab UI, and zero-console-error gates |
 | Self-describing optical image/audio framing | Complete and published | Commit `c8600c7`; `LWF1` carries profile, length, audio sample count, and CRC; all image routes plus one-second audio passed physical reconstruction |
 | Integrated text transport | Complete and published | Commit `62c540d`; exact 16-byte optical transfer passed profile `0x20`, CRC/stop-bit, TXT persistence, no-AI evidence, paired App Lab names, local browser UI, and protected legacy-source hashes |
-| Three-lane optical sketch pair | Physical STM32 gate passed; publication pending | Separate clones compile on Zephyr 0.90.0; isolated D5/A0, D7/A2, and D9/A5 masks pass at threshold 800; exact `3-LANE` LWF1 text arrived in 1.25 seconds with matching CRC and valid stop bit |
+| Three-lane optical sketch pair | Complete and published | Commit `2e50e0a`; separate clones compile on Zephyr 0.90.0, isolated lane masks pass at threshold 800, and exact `3-LANE` plus partial-slot `HELLO` frames arrived with matching CRC and valid stop bits |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
 | GitHub Actions unit CI | Complete | Windows run `31147024146` passed on text-integration head `62c540d`; accelerator/hardware gates stay local |
@@ -970,3 +970,4 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-07 | Exercised the direct S25 host path: Android enumerated the real receiver and LightWeave opened CDC and sent controls, but no response arrived because App Lab default boot omitted the Compose device allow-list; reproduced `/dev/ttyGS0` `EPERM` in the live container and marked standalone boot blocked pending a persistent mapping. |
 | 2026-08-07 | Replaced direct gadget-node access with the boot-managed Arduino Router monitor, removed the unsupported Compose override, deployed the default-started receiver, passed 15 focused tests, direct S25 Status/Listen/Cancel, and a complete 9-byte optical text transfer rendered with matching CRC/hash/stop-bit evidence. |
 | 2026-08-07 | Added and exercised separate three-lane App Lab sketch clones: D5/D7/D9 and A0/A2/A5 passed isolated threshold-800 sensor masks, D5/A0 remained above threshold for 60 seconds, and the receiver reassembled exact text `3-LANE` with matching CRC and a valid stop bit in 1.25 seconds while the original single-lane app hashes remained unchanged. |
+| 2026-08-07 | Published the three-lane sketches, clone installers, reproducible verifier, portable tests, setup guidance, and physical evidence as commit `2e50e0a`; a second exact `HELLO` transfer proved partial final-slot handling. |
