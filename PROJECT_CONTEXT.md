@@ -620,14 +620,14 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Windows-to-UNO Q transmitter flow | Complete and published | Commit `028f9d9`; dashboard image/audio Send actions, USB/ADB sink, atomic App Lab inbox, variable-length STM32 loop, tracked clone source, installer, and real 104/124/188-byte board acceptance pass |
 | UNO Q optical byte diagnostic | Complete and published | Commit `80ba103`; exact `00 FF AA 55` received twice with matching SHA-256 and valid stop bit |
 | UNO Q optical image receiver | Complete and published | Commit `506eee9`; two 80-byte physical image transfers passed exact-byte, stop-bit, 64-by-64 PNG, 16-layer Adreno, strict-no-fallback, App Lab UI, and zero-console-error gates |
-| Self-describing optical image/audio framing | Complete; publication pending | `LWF1` carries profile, length, audio sample count, and CRC; all three image routes plus one-second audio passed physical reconstruction |
+| Self-describing optical image/audio framing | Complete and published | Commit `c8600c7`; `LWF1` carries profile, length, audio sample count, and CRC; all image routes plus one-second audio passed physical reconstruction |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
 | GitHub Actions unit CI | Complete | Corrected-history Windows Python 3.11 run `31034723025` passed; QNN gates stay local |
 | Second Snapdragon PC | Pending external device | Transfer the same `.lwv` plus generated artifacts and verify |
 | AI Hub/QAIRT Visualizer | Pending access/install | Compare only when account/SDK are available |
 | Arduino/optical adapter | Image/audio implementation complete | Default `LWF1`, explicit `raw-v0` diagnostic, automatic routing, strict image Adreno and truthful audio hybrid verified physically |
-| GitHub push | Pending current publication | Push the focused `LWF1` implementation and evidence commit directly to `origin/main` without force-pushing |
+| GitHub push | Complete | Dynamic image/audio optical implementation commit `c8600c7` was pushed directly to `origin/main` without force-pushing |
 
 ## Risks and mitigations
 
@@ -805,3 +805,4 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-06 | Replaced the image-only proposal with common 12-byte `LWF1` framing for images/audio, automatic two-board transmitter selection, one-shot Listen/Cancel reception, CRC-gated routing, and preserved explicit `raw-v0` diagnostics. |
 | 2026-08-06 | Diagnosed a repeatable long-frame free-running-clock slip, calibrated this receiver to 24,991 us against the unchanged 25-ms transmitter, and physically passed 80/216/716-byte images plus 188-byte one-second audio with strict Adreno evidence. |
 | 2026-08-06 | Honored the owner's request to skip further long transfers, omitted the five-second optical audio run, revalidated exact `00 FF AA 55` in `raw-v0`, and left the production optical receiver running. |
+| 2026-08-06 | Published the dynamic `LWF1` image/audio transmitter/receiver implementation, App Lab sources, installers, tests, setup guidance, SBOM/notices, and physical evidence as commit `c8600c7` on `origin/main`. |
