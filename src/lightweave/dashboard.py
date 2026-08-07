@@ -18,6 +18,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from .audio import resolve_audio_weights, roundtrip_audio
 from .audio_npu import default_audio_tail_model
 from .errors import LightWeaveError
+from .hardware import OperationMonitor, host_inventory
 from .image import resolve_image_weights
 from .metrics import ms_ssim, psnr, transfer_estimates
 from .npu import (
@@ -102,6 +103,7 @@ def _runtime_status() -> dict[str, object]:
     return {
         "offline": True,
         "bind_host": "127.0.0.1",
+        "host_hardware": host_inventory(),
         "weights_ready": weights_ready,
         "weights_path": str(weights) if weights else None,
         "decoder_ready": decoder.is_file(),
@@ -217,11 +219,44 @@ def create_app(*, uno_q_sink_factory: UnoQSinkFactory = UnoQAdbSink) -> FastAPI:
         if not value:
             raise HTTPException(status_code=400, detail="The uploaded image is empty.")
         try:
+            monitor = OperationMonitor("raw image payload generation")
             with tempfile.TemporaryDirectory(prefix="lightweave-raw-image-tx-") as temp:
                 input_path = Path(temp) / "input-image"
                 input_path.write_bytes(value)
                 encoded = encode_raw_image(input_path, preset_code=preset_code)
                 raw_bytes = len(encoded.payload)
+                hardware_usage = monitor.finish(
+                    stages=[
+                        {
+                            "processor": "CPU",
+                            "stage": (
+                                "EXIF/RGB preprocessing, CompressAI g_a, "
+                                "quantization, and rANS entropy coding"
+                            ),
+                            "measured_seconds": encoded.encode_seconds,
+                            "used": True,
+                        },
+                        {
+                            "processor": "NPU",
+                            "stage": "not used for encoding",
+                            "used": False,
+                        },
+                        {
+                            "processor": "GPU",
+                            "stage": "not used for encoding",
+                            "used": False,
+                        },
+                    ],
+                    counters={
+                        "payload_bytes": raw_bytes,
+                        "output_pixels": encoded.output_size**2,
+                        "latent_channels": 192,
+                    },
+                    accelerator_note=(
+                        "Encoding is intentionally CPU/PyTorch. NPU evidence "
+                        "is produced during reconstruction."
+                    ),
+                )
                 return {
                     "preset_code": encoded.preset_code,
                     "payload_base64": base64.b64encode(encoded.payload).decode("ascii"),
@@ -236,6 +271,7 @@ def create_app(*, uno_q_sink_factory: UnoQSinkFactory = UnoQAdbSink) -> FastAPI:
                     **transfer_estimates(raw_bytes),
                     "input_image": _image_data_url(encoded.original_preview),
                     "encoded_reference": _image_data_url(encoded.reference),
+                    "hardware_usage": hardware_usage,
                     "warning": (
                         "Raw mode contains no integrity or model-negotiation fields."
                     ),
@@ -259,12 +295,46 @@ def create_app(*, uno_q_sink_factory: UnoQSinkFactory = UnoQAdbSink) -> FastAPI:
         if not value:
             raise HTTPException(status_code=400, detail="The uploaded WAV is empty.")
         try:
+            monitor = OperationMonitor("raw audio payload generation")
             with tempfile.TemporaryDirectory(prefix="lightweave-raw-audio-tx-") as temp:
                 input_path = Path(temp) / "input.wav"
                 input_path.write_bytes(value)
                 encoded = encode_raw_audio(input_path)
                 raw_bytes = len(encoded.payload)
                 duration = encoded.original_samples / 24_000
+                hardware_usage = monitor.finish(
+                    stages=[
+                        {
+                            "processor": "CPU",
+                            "stage": (
+                                "PCM ingest/resample, EnCodec encoder, and "
+                                "10-bit code packing"
+                            ),
+                            "measured_seconds": encoded.encode_seconds,
+                            "used": True,
+                        },
+                        {
+                            "processor": "NPU",
+                            "stage": "not used for encoding",
+                            "used": False,
+                        },
+                        {
+                            "processor": "GPU",
+                            "stage": "not used for encoding",
+                            "used": False,
+                        },
+                    ],
+                    counters={
+                        "payload_bytes": raw_bytes,
+                        "audio_samples": encoded.original_samples,
+                        "codebook_indices": encoded.chunk_count * 75 * 2,
+                        "packed_code_bits": encoded.chunk_count * 1_500,
+                    },
+                    accelerator_note=(
+                        "Encoding is intentionally CPU/PyTorch. The receiver "
+                        "performs hybrid CPU/NPU reconstruction."
+                    ),
+                )
                 return {
                     "preset_code": encoded.preset_code,
                     "payload_base64": base64.b64encode(encoded.payload).decode("ascii"),
@@ -277,6 +347,7 @@ def create_app(*, uno_q_sink_factory: UnoQSinkFactory = UnoQAdbSink) -> FastAPI:
                     "encode_seconds": encoded.encode_seconds,
                     **transfer_estimates(raw_bytes),
                     "input_audio": _audio_data_url(value),
+                    "hardware_usage": hardware_usage,
                     "warning": (
                         "Raw mode contains no integrity or model-negotiation fields."
                     ),
@@ -290,11 +361,27 @@ def create_app(*, uno_q_sink_factory: UnoQSinkFactory = UnoQAdbSink) -> FastAPI:
     def transmit_text(
         text: Annotated[str, Form()],
     ) -> dict[str, object]:
+        monitor = OperationMonitor("raw text payload generation")
         try:
             payload = encode_text(text)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         raw_bytes = len(payload)
+        hardware_usage = monitor.finish(
+            stages=[
+                {
+                    "processor": "CPU",
+                    "stage": "printable-ASCII validation and byte encoding",
+                    "used": True,
+                },
+                {"processor": "NPU", "stage": "not used", "used": False},
+                {"processor": "GPU", "stage": "not used", "used": False},
+            ],
+            counters={"characters": len(text), "payload_bytes": raw_bytes},
+            accelerator_note=(
+                "Text is deterministic ASCII and intentionally uses no AI accelerator."
+            ),
+        )
         return {
             "preset_code": TEXT_PRESET_CODE,
             "payload_base64": base64.b64encode(payload).decode("ascii"),
@@ -302,6 +389,7 @@ def create_app(*, uno_q_sink_factory: UnoQSinkFactory = UnoQAdbSink) -> FastAPI:
             "maximum_bytes": MAX_TEXT_BYTES,
             "characters": len(text),
             "text": text,
+            "hardware_usage": hardware_usage,
             **transfer_estimates(raw_bytes),
             "warning": "Text uses printable ASCII bytes directly; no AI model runs.",
         }
@@ -318,13 +406,42 @@ def create_app(*, uno_q_sink_factory: UnoQSinkFactory = UnoQAdbSink) -> FastAPI:
         except UnoQTransportError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         try:
+            monitor = OperationMonitor("Windows-to-UNO Q USB handoff")
             sink = uno_q_sink_factory(media_type=media_type, preset_code=preset_code)
             receipt = sink.send(payload)
             evidence = dict(receipt.evidence or {})
+            laptop_usage = monitor.finish(
+                stages=[
+                    {
+                        "processor": "CPU",
+                        "stage": (
+                            "payload validation, SHA-256, and ADB/USB "
+                            "control-plane handoff"
+                        ),
+                        "used": True,
+                    },
+                    {
+                        "processor": "NPU",
+                        "stage": "not used during transport",
+                        "used": False,
+                    },
+                    {
+                        "processor": "GPU",
+                        "stage": "not used during transport",
+                        "used": False,
+                    },
+                ],
+                counters={"usb_payload_bytes": len(payload), "adb_requests": 1},
+                accelerator_note=(
+                    "Transport uses CPU, USB/ADB, the UNO Q Linux CPU, and "
+                    "STM32. Media accelerators run only in codec stages."
+                ),
+            )
             return {
                 "accepted": True,
                 "bytes_sent": receipt.bytes_sent,
                 "adapter": receipt.adapter,
+                "laptop_hardware_usage": laptop_usage,
                 **evidence,
             }
         except (OSError, RuntimeError, UnoQTransportError) as exc:
@@ -344,6 +461,7 @@ def create_app(*, uno_q_sink_factory: UnoQSinkFactory = UnoQAdbSink) -> FastAPI:
             reference.file.read(MAX_UPLOAD_BYTES + 1) if reference else None
         )
         try:
+            monitor = OperationMonitor("raw image reconstruction")
             preset = parse_raw_image_preset(preset_code)
             with tempfile.TemporaryDirectory(prefix="lightweave-raw-image-rx-") as temp:
                 output_path = Path(temp) / "reconstructed.png"
@@ -367,6 +485,48 @@ def create_app(*, uno_q_sink_factory: UnoQSinkFactory = UnoQAdbSink) -> FastAPI:
                         "psnr_db": psnr(reference_image, decoded.image),
                         "ms_ssim": ms_ssim(reference_image, decoded.image),
                     }
+                processor = "NPU" if backend == "qnn" else "CPU"
+                hardware_usage = monitor.finish(
+                    stages=[
+                        {
+                            "processor": "CPU",
+                            "stage": "CompressAI rANS entropy decode and PNG packaging",
+                            "measured_seconds": decoded.entropy_decode_seconds,
+                            "used": True,
+                        },
+                        {
+                            "processor": processor,
+                            "stage": "complete fixed-shape g_s image synthesis",
+                            "measured_seconds": decoded.reconstruction_seconds,
+                            "used": True,
+                            "strict_no_fallback": decoded.evidence.get(
+                                "strict_no_fallback"
+                            ),
+                        },
+                        {
+                            "processor": "GPU",
+                            "stage": "not used on Windows image path",
+                            "used": False,
+                        },
+                    ],
+                    counters={
+                        "payload_bytes": len(payload),
+                        "latent_values": 192
+                        * preset.latent_shape[2]
+                        * preset.latent_shape[3],
+                        "profile_provider_events": decoded.evidence.get(
+                            "profile_provider_event_count"
+                        ),
+                        "profile_cpu_nodes": decoded.evidence.get(
+                            "profile_cpu_node_count"
+                        ),
+                        "output_pixels": decoded.image.width * decoded.image.height,
+                    },
+                    accelerator_note=(
+                        "QNN profile-provider counts are execution events, "
+                        "not FLOP/MAC estimates."
+                    ),
+                )
                 return {
                     "preset_code": preset_code,
                     "raw_bytes": len(payload),
@@ -376,6 +536,7 @@ def create_app(*, uno_q_sink_factory: UnoQSinkFactory = UnoQAdbSink) -> FastAPI:
                     "entropy_decode_seconds": decoded.entropy_decode_seconds,
                     "reconstruction_seconds": decoded.reconstruction_seconds,
                     "npu_evidence": decoded.evidence,
+                    "hardware_usage": hardware_usage,
                     "reconstructed_image": _image_data_url(decoded.image),
                     **quality,
                 }
@@ -400,6 +561,7 @@ def create_app(*, uno_q_sink_factory: UnoQSinkFactory = UnoQAdbSink) -> FastAPI:
         if not payload:
             raise HTTPException(status_code=400, detail="Raw audio payload is empty.")
         try:
+            monitor = OperationMonitor("raw audio reconstruction")
             with tempfile.TemporaryDirectory(prefix="lightweave-raw-audio-rx-") as temp:
                 output_path = Path(temp) / "reconstructed.wav"
                 decoded = decode_raw_audio(
@@ -407,6 +569,53 @@ def create_app(*, uno_q_sink_factory: UnoQSinkFactory = UnoQAdbSink) -> FastAPI:
                     preset_code=preset_code,
                     backend=backend,
                     output_path=output_path,
+                )
+                npu_used = backend == "hybrid-qnn"
+                hardware_usage = monitor.finish(
+                    stages=[
+                        {
+                            "processor": "CPU",
+                            "stage": (
+                                "10-bit unpacking, codebooks, recurrent decoder "
+                                "prefix, and WAV packaging"
+                            ),
+                            "measured_seconds": decoded.codebook_seconds
+                            + decoded.cpu_prefix_seconds,
+                            "used": True,
+                        },
+                        {
+                            "processor": "NPU" if npu_used else "CPU",
+                            "stage": "fixed convolutional decoder tail",
+                            "measured_seconds": decoded.reconstruction_seconds,
+                            "used": True,
+                            "strict_no_fallback": decoded.evidence.get(
+                                "strict_no_fallback"
+                            ),
+                        },
+                        {
+                            "processor": "GPU",
+                            "stage": "not used on Windows audio path",
+                            "used": False,
+                        },
+                    ],
+                    counters={
+                        "payload_bytes": len(payload),
+                        "audio_chunks": len(payload) // RAW_AUDIO_CHUNK_BYTES,
+                        "codebook_indices": (len(payload) // RAW_AUDIO_CHUNK_BYTES)
+                        * 75
+                        * 2,
+                        "profile_provider_events": decoded.evidence.get(
+                            "profile_provider_event_count"
+                        ),
+                        "profile_cpu_nodes": decoded.evidence.get(
+                            "profile_cpu_node_count"
+                        ),
+                        "output_samples": int(decoded.waveform.shape[-1]),
+                    },
+                    accelerator_note=(
+                        "QNN profile-provider counts are execution events, "
+                        "not FLOP/MAC estimates."
+                    ),
                 )
                 return {
                     "preset_code": preset_code,
@@ -418,6 +627,7 @@ def create_app(*, uno_q_sink_factory: UnoQSinkFactory = UnoQAdbSink) -> FastAPI:
                     "cpu_prefix_seconds": decoded.cpu_prefix_seconds,
                     "reconstruction_seconds": decoded.reconstruction_seconds,
                     "execution_evidence": decoded.evidence,
+                    "hardware_usage": hardware_usage,
                     "reconstructed_audio": _audio_data_url(output_path.read_bytes()),
                 }
         except (LightWeaveError, ValueError, OSError) as exc:

@@ -481,6 +481,20 @@ private endpoints, and confidential material must never appear here.
 | Workaround | Keep stable lowercase app IDs and paired title-case display names, track both in manifests, fail closed when the expected running display name/marker is absent, and preserve original apps with before/after source hashes. Use one shared profile table in Python and C++ tests. |
 | Suggested improvement | App CLI should expose stable app ID and display name as separate first-class fields in every lifecycle response, support source-only incremental updates, and provide an official binary-framing/RouterBridge sample that demonstrates dynamic length, CRC, local assets, and persisted output. |
 
+### DX-032 - Presentation telemetry needs precise scope, not headline FLOP claims
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-06; expose useful hardware evidence for each LightWeave transfer and reconstruction without overstating what the runtimes measure |
+| Environment | Snapdragon X Elite/Windows 11 ARM64 with x64 Python orchestration and native ARM64 ONNX Runtime QNN; two UNO Q boards with QRB2210 Linux, Adreno 702, and STM32U585; App CLI 0.12.1 |
+| Tool/source | Python process clocks and peak working set, ONNX Runtime profiling JSON, QNN execution-provider device metadata, ncnn runner evidence, App Lab/RouterBridge acknowledgements, and the shared LWF1 frame contract |
+| Intended workflow | Give judges a per-operation view of which CPU/GPU/NPU/MCU stages ran, how long they took, and what exact work can be counted |
+| Actual result and evidence | Windows operations now report wall/process CPU time, peak process RSS, media counters, selected QNN device, provider event counts, and zero-CPU-node evidence. The UNO Q transmitter reports per-byte bridge calls, buffer size, CRC input, framed bytes, and laser GPIO bits. The receiver reports STM32 decoded bits/CRC bytes, CPU entropy or recurrent-prefix time, strict Adreno image/suffix time, audited layer counts, and child peak RSS. After reinstalling both production apps, a physical 12-byte `Telemetry OK` text fixture crossed in a 194-bit frame with 15 bridge calls, 22 CRC input bytes, valid CRC/stop bit, and CPU/MCU-only labeling. Windows UI validation showed Qualcomm CPU identity and measured 80.1 MiB peak process memory. No current interface supplies trustworthy energy, NPU utilization percentage, or model FLOP execution counts. |
+| Usefulness | Creates an auditable Qualcomm heterogeneous-compute story: Windows image synthesis uses Hexagon HTP, Windows audio is CPU/HTP hybrid, UNO Q images use complete Adreno Vulkan, UNO Q audio is CPU/Adreno hybrid, and optical timing/framing belongs to the STM32 MCU |
+| Friction and owner | ONNX Runtime profile entries are execution-provider events rather than FLOPs; ncnn exposes the validated graph/layer path but not unified power counters; dashboard process RSS excludes native worker peak memory; and App Lab has no physical-completion callback. These are a mix of runtime observability gaps and deliberate application boundaries. |
+| Workaround | Label every counter by scope, retain raw JSON evidence, separate CPU and accelerator stages, use strict no-fallback gates, disclose estimated physical completion, and avoid converting layer/event counts into unsupported FLOP or energy claims. |
+| Suggested improvement | Qualcomm tooling should expose one portable telemetry schema across QNN/QAIRT and Adreno paths with device identity, graph assignment, per-stage time, peak memory, power/energy when available, and clear event semantics suitable for application dashboards. |
+
 ## Change log
 
 | Date | Change |
@@ -521,3 +535,4 @@ private endpoints, and confidential material must never appear here.
 | 2026-08-06 | Inspected the stopped legacy text apps, retained their protocol as compatibility reference, and selected a no-AI ASCII profile plus matched production App Lab identities. |
 | 2026-08-06 | Built and installed the paired production App Lab apps, preserved original/rollback hashes, and proved exact 16-byte no-AI text reception with automatic LWF1 routing, valid CRC/stop bit, persisted TXT output, and browser-clean local UIs. |
 | 2026-08-06 | Published the unified text/image/audio App Lab integration as commit `62c540d`; GitHub Actions run `31147024146` passed the portable Windows lint/unit gate while board evidence remains recorded separately. |
+| 2026-08-06 | Added scoped heterogeneous-compute telemetry across Windows QNN, UNO Q Adreno/CPU, RouterBridge, and STM32 optical work while explicitly rejecting unsupported FLOP/power claims. |

@@ -19,6 +19,22 @@ function renderMetrics(target, entries) {
   }));
 }
 
+function renderHardware(prefix, usage) {
+  if (!usage) return;
+  const measurement = usage.process_measurement || {};
+  const used = (usage.stages || [])
+    .filter((stage) => stage.used !== false && !String(stage.stage).startsWith("not used"))
+    .map((stage) => stage.processor)
+    .join(" + ");
+  renderMetrics(document.querySelector(`#${prefix}-hardware-summary`), [
+    ["Processors", used || "CPU"],
+    ["Process CPU", formatSeconds(measurement.process_cpu_seconds || 0)],
+    ["Process peak memory", measurement.peak_process_rss_mib == null ? "n/a" : `${Number(measurement.peak_process_rss_mib).toFixed(1)} MiB`],
+    ["Measured operation", usage.operation || "operation"],
+  ]);
+  document.querySelector(`#${prefix}-hardware-evidence`).textContent = JSON.stringify(usage, null, 2);
+}
+
 function decodeBase64(value) {
   const binary = atob(value);
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
@@ -99,6 +115,7 @@ document.querySelector("#text-transmit-form").addEventListener("submit", async (
       ["Transfer / 1 kbps", formatSeconds(body.at_1_kbps_seconds)],
       ["Transfer / 2 kbps", formatSeconds(body.at_2_kbps_seconds)],
     ]);
+    renderHardware("text", body.hardware_usage);
     result.hidden = false;
     setArduinoButtons();
   } catch (caught) {
@@ -173,6 +190,9 @@ async function sendToArduino(mediaType) {
       `${Number(body.estimated_transmission_seconds).toFixed(2)} s estimated at 25 ms/bit`,
       `request ${body.request_id}`,
       "launch accepted; physical completion is not claimed",
+      "",
+      "HARDWARE EVIDENCE",
+      JSON.stringify({ laptop: body.laptop_hardware_usage, uno_q: body.hardware_usage }, null, 2),
     ].join("\n");
     result.hidden = false;
     const delay = Math.max(1000, Number(body.estimated_transmission_seconds) * 1000 + 1000);
@@ -229,6 +249,7 @@ document.querySelector("#image-transmit-form").addEventListener("submit", async 
       ["Transfer / 2 kbps", formatSeconds(body.at_2_kbps_seconds)],
       ["Encode", formatSeconds(body.encode_seconds)],
     ]);
+    renderHardware("image", body.hardware_usage);
     document.querySelector("#image-verification").hidden = true;
     document.querySelector("#image-reference-caption").textContent = `${body.output_size} x ${body.output_size} encoded target`;
     result.hidden = false;
@@ -264,6 +285,7 @@ document.querySelector("#image-verify").addEventListener("click", async (event) 
       ["MS-SSIM", body.ms_ssim === null ? "n/a" : Number(body.ms_ssim).toFixed(3)],
     ]);
     document.querySelector("#image-evidence").textContent = JSON.stringify(body.npu_evidence, null, 2);
+    renderHardware("image-verify", body.hardware_usage);
     document.querySelector("#image-verification").hidden = false;
   } catch (caught) {
     error.textContent = caught.message;
@@ -302,6 +324,7 @@ document.querySelector("#audio-transmit-form").addEventListener("submit", async 
       ["Transfer / 2 kbps", formatSeconds(body.at_2_kbps_seconds)],
       ["Encode", formatSeconds(body.encode_seconds)],
     ]);
+    renderHardware("audio", body.hardware_usage);
     document.querySelector("#audio-verification").hidden = true;
     result.hidden = false;
     setArduinoButtons();
@@ -338,6 +361,7 @@ document.querySelector("#audio-verify").addEventListener("click", async (event) 
       ["NPU tail", formatSeconds(body.reconstruction_seconds)],
     ]);
     document.querySelector("#audio-evidence").textContent = JSON.stringify(body.execution_evidence, null, 2);
+    renderHardware("audio-verify", body.hardware_usage);
     document.querySelector("#audio-verification").hidden = false;
   } catch (caught) {
     error.textContent = caught.message;

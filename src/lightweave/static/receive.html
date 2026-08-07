@@ -3,9 +3,10 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="dark">
+    <meta name="color-scheme" content="dark light">
     <title>Receive / LightWeave</title>
     <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/theme.js" defer></script>
   </head>
   <body>
     <main>
@@ -15,6 +16,7 @@
           <a href="/transmit">transmit</a>
           <a class="active" href="/receive">receive</a>
           <a href="/loopback">.lwv workbench</a>
+          <button class="theme-toggle" data-theme-toggle type="button">light mode</button>
         </div>
       </nav>
 
@@ -61,6 +63,7 @@
             <a class="download-link" id="image-save" download="reconstructed.png">save reconstructed PNG</a>
             <div class="metrics compact" id="image-metrics"></div>
             <details><summary>QNN execution evidence</summary><pre id="image-evidence"></pre></details>
+            <details class="hardware-panel"><summary>hardware usage / operation counts</summary><div class="metrics compact" id="image-hardware-summary"></div><pre id="image-hardware-evidence"></pre></details>
           </div>
         </section>
 
@@ -88,6 +91,7 @@
             <a class="download-link" id="audio-save" download="reconstructed.wav">save reconstructed WAV</a>
             <div class="metrics compact" id="audio-metrics"></div>
             <details><summary>hybrid execution evidence</summary><pre id="audio-evidence"></pre></details>
+            <details class="hardware-panel"><summary>hardware usage / operation counts</summary><div class="metrics compact" id="audio-hardware-summary"></div><pre id="audio-hardware-evidence"></pre></details>
           </div>
         </section>
       </div>

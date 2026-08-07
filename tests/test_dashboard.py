@@ -38,6 +38,10 @@ class FakeUnoQSink:
                 "wire_crc_hex": "fixture",
                 "optical_bits": (len(payload) + 12) * 8 + 2,
                 "estimated_transmission_seconds": ((len(payload) + 12) * 8 + 2) * 0.025,
+                "hardware_usage": {
+                    "uno_q_linux": {"routerbridge_calls": len(payload) + 3},
+                    "stm32": {"optical_gpio_bit_writes": (len(payload) + 12) * 8 + 2},
+                },
             },
         )
 
@@ -48,6 +52,7 @@ def test_dashboard_is_local_and_offline() -> None:
         assert status.status_code == 200
         assert status.json()["offline"] is True
         assert status.json()["bind_host"] == "127.0.0.1"
+        assert status.json()["host_hardware"]["architecture"]
 
 
 def test_dashboard_serves_only_local_assets() -> None:
@@ -59,6 +64,9 @@ def test_dashboard_serves_only_local_assets() -> None:
         assert page.status_code == 200
         assert 'href="/static/styles.css"' in page.text
         assert 'src="/static/transmit.js"' in page.text
+        assert 'src="/static/theme.js"' in page.text
+        assert "data-theme-toggle" in page.text
+        assert "hardware usage" in page.text
         assert "I128-Q1-B768" in page.text
         assert "T1-ASCII-B100" in page.text
         assert "NO AI" in page.text
@@ -75,6 +83,9 @@ def test_dashboard_serves_only_local_assets() -> None:
         assert loopback.status_code == 200
         assert 'src="/static/app.js"' in loopback.text
         assert client.get("/static/styles.css").status_code == 200
+        theme = client.get("/static/theme.js")
+        assert theme.status_code == 200
+        assert "lightweave-theme" in theme.text
 
 
 def test_dashboard_exposes_uno_q_status_and_transmit_contract() -> None:
@@ -90,6 +101,12 @@ def test_dashboard_exposes_uno_q_status_and_transmit_contract() -> None:
         assert response.status_code == 200
         assert response.json()["buffered_bytes"] == 80
         assert response.json()["optical_bits"] == 738
+        assert response.json()["laptop_hardware_usage"]["operation"] == (
+            "Windows-to-UNO Q USB handoff"
+        )
+        assert (
+            response.json()["hardware_usage"]["stm32"]["optical_gpio_bit_writes"] == 738
+        )
 
         text = client.post(
             "/api/adapters/uno-q/transmit",
@@ -104,7 +121,21 @@ def test_dashboard_generates_exact_no_ai_text_payload() -> None:
     with TestClient(create_app()) as client:
         response = client.post("/api/transmit/text", data={"text": "Hello!"})
         assert response.status_code == 200
-        assert response.json() == {
+        body = response.json()
+        assert {
+            key: body[key]
+            for key in (
+                "preset_code",
+                "payload_base64",
+                "raw_bytes",
+                "maximum_bytes",
+                "characters",
+                "text",
+                "at_1_kbps_seconds",
+                "at_2_kbps_seconds",
+                "warning",
+            )
+        } == {
             "preset_code": "T1-ASCII-B100",
             "payload_base64": "SGVsbG8h",
             "raw_bytes": 6,
@@ -115,6 +146,8 @@ def test_dashboard_generates_exact_no_ai_text_payload() -> None:
             "at_2_kbps_seconds": 0.024,
             "warning": "Text uses printable ASCII bytes directly; no AI model runs.",
         }
+        assert body["hardware_usage"]["counters"]["payload_bytes"] == 6
+        assert body["hardware_usage"]["stages"][1]["used"] is False
         invalid = client.post("/api/transmit/text", data={"text": "line\nbreak"})
         assert invalid.status_code == 422
 

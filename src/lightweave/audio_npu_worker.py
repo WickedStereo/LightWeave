@@ -65,7 +65,9 @@ def run(
         if not np.isfinite(audio).all():
             raise RuntimeError("Audio tail returned non-finite values.")
         profile_path = Path(session.end_profiling())
-        providers, cpu_nodes = _profile_providers(profile_path)
+        providers, cpu_nodes, event_count, provider_event_counts = _profile_providers(
+            profile_path
+        )
         if cpu_nodes:
             raise RuntimeError(f"Audio QNN profile contains {cpu_nodes} CPU nodes.")
         np.save(output_path, audio, allow_pickle=False)
@@ -79,6 +81,8 @@ def run(
             "chunk_inference_seconds": chunk_seconds,
             "profile_providers": providers,
             "profile_cpu_node_count": cpu_nodes,
+            "profile_provider_event_count": event_count,
+            "profile_provider_event_counts": provider_event_counts,
             "profile_filename": profile_path.name,
             "input_shape": list(prefixes.shape),
             "output_shape": list(audio.shape),

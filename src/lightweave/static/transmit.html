@@ -3,9 +3,10 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="dark">
+    <meta name="color-scheme" content="dark light">
     <title>Transmit / LightWeave</title>
     <link rel="stylesheet" href="/static/styles.css">
+    <script src="/static/theme.js" defer></script>
   </head>
   <body>
     <main>
@@ -15,6 +16,7 @@
           <a class="active" href="/transmit">transmit</a>
           <a href="/receive">receive</a>
           <a href="/loopback">.lwv workbench</a>
+          <button class="theme-toggle" data-theme-toggle type="button">light mode</button>
         </div>
       </nav>
 
@@ -59,6 +61,7 @@
               <button class="secondary" id="text-copy" type="button">copy</button>
             </div>
             <div class="metrics compact" id="text-metrics"></div>
+            <details class="hardware-panel"><summary>hardware usage / operation counts</summary><div class="metrics compact" id="text-hardware-summary"></div><pre id="text-hardware-evidence"></pre></details>
             <pre class="text-preview" id="text-preview"></pre>
             <div class="action-row">
               <a class="download-button" id="text-download" download="payload.bin">download payload.bin</a>
@@ -105,6 +108,7 @@
               <button class="secondary" id="image-copy" type="button">copy</button>
             </div>
             <div class="metrics compact" id="image-metrics"></div>
+            <details class="hardware-panel"><summary>encoding hardware usage</summary><div class="metrics compact" id="image-hardware-summary"></div><pre id="image-hardware-evidence"></pre></details>
             <div class="action-row">
               <a class="download-button" id="image-download" download="payload.bin">download payload.bin</a>
               <button class="secondary" id="image-verify" type="button">verify locally / NPU</button>
@@ -118,6 +122,7 @@
               </div>
               <div class="metrics compact" id="image-verify-metrics"></div>
               <details><summary>QNN execution evidence</summary><pre id="image-evidence"></pre></details>
+              <details class="hardware-panel"><summary>reconstruction hardware usage</summary><div class="metrics compact" id="image-verify-hardware-summary"></div><pre id="image-verify-hardware-evidence"></pre></details>
             </div>
           </div>
         </section>
@@ -145,6 +150,7 @@
               <button class="secondary" id="audio-copy" type="button">copy</button>
             </div>
             <div class="metrics compact" id="audio-metrics"></div>
+            <details class="hardware-panel"><summary>encoding hardware usage</summary><div class="metrics compact" id="audio-hardware-summary"></div><pre id="audio-hardware-evidence"></pre></details>
             <div class="action-row">
               <a class="download-button" id="audio-download" download="payload.bin">download payload.bin</a>
               <button class="secondary" id="audio-verify" type="button">verify locally / hybrid</button>
@@ -155,6 +161,7 @@
               <audio id="audio-reconstructed" controls></audio>
               <div class="metrics compact" id="audio-verify-metrics"></div>
               <details><summary>hybrid execution evidence</summary><pre id="audio-evidence"></pre></details>
+              <details class="hardware-panel"><summary>reconstruction hardware usage</summary><div class="metrics compact" id="audio-verify-hardware-summary"></div><pre id="audio-verify-hardware-evidence"></pre></details>
             </div>
           </div>
         </section>

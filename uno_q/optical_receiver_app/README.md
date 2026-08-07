@@ -30,9 +30,12 @@ Profile routing is automatic:
   decoder layers 0-4 plus the strict 39-layer Adreno Vulkan suffix (layers
   5-15), then applies the disclosed boundary correction and exact sample trim.
 
-The result page displays a PNG or playable WAV, download link, parsed header,
-CRC/stop-bit evidence, timings, device, and strict assignment evidence.
-Received raw payloads and outputs are written atomically under `data/results`.
+The result page displays text, a PNG, or a playable WAV plus download, parsed
+header, CRC/stop-bit, timing, device, and strict-assignment evidence. It has
+persistent light/dark modes and reports STM32 optical-bit/CRC work, QRB2210 CPU
+stages, Adreno 702 stages/audited layer counts, and peak decoder memory. Layer
+counts are graph evidence, not FLOP or power estimates. Received raw payloads
+and outputs are written atomically under `data/results`.
 
 The tracked project contains no generated models or vendor libraries. Install
 the base native receiver first, then deploy this App Lab application:

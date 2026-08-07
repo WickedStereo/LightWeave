@@ -2,13 +2,14 @@
 
 [![CI](https://github.com/WickedStereo/LightWeave/actions/workflows/ci.yml/badge.svg)](https://github.com/WickedStereo/LightWeave/actions/workflows/ci.yml)
 
-LightWeave turns images and PCM WAV audio into compact bytes for an extremely
-low-bandwidth, air-gapped link. The current software treats the future
-Arduino/optical layer as a reliable ordered, message-bounded byte pipe: encode
-on one host, transfer the bytes unchanged, and reconstruct on a Snapdragon
-receiver.
+LightWeave is an offline text, image, and audio network for RF-denied spaces.
+The Windows application creates compact payloads, hands them to an Arduino UNO
+Q transmitter over USB, and sends a self-describing, CRC-protected frame over
+visible light. A second UNO Q automatically identifies the media: printable
+ASCII is restored directly, images run through a strict Adreno 702 decoder,
+and audio runs through an explicitly labeled QRB2210 CPU/Adreno hybrid.
 
-Two wire formats coexist:
+Three data representations coexist:
 
 - Raw optical mode sends only codec bytes. Image presets reconstruct at
   64 x 64 / 128 bytes, 128 x 128 / 768 bytes, or 256 x 256 / 2,048 bytes.
@@ -16,6 +17,15 @@ Two wire formats coexist:
   code travels separately.
 - `.lwv` remains the self-validating archival and debugging format with typed
   metadata, length, model fingerprint, and SHA-256 integrity.
+- `LWF1` is the optical-only wrapper around unchanged raw bytes. It carries the
+  profile, dynamic payload length, audio sample count, and CRC-16 so the UNO Q
+  receiver needs no manual preset or length entry.
+
+## Team
+
+The final public names and email addresses are intentionally not guessed from
+Git metadata. The repository owner must replace this note with the complete
+team roster before submitting the GitHub link.
 
 The image path is fully NPU-backed. CompressAI creates an entropy-coded image
 payload, the receiver restores the latent tensor on CPU, and the complete
@@ -106,6 +116,16 @@ the `.lwv` development workbench. The monochrome text-first UI defaults to the
 balanced 128 x 128 profile, includes tiny and quality alternatives plus three
 local test patterns, and shows transfer estimates, quality/latency metrics,
 playable media, QNN device selection, and strict provider evidence.
+Every Windows and production UNO Q page includes a persistent light/dark mode
+control that also respects the browser's initial system preference.
+
+Hardware evidence is shown with each operation. Windows records process CPU
+time, wall time, peak process memory, exact media counters, QNN device
+selection, and execution-provider event counts. The transmitter reports ADB,
+RouterBridge, buffered-byte, CRC-byte, optical-bit, and GPIO-write counts. The
+receiver reports STM32 frame work plus QRB2210 CPU and Adreno 702 stage timing
+and audited graph-layer counts. These are measured events and graph layers,
+not inferred FLOPs, power, or energy figures.
 
 Downloaded raw `payload.bin` files intentionally have no integrity or
 model-negotiation bytes. The production laser path adds the small `LWF1`
@@ -306,5 +326,8 @@ stress transfer.
   acceptance set and oversize stress case.
 - [models/manifest.json](models/manifest.json) pins model sources, hashes,
   profiles, shapes, and expected generated artifacts.
+- [docs/SUBMISSION_CHECKLIST.md](docs/SUBMISSION_CHECKLIST.md) audits the
+  repository against the hackathon delivery requirements and identifies the
+  remaining owner-only actions.
 
 Licensed under the [MIT License](LICENSE).

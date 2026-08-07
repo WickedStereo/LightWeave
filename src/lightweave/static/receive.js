@@ -13,6 +13,22 @@ function renderMetrics(target, entries) {
   }));
 }
 
+function renderHardware(prefix, usage) {
+  if (!usage) return;
+  const measurement = usage.process_measurement || {};
+  const used = (usage.stages || [])
+    .filter((stage) => stage.used !== false && !String(stage.stage).startsWith("not used"))
+    .map((stage) => stage.processor)
+    .join(" + ");
+  renderMetrics(document.querySelector(`#${prefix}-hardware-summary`), [
+    ["Processors", used || "CPU"],
+    ["Process CPU", formatSeconds(measurement.process_cpu_seconds || 0)],
+    ["Process peak memory", measurement.peak_process_rss_mib == null ? "n/a" : `${Number(measurement.peak_process_rss_mib).toFixed(1)} MiB`],
+    ["Measured operation", usage.operation || "operation"],
+  ]);
+  document.querySelector(`#${prefix}-hardware-evidence`).textContent = JSON.stringify(usage, null, 2);
+}
+
 async function responseBody(response) {
   const body = await response.json();
   if (!response.ok) throw new Error(body.detail || `Request failed (${response.status})`);
@@ -56,6 +72,7 @@ document.querySelector("#image-receive-form").addEventListener("submit", async (
       ["NPU reconstruction", formatSeconds(body.reconstruction_seconds)],
     ]);
     document.querySelector("#image-evidence").textContent = JSON.stringify(body.npu_evidence, null, 2);
+    renderHardware("image", body.hardware_usage);
     result.hidden = false;
   } catch (caught) {
     error.textContent = caught.message;
@@ -91,6 +108,7 @@ document.querySelector("#audio-receive-form").addEventListener("submit", async (
       ["NPU tail", formatSeconds(body.reconstruction_seconds)],
     ]);
     document.querySelector("#audio-evidence").textContent = JSON.stringify(body.execution_evidence, null, 2);
+    renderHardware("audio", body.hardware_usage);
     result.hidden = false;
   } catch (caught) {
     error.textContent = caught.message;

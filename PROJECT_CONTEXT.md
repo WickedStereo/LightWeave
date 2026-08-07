@@ -6,8 +6,8 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | Self-describing optical image/audio reception complete on the two UNO Q boards |
-| Primary milestone | `LWF1` automatically routes image/audio bytes into the Qualcomm-accelerated receiver |
+| Phase | Unified text/image/audio optical demo complete; submission hardening in progress |
+| Primary milestone | Present measured Windows, UNO Q, STM32, QNN, and Adreno execution evidence clearly |
 | Secondary milestone | Galaxy S25 receiver UI and hardware validation |
 | Last updated | 2026-08-06 |
 | Approval gate | Application implementation explicitly approved on 2026-08-05 |
@@ -71,10 +71,17 @@ The implemented milestone assumes a reliable ordered byte pipe and includes:
 - A separate `lightweave_byte_receiver` diagnostic that accepts an out-of-band
   expected length, captures the matching raw optical bytes, and reports binary,
   SHA-256, length, and stop-bit evidence without invoking media reconstruction.
-- A separate `lightweave_optical_receiver` production App Lab application with
+- The production `lightweave_receiver` App Lab application with
   one-shot Listen/Cancel controls. It validates `LWF1`, automatically routes all
-  three image presets and one- to five-second audio, then reconstructs through
-  the installed strict image-Adreno or truthful CPU/Adreno audio path.
+  three image presets, one- to five-second audio, and exact ASCII text, then
+  reconstructs through the installed strict image-Adreno or truthful
+  CPU/Adreno audio path. The former `lightweave_optical_receiver` is retained
+  stopped as rollback.
+- Persistent system-aware light/dark controls across the Windows dashboard and
+  production UNO Q receiver WebUI.
+- Per-operation presentation evidence: Windows process CPU time/RSS and QNN
+  provider events; UNO Q CPU/Adreno stage timings and audited layers; and STM32
+  framing, CRC, payload, optical-bit, GPIO-write, and RouterBridge counts.
 
 The following remain out of scope:
 
@@ -799,6 +806,9 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | D-047 | 2026-08-06 | Stop additional long optical acceptance transfers. | Owner accepted existing evidence; the five-second audio wire test is intentionally skipped while the supported decoder limit remains five seconds. |
 | D-048 | 2026-08-06 | Integrate text as `T1-ASCII-B100` / profile `0x20` in `LWF1`, with no AI stage. | Reuses automatic routing, length, CRC, storage, and one-shot reception while preserving exact printable-ASCII payload bytes. |
 | D-049 | 2026-08-06 | Name the production App Lab pair `lightweave_transmitter` / **LightWeave Transmitter** and `lightweave_receiver` / **LightWeave Receiver**. | Clear matched identities; original `laser_*` and stopped `lightweave_optical_receiver` remain rollback/reference apps. |
+| D-050 | 2026-08-06 | Present measured process time/memory, accelerator profile events, audited graph layers, bridge calls, and optical-bit counts instead of estimating FLOPs, power, or energy. | These quantities are available and defensible from the current runtimes; layer/event counts are explicitly not operation or energy estimates. |
+| D-051 | 2026-08-06 | Add persistent light/dark modes while preserving the plain monochrome visual system. | Uses local assets, browser preference on first visit, and local storage thereafter; runtime remains offline. |
+| D-052 | 2026-08-06 | Track an evidence-based submission checklist and classify the repository as ready for open-source distribution, not commercially certified. | Reproducible source installation, verified hardware behavior, tests, and licenses satisfy the open-source-platform path; no signed/store package, authentication, or production clock recovery is claimed. Team roster and form completion remain owner actions. |
 
 ## Public references
 
@@ -865,3 +875,4 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-06 | Inspected the stopped legacy text pair, documented its 100-ms printable-ASCII leading-bit protocol and prototype gaps, selected `T1-ASCII-B100` in `LWF1`, and chose matched production transmitter/receiver App Lab names. |
 | 2026-08-06 | Integrated no-AI text into the Windows dashboard and production App Lab pair, installed **LightWeave Transmitter**/**LightWeave Receiver**, preserved all legacy/rollback source hashes, and physically received `Hello LightWeave` exactly with valid LWF1 CRC/stop bit and atomic TXT output. |
 | 2026-08-06 | Published the integrated text implementation as commit `62c540d`; GitHub Actions run `31147024146` passed the Windows lint/unit gate. |
+| 2026-08-06 | Added persistent light/dark UI controls, defensible Windows/UNO Q/STM32 hardware evidence, QNN provider-event counts, and an explicit hackathon submission audit with owner-only gaps; reinstalled both production apps and physically verified `Telemetry OK` with 194 optical bits, 15 bridge calls, valid CRC/stop bit, and correct CPU-only text labeling. |

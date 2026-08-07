@@ -193,7 +193,11 @@ def test_tracked_app_preserves_hardware_and_accelerator_contracts() -> None:
     assert "decode_audio_payload(frame.payload, frame.header.preset_code)" in main
     assert 'frame.payload.decode("ascii")' in main
     assert 'accelerator_required": False' in main
+    assert 'metrics["hardware_usage"] = hardware_usage(frame, metrics)' in main
+    assert '"decoded_optical_bits": optical_bits' in main
+    assert '"Adreno 702 GPU"' in main
     assert 'id="text-content"' in page
+    assert 'id="theme-toggle"' in page
     assert "Download TXT" in page
     assert "Listen for transfer" in page
     assert "http://" not in page

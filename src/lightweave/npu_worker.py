@@ -32,19 +32,31 @@ def _device_evidence(ep_device: Any) -> dict[str, object]:
     }
 
 
-def _profile_providers(profile_path: Path) -> tuple[list[str], int]:
+def _profile_providers(
+    profile_path: Path,
+) -> tuple[list[str], int, int, dict[str, int]]:
     if not profile_path.is_file():
-        return [], 0
+        return [], 0, 0, {}
     events = json.loads(profile_path.read_text(encoding="utf-8-sig"))
     providers: set[str] = set()
+    provider_node_counts: dict[str, int] = {}
     cpu_nodes = 0
     for event in events:
         provider = event.get("args", {}).get("provider")
         if provider:
-            providers.add(str(provider))
-            if str(provider) == "CPUExecutionProvider":
+            provider_name = str(provider)
+            providers.add(provider_name)
+            provider_node_counts[provider_name] = (
+                provider_node_counts.get(provider_name, 0) + 1
+            )
+            if provider_name == "CPUExecutionProvider":
                 cpu_nodes += 1
-    return sorted(providers), cpu_nodes
+    return (
+        sorted(providers),
+        cpu_nodes,
+        sum(provider_node_counts.values()),
+        provider_node_counts,
+    )
 
 
 def run(
@@ -124,7 +136,9 @@ def run(
             raise RuntimeError("The NPU decoder returned non-finite values.")
 
         profile_path = Path(session.end_profiling())
-        providers, cpu_node_count = _profile_providers(profile_path)
+        providers, cpu_node_count, event_count, provider_event_counts = (
+            _profile_providers(profile_path)
+        )
         if cpu_node_count:
             raise RuntimeError(
                 f"QNN profile reported {cpu_node_count} CPU-executed nodes."
@@ -142,6 +156,8 @@ def run(
             "inference_seconds": inference_seconds,
             "profile_providers": providers,
             "profile_cpu_node_count": cpu_node_count,
+            "profile_provider_event_count": event_count,
+            "profile_provider_event_counts": provider_event_counts,
             "profile_filename": profile_path.name,
             "input_shape": list(latent.shape),
             "output_shape": list(reconstructed.shape),

@@ -255,6 +255,8 @@ class InboxWorker:
                     f"{status['busy_remaining_seconds']:.1f} more seconds."
                 )
 
+            orchestration_started = time.perf_counter()
+            cpu_started = time.process_time()
             wire_mode_id = 1 if request.wire_mode == "lwf1" else 0
             if not self.bridge.call(
                 "prepare_transmission",
@@ -279,6 +281,14 @@ class InboxWorker:
             launch_time = current if now is not None else time.time()
             busy_until = launch_time + duration
             self.bridge.notify("transmit_payload")
+            orchestration_seconds = time.perf_counter() - orchestration_started
+            process_cpu_seconds = time.process_time() - cpu_started
+            frame_bytes = (
+                len(payload) + FRAME_OVERHEAD_BYTES
+                if request.wire_mode == "lwf1"
+                else len(payload)
+            )
+            optical_bit_count = optical_bits(len(payload), request.wire_mode)
             result = {
                 "accepted": True,
                 "status": "accepted",
@@ -303,16 +313,42 @@ class InboxWorker:
                 "frame_overhead_bytes": (
                     FRAME_OVERHEAD_BYTES if request.wire_mode == "lwf1" else 0
                 ),
-                "total_optical_bytes": (
-                    len(payload) + FRAME_OVERHEAD_BYTES
-                    if request.wire_mode == "lwf1"
-                    else len(payload)
-                ),
-                "optical_bits": optical_bits(len(payload), request.wire_mode),
+                "total_optical_bytes": frame_bytes,
+                "optical_bits": optical_bit_count,
                 "bit_duration_ms": BIT_DURATION_MS,
                 "estimated_transmission_seconds": duration,
                 "busy_until_epoch": busy_until,
                 "completion_claimed": False,
+                "hardware_usage": {
+                    "uno_q_linux": {
+                        "processor": "Qualcomm QRB2210 CPU",
+                        "role": "ADB inbox validation and RouterBridge orchestration",
+                        "process_cpu_seconds": process_cpu_seconds,
+                        "orchestration_seconds": orchestration_seconds,
+                        "routerbridge_calls": len(payload) + 3,
+                        "payload_byte_store_calls": len(payload),
+                    },
+                    "stm32": {
+                        "processor": "STM32U585 MCU",
+                        "role": "LWF1 framing, CRC-16, timing, and laser GPIO",
+                        "payload_buffer_bytes": buffered,
+                        "crc_input_bytes": (
+                            len(payload) + 10 if request.wire_mode == "lwf1" else 0
+                        ),
+                        "optical_frame_bytes": frame_bytes,
+                        "optical_gpio_bit_writes": optical_bit_count,
+                        "bit_duration_ms": BIT_DURATION_MS,
+                    },
+                    "accelerators": {
+                        "npu": "not used during transmission",
+                        "gpu": "not used during transmission",
+                    },
+                    "measurement_note": (
+                        "Counts describe control-plane and MCU work. Physical "
+                        "completion remains estimated because the MCU exposes "
+                        "no completion callback."
+                    ),
+                },
             }
             self._write_atomic(
                 self.state_path,

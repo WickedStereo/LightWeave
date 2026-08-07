@@ -103,6 +103,12 @@ def test_inbox_preserves_every_binary_value(tmp_path: Path) -> None:
     assert result["buffered_bytes"] == 256
     assert bytes(bridge.values) == payload
     assert bridge.notifications == ["transmit_payload"]
+    usage = result["hardware_usage"]
+    assert usage["uno_q_linux"]["payload_byte_store_calls"] == 256
+    assert usage["uno_q_linux"]["routerbridge_calls"] == 259
+    assert usage["stm32"]["crc_input_bytes"] == 266
+    assert usage["stm32"]["optical_gpio_bit_writes"] == (256 + 12) * 8 + 2
+    assert usage["accelerators"]["npu"] == "not used during transmission"
     assert not list((tmp_path / "data" / "inbox").iterdir())
 
 
@@ -165,6 +171,7 @@ def test_inbox_preserves_explicit_raw_v0_diagnostic(tmp_path: Path) -> None:
     assert result["frame_overhead_bytes"] == 0
     assert result["total_optical_bytes"] == len(payload)
     assert result["crc16"] is None
+    assert result["hardware_usage"]["stm32"]["crc_input_bytes"] == 0
     assert bytes(bridge.values) == payload
 
 

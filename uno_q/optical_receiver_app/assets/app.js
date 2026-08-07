@@ -18,7 +18,26 @@ const audio = document.querySelector("#audio");
 const audioDownload = document.querySelector("#audio-download");
 const metrics = document.querySelector("#metrics");
 const error = document.querySelector("#error");
+const themeToggle = document.querySelector("#theme-toggle");
 let mediaUrl = null;
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  document.documentElement.style.colorScheme = theme;
+  const next = theme === "dark" ? "light" : "dark";
+  themeToggle.textContent = `${next} mode`;
+  themeToggle.setAttribute("aria-label", `Switch to ${next} mode`);
+}
+
+const savedTheme = localStorage.getItem("lightweave-theme");
+applyTheme(savedTheme === "light" || savedTheme === "dark"
+  ? savedTheme
+  : (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"));
+themeToggle.addEventListener("click", () => {
+  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  localStorage.setItem("lightweave-theme", next);
+  applyTheme(next);
+});
 
 function showError(message) {
   error.textContent = message;
@@ -38,6 +57,8 @@ function milliseconds(value) {
 
 function renderMetrics(values) {
   const reconstruction = values.reconstruction || {};
+  const hardware = reconstruction.hardware_usage || {};
+  const stm32 = hardware.stm32 || {};
   const rows = [
     ["media", values.media_type],
     ["preset", values.preset_code],
@@ -78,6 +99,17 @@ function renderMetrics(values) {
       ["characters", reconstruction.characters],
       ["AI / accelerator", reconstruction.accelerator_required ? "required" : "not used"],
     );
+  }
+  rows.push(
+    ["optical bits decoded / STM32", stm32.decoded_optical_bits],
+    ["CRC bytes checked / STM32", stm32.crc_input_bytes],
+    ["peak decoder memory", hardware.peak_child_rss_kib == null ? "n/a" : `${(Number(hardware.peak_child_rss_kib) / 1024).toFixed(1)} MiB`],
+    ["hardware count scope", "measured bits/timing + audited layers; not FLOPs"],
+  );
+  for (const stage of hardware.stages || []) {
+    const count = stage.compute_layers == null ? "" : ` / ${stage.compute_layers} layers`;
+    const elapsed = stage.measured_seconds == null ? "" : ` / ${milliseconds(stage.measured_seconds)}`;
+    rows.push([stage.processor, `${stage.stage}${count}${elapsed}`]);
   }
   metrics.replaceChildren();
   for (const [name, value] of rows) {

@@ -8,6 +8,7 @@ import threading
 import time
 import uuid
 from contextlib import suppress
+from typing import Any
 
 from arduino.app_bricks.web_ui import WebUI
 from arduino.app_utils import App, Bridge
@@ -28,6 +29,73 @@ listen_queue: queue.Queue[ReceiveRequest] = queue.Queue()
 frame_finished_event = threading.Event()
 cancel_event = threading.Event()
 pending_request: ReceiveRequest | None = None
+
+
+def hardware_usage(frame: Any, metrics: dict[str, Any]) -> dict[str, Any]:
+    payload_bytes = len(frame.payload)
+    optical_bits = (payload_bytes + 12) * 8 + 2
+    common: dict[str, Any] = {
+        "stm32": {
+            "processor": "STM32U585 MCU",
+            "role": "photodiode sampling, LWF1 parsing, CRC-16, and byte buffering",
+            "decoded_optical_bits": optical_bits,
+            "payload_bytes": payload_bytes,
+            "crc_input_bytes": payload_bytes + 10,
+            "bit_duration_ms": 25,
+        },
+        "peak_child_rss_kib": metrics.get("peak_child_rss_kib"),
+        "measurement_note": (
+            "Layer counts are audited graph layers; they are not FLOP/MAC estimates. "
+            "Text uses no neural accelerator."
+        ),
+    }
+    media_type = frame.header.profile.media_type
+    if media_type == "image":
+        common["stages"] = [
+            {
+                "processor": "Qualcomm QRB2210 CPU",
+                "stage": "native rANS entropy decode and PNG packaging",
+                "measured_seconds": metrics.get("entropy_seconds"),
+            },
+            {
+                "processor": "Adreno 702 GPU",
+                "stage": "complete g_s image synthesis",
+                "measured_seconds": metrics.get("inference_seconds"),
+                "compute_layers": metrics.get("compute_layers"),
+                "strict_no_fallback": metrics.get("strict_no_fallback"),
+            },
+            {"processor": "Hexagon NPU", "stage": "not available/used on UNO Q"},
+        ]
+    elif media_type == "audio":
+        common["stages"] = [
+            {
+                "processor": "Qualcomm QRB2210 CPU",
+                "stage": "codebooks and EnCodec recurrent layers 0-4",
+                "measured_seconds": (
+                    float(metrics.get("cpu_codebook_seconds", 0.0))
+                    + float(metrics.get("cpu_prefix_seconds", 0.0))
+                ),
+                "compute_layers": metrics.get("cpu_compute_layers"),
+            },
+            {
+                "processor": "Adreno 702 GPU",
+                "stage": "EnCodec convolutional layers 5-15",
+                "measured_seconds": metrics.get("accelerator_seconds"),
+                "compute_layers": metrics.get("vulkan_compute_layers"),
+                "strict_no_fallback": metrics.get("strict_suffix_no_fallback"),
+            },
+            {"processor": "Hexagon NPU", "stage": "not available/used on UNO Q"},
+        ]
+    else:
+        common["stages"] = [
+            {
+                "processor": "Qualcomm QRB2210 CPU",
+                "stage": "ASCII validation, persistence, and WebUI delivery",
+            },
+            {"processor": "Adreno 702 GPU", "stage": "not used"},
+            {"processor": "Hexagon NPU", "stage": "not used"},
+        ]
+    return common
 
 
 def send_status(request: ReceiveRequest | None, status: str, client=None) -> None:
@@ -103,6 +171,7 @@ def process_completed_request(request: ReceiveRequest) -> None:
         }
         extension = "txt"
         base64_field = None
+    metrics["hardware_usage"] = hardware_usage(frame, metrics)
     result = store.write_result(
         request,
         frame,

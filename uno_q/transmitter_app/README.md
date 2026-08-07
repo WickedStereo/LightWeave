@@ -35,3 +35,8 @@ From the repository root, inspect and install with:
 The dashboard uses ADB over USB and requires no network connection. Generated
 `payload.bin` files remain raw codec payloads; framing is produced only by the
 STM32 while transmitting.
+
+Each acceptance result includes measured QRB2210 orchestration/CPU time,
+per-byte RouterBridge calls, STM32 payload/CRC/frame counts, and exact laser
+GPIO bit writes. NPU and GPU are correctly reported as unused during transport;
+physical completion remains estimated because the MCU has no completion event.
