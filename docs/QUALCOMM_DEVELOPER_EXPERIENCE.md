@@ -520,3 +520,4 @@ private endpoints, and confidential material must never appear here.
 | 2026-08-06 | Separated a healthy App Lab port-7000 receiver from intermittent mobile LAN discovery and documented direct-IP, same-subnet, DHCP, and trusted-network guidance. |
 | 2026-08-06 | Inspected the stopped legacy text apps, retained their protocol as compatibility reference, and selected a no-AI ASCII profile plus matched production App Lab identities. |
 | 2026-08-06 | Built and installed the paired production App Lab apps, preserved original/rollback hashes, and proved exact 16-byte no-AI text reception with automatic LWF1 routing, valid CRC/stop bit, persisted TXT output, and browser-clean local UIs. |
+| 2026-08-06 | Published the unified text/image/audio App Lab integration as commit `62c540d`; GitHub Actions run `31147024146` passed the portable Windows lint/unit gate while board evidence remains recorded separately. |
