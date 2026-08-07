@@ -6,9 +6,9 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | End-to-end Windows-to-UNO-Q optical image reconstruction complete |
+| Phase | End-to-end optical image reconstruction complete; automatic framing approved next |
 | Primary milestone | Raw image bytes now cross the laser link and reconstruct through the complete Adreno graph |
-| Secondary milestone | Android receiver UI/hardware validation, then optical audio reception |
+| Secondary milestone | Self-describing optical image framing, then Android and optical audio |
 | Last updated | 2026-08-06 |
 | Approval gate | Application implementation explicitly approved on 2026-08-05 |
 
@@ -299,6 +299,32 @@ out-of-band settings; the optical bytes remain header-free. A subsequent
 idempotent reinstall stopped only its own display-named target, rebuilt the
 same sketch, preserved reusable source hashes, and restarted successfully.
 
+### Approved self-describing optical image frame
+
+The owner approved automatic length/preset negotiation as the next change, but
+will test the current manually configured receiver before implementation. The
+downloaded/generated `payload.bin` remains the unchanged raw CompressAI entropy
+string. Only the optical transport wraps it:
+
+```text
+start bit
+magic "LW"            2 bytes
+frame version          1 byte
+image preset ID        1 byte
+payload length         2 bytes, little-endian
+raw payload            N bytes
+CRC-16                 2 bytes over fixed header plus payload
+stop bit
+```
+
+The eight transport bytes add 1.6 seconds at the current 25-ms/bit waveform.
+The receiver will expose one Listen action, validate magic/version/preset,
+enforce the preset budget and 2,048-byte buffer bound, receive the declared
+payload, verify CRC-16 and stop bit, strip the frame, and pass only the raw
+payload into the existing strict-Adreno decoder. The current manual receiver
+and byte diagnostic remain preserved until the new physical gate passes. Audio
+framing will later add the exact output sample count needed by `A1-E15-S<n>`.
+
 ## Confirmed architecture
 
 ### `.lwv` envelope
@@ -584,6 +610,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Windows-to-UNO Q transmitter flow | Complete and published | Commit `028f9d9`; dashboard image/audio Send actions, USB/ADB sink, atomic App Lab inbox, variable-length STM32 loop, tracked clone source, installer, and real 104/124/188-byte board acceptance pass |
 | UNO Q optical byte diagnostic | Complete and published | Commit `80ba103`; exact `00 FF AA 55` received twice with matching SHA-256 and valid stop bit |
 | UNO Q optical image receiver | Complete and published | Commit `506eee9`; two 80-byte physical image transfers passed exact-byte, stop-bit, 64-by-64 PNG, 16-layer Adreno, strict-no-fallback, App Lab UI, and zero-console-error gates |
+| Self-describing optical image framing | Approved; implementation pending current receiver test | Add version/preset/length/CRC around unchanged `payload.bin`, eliminate manual receiver configuration, and preserve diagnostic compatibility |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
 | GitHub Actions unit CI | Complete | Corrected-history Windows Python 3.11 run `31034723025` passed; QNN gates stay local |
@@ -651,8 +678,8 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
   while decoding existing raw `payload.bin` files byte-identically?
 - Would a future, explicitly approved UNO Q encoding phase justify the extra
   `g_a` model, native rANS encoder, storage, and accelerator-validation cost?
-- Should a future physical transport frame carry preset/length/checksum, or
-  should the now-working trusted App Lab/ADB out-of-band configuration remain?
+- What sustained frame-error rate does the new magic/version/length/CRC framing
+  achieve across longer balanced and quality payloads under varied light?
 - Can the same receiver boundary carry one- to five-second EnCodec payloads
   reliably before invoking the existing CPU/Adreno audio decoder?
 - Is the existing 25 ms bit duration intentional for the optical hardware, and
@@ -705,6 +732,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | D-041 | 2026-08-06 | Keep SHA-256 and request metadata in the local USB control plane and report launch acceptance rather than physical completion. | Raw optical mode stays header-free and the unchanged MCU interface exposes no completion callback. |
 | D-042 | 2026-08-06 | Add a separate variable-length optical byte diagnostic before connecting the accelerated media receiver. | Preserves all existing receiver apps, proves the transport independently, and keeps expected length as out-of-band control data. |
 | D-043 | 2026-08-06 | Keep the byte diagnostic separate and add `lightweave_optical_receiver` by composing the proven `image_receiver` sampling logic with the installed strict-Adreno decoder. | Preserves original apps, avoids repeating the long runtime build, and makes optical transport evidence distinct from reconstruction evidence. |
+| D-044 | 2026-08-06 | Add an eight-byte self-describing optical wrapper carrying magic, version, image preset, payload length, and CRC-16 around the unchanged raw payload. | Eliminates manual preset/length entry while preserving `payload.bin`; implementation starts after the owner tests the current receiver. |
 
 ## Public references
 
@@ -761,3 +789,4 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-06 | Added and installed the separate variable-length byte receiver plus automated verifier; the first physical two-board test received `00 FF AA 55` exactly with matching SHA-256 and a valid stop bit while preserving all original receiver apps. |
 | 2026-08-06 | Published the byte diagnostic as commit `80ba103`, then installed and exercised the separate production optical image receiver: two exact 80-byte transfers reconstructed to 64 by 64 through all 16 Adreno layers with strict fallback disabled, including a live App Lab UI run with PNG download and no browser errors. |
 | 2026-08-06 | Published the production optical image receiver, installer, acceptance harness, tests, setup instructions, and evidence as commit `506eee9` on `origin/main` without force-pushing. |
+| 2026-08-06 | Approved self-describing optical image framing as the next implementation: eight transport bytes provide magic/version/preset/length/CRC while the generated raw payload remains unchanged; current manual receiver testing comes first. |
