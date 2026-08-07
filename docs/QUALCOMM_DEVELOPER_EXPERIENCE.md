@@ -536,3 +536,4 @@ private endpoints, and confidential material must never appear here.
 | 2026-08-06 | Built and installed the paired production App Lab apps, preserved original/rollback hashes, and proved exact 16-byte no-AI text reception with automatic LWF1 routing, valid CRC/stop bit, persisted TXT output, and browser-clean local UIs. |
 | 2026-08-06 | Published the unified text/image/audio App Lab integration as commit `62c540d`; GitHub Actions run `31147024146` passed the portable Windows lint/unit gate while board evidence remains recorded separately. |
 | 2026-08-06 | Added scoped heterogeneous-compute telemetry across Windows QNN, UNO Q Adreno/CPU, RouterBridge, and STM32 optical work while explicitly rejecting unsupported FLOP/power claims. |
+| 2026-08-06 | Recorded publication of the presentation-telemetry milestone as commit `98481a8` after live Windows/UNO Q UI checks, physical text evidence, and 124 passing portable tests. |
