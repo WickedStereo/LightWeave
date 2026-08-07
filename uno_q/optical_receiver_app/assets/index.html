@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>LightWeave / optical receiver</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <p class="eyebrow">LIGHTWEAVE / UNO Q</p>
+      <h1>Optical image receiver</h1>
+      <p>Receive raw codec bytes through light, then reconstruct on Adreno 702.</p>
+    </header>
+
+    <section class="status" aria-live="polite">
+      <span id="connection">connecting</span>
+      <span>/</span>
+      <span id="receiver-status">checking receiver</span>
+    </section>
+
+    <section>
+      <h2>Arm receiver</h2>
+      <form id="arm-form">
+        <label for="preset-code">Image preset</label>
+        <select id="preset-code" required>
+          <option value="I64-Q1-B128">I64-Q1-B128 / 64 × 64 / max 128 bytes</option>
+          <option value="I128-Q1-B768" selected>I128-Q1-B768 / 128 × 128 / max 768 bytes</option>
+          <option value="I256-Q1-B2048">I256-Q1-B2048 / 256 × 256 / max 2,048 bytes</option>
+        </select>
+
+        <label for="expected-bytes">Exact payload.bin size</label>
+        <input id="expected-bytes" type="number" min="1" max="768" value="104" required>
+        <p id="budget" class="note">Enter the exact byte count shown by the transmitter.</p>
+
+        <button type="submit">Arm optical receiver</button>
+      </form>
+    </section>
+
+    <p class="warning">
+      Arm this page before pressing Send to Arduino on the transmitter dashboard.
+      Raw mode sends no length, preset, hash, or model identifier through the laser.
+    </p>
+
+    <section id="result" hidden>
+      <h2>Reconstructed image</h2>
+      <div class="image-frame"><img id="image" alt="Reconstructed LightWeave image"></div>
+      <a id="download" download="lightweave-optical-reconstruction.png">Download PNG</a>
+      <dl id="metrics"></dl>
+    </section>
+
+    <section id="error" class="error" role="alert" hidden></section>
+  </main>
+  <script src="/libs/socket.io.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
+

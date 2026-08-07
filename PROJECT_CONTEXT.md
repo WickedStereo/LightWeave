@@ -6,9 +6,9 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | Basic two-UNO-Q optical byte verification complete; media handoff deferred |
-| Primary milestone | The optical link now preserves a known variable-length binary payload byte-for-byte |
-| Secondary milestone | Android receiver UI and hardware validation |
+| Phase | End-to-end Windows-to-UNO-Q optical image reconstruction complete |
+| Primary milestone | Raw image bytes now cross the laser link and reconstruct through the complete Adreno graph |
+| Secondary milestone | Android receiver UI/hardware validation, then optical audio reception |
 | Last updated | 2026-08-06 |
 | Approval gate | Application implementation explicitly approved on 2026-08-05 |
 
@@ -66,15 +66,18 @@ The implemented milestone assumes a reliable ordered byte pipe and includes:
 - A separate `lightweave_byte_receiver` diagnostic that accepts an out-of-band
   expected length, captures the matching raw optical bytes, and reports binary,
   SHA-256, length, and stop-bit evidence without invoking media reconstruction.
+- A separate `lightweave_optical_receiver` production App Lab application that
+  receives variable-length raw image payloads and passes them unchanged into
+  the installed strict-Adreno LightWeave decoder.
 
 The following remain out of scope:
 
-- Photodiode/receiver circuitry, optical decoding, clock recovery, serial
-  framing, retransmission, and changes to the existing laser waveform/timing.
+- Analog/photodiode redesign, clock recovery, serial framing, retransmission,
+  faster modulation, and changes to the existing laser waveform/timing.
 - Galaxy S25 hardware validation, Android audio playback, WebSockets, and Cloud
   AI in the runtime path.
-- UNO Q media encoding, optical receive integration, and MCU performance
-  optimization beyond the approved variable-length transmit loop.
+- UNO Q media encoding, optical audio receive integration, and MCU performance
+  optimization beyond the approved variable-length image receive/transmit loop.
 - Medical, regulatory, safety, or absolute-security claims.
 - A packaged EXE/MSIX.
 
@@ -155,11 +158,11 @@ download/verification scripts are tracked.
 
 ### Deferred next milestones
 
-The direct Windows transmitter-to-UNO Q workflow is now implemented. The next
-selected milestone remains finishing and hardware-validating the Android
-receiver UI for presentation of text, reconstructed images, and later audio
-received from UNO Q. Optical reception and end-to-end reconstruction remain
-deferred until the receiving hardware/application is ready.
+The direct Windows-to-UNO-Q optical image workflow is now implemented and
+physically validated. The next selected milestone remains finishing and
+hardware-validating the Android receiver UI for presentation of text and
+reconstructed images from UNO Q. Optical EnCodec audio reception can then reuse
+the same variable-length byte boundary with `A1-E15-S<n>` validation.
 
 ### Existing App Lab transmitter discovery
 
@@ -269,7 +272,32 @@ sent `00 FF AA 55` in 0.85 seconds. The receiver returned the exact same four
 bytes, matching SHA-256
 `df7d75aad696b49ea81cbddff8c30a794ce0243bf9895db26e8127e0485f4de5`,
 and a valid stop bit. This proves byte correctness for that diagnostic pattern,
-not yet for full media payloads or adverse optical conditions.
+not general reliability under adverse optical conditions. The same diagnostic
+passed a second time before production integration began.
+
+### Production optical image receiver
+
+The repository now tracks `uno_q/optical_receiver_app/`, installed on receiver
+`371371094` as `lightweave_optical_receiver`. It remains separate from the byte
+diagnostic and all original apps. Its installer clones the already installed
+`lightweave-uno` runtime/models, verifies the installed decoder source against
+the repository, reuses the platform-local WebUI library, and deploys the proven
+A0/threshold-800, 25-ms, MSB-first variable-length sketch. The expensive native
+runtime preparation is not repeated; the App Lab build/flash took 92.4 seconds
+and used 87,764 bytes of flash plus 33,678 bytes of global RAM.
+
+Two physical 80-byte `I64-Q1-B128` transfers passed. The automated run received
+the exact SHA-256
+`17493ea32aee4d0e615cf7f49ef678c78198de716f5cf31247e2b7d89a30033f`,
+validated the low stop bit, entropy-decoded in about 0.15 ms, and reconstructed
+64 by 64 through all 16 compute layers on Turnip Adreno 702 with strict CPU
+fallback disabled. Accelerator time was about 214 ms and total serialized
+runner time about 1.97 seconds. A second run armed from the live App Lab page,
+rendered the PNG and download link, reported about 175 ms Adreno inference, and
+produced no browser console errors. Preset and exact length remain trusted
+out-of-band settings; the optical bytes remain header-free. A subsequent
+idempotent reinstall stopped only its own display-named target, rebuilt the
+same sketch, preserved reusable source hashes, and restarted successfully.
 
 ## Confirmed architecture
 
@@ -554,12 +582,14 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | UNO Q audio receiver | Complete and published | Commit `03b0bd7`; native unpack/codebook parity, earliest valid split 5, strict 39-layer Adreno suffix, 1/5-second parity, CLI/API/WebUI, offline bundle, installer, and offline smoke pass |
 | Android receiver UI and hardware path | Next milestone; deferred for now | Refine the existing prototype, then validate S25/UNO Q enumeration, power, text/image rendering, reconnects, throughput, and later WAV playback |
 | Windows-to-UNO Q transmitter flow | Complete and published | Commit `028f9d9`; dashboard image/audio Send actions, USB/ADB sink, atomic App Lab inbox, variable-length STM32 loop, tracked clone source, installer, and real 104/124/188-byte board acceptance pass |
+| UNO Q optical byte diagnostic | Complete and published | Commit `80ba103`; exact `00 FF AA 55` received twice with matching SHA-256 and valid stop bit |
+| UNO Q optical image receiver | Complete locally; publication pending | Two 80-byte physical image transfers passed exact-byte, stop-bit, 64-by-64 PNG, 16-layer Adreno, strict-no-fallback, App Lab UI, and zero-console-error gates |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
 | GitHub Actions unit CI | Complete | Corrected-history Windows Python 3.11 run `31034723025` passed; QNN gates stay local |
 | Second Snapdragon PC | Pending external device | Transfer the same `.lwv` plus generated artifacts and verify |
 | AI Hub/QAIRT Visualizer | Pending access/install | Compare only when account/SDK are available |
-| Arduino/optical adapter | Basic byte transport complete locally; publication pending | Separate receiver clone captured `00 FF AA 55` exactly with matching SHA-256 and valid stop bit; full media payload and decoder handoff remain deferred |
+| Arduino/optical adapter | Image path complete locally; publication pending | The separate diagnostic proves bytes; the production receiver reconstructs an exact 80-byte raw image payload on strict Adreno. Audio remains deferred |
 | GitHub push | Complete | Transmitter implementation commit `028f9d9` was pushed directly to `origin/main` without force-pushing |
 
 ## Risks and mitigations
@@ -594,6 +624,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | USB inbox is interrupted or stale | Publish payload/metadata atomically, publish the descriptor last, verify SHA-256/length/request ID, ignore partial files, and return per-request result files |
 | Transmitter has no physical completion callback | Report only exact buffering plus launch acceptance; enforce an estimated busy window and never claim optical completion from the dashboard |
 | Fixed analog threshold and open-loop timing may be environment-sensitive | Byte test passed at threshold 800 and 25 ms/bit in the current alignment; repeat longer/stress payloads and measure errors before claiming general reliability |
+| Raw optical receiver depends on trusted preset and length | App Lab UI/ADB requires both settings before arming, validates the selected budget, and fails on an invalid stop bit; future framing may carry control metadata without changing codec bytes |
 
 ## Open questions
 
@@ -620,9 +651,10 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
   while decoding existing raw `payload.bin` files byte-identically?
 - Would a future, explicitly approved UNO Q encoding phase justify the extra
   `g_a` model, native rANS encoder, storage, and accelerator-validation cost?
-- How will the optical receiver obtain the exact variable payload length while
-  preserving LightWeave's header-free raw codec bytes: trusted out-of-band
-  configuration or a separately approved physical transport frame?
+- Should a future physical transport frame carry preset/length/checksum, or
+  should the now-working trusted App Lab/ADB out-of-band configuration remain?
+- Can the same receiver boundary carry one- to five-second EnCodec payloads
+  reliably before invoking the existing CPU/Adreno audio decoder?
 - Is the existing 25 ms bit duration intentional for the optical hardware, and
   what faster rate passes sustained end-to-end tests?
 
@@ -672,6 +704,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | D-040 | 2026-08-06 | Clone the backup as `lightweave_transmitter`, retain per-byte RouterBridge loading and the existing waveform, and change only the active payload length on the STM32. | Owner explicitly prohibited backup edits and approved variable-length transmission without hardware/timing changes. |
 | D-041 | 2026-08-06 | Keep SHA-256 and request metadata in the local USB control plane and report launch acceptance rather than physical completion. | Raw optical mode stays header-free and the unchanged MCU interface exposes no completion callback. |
 | D-042 | 2026-08-06 | Add a separate variable-length optical byte diagnostic before connecting the accelerated media receiver. | Preserves all existing receiver apps, proves the transport independently, and keeps expected length as out-of-band control data. |
+| D-043 | 2026-08-06 | Keep the byte diagnostic separate and add `lightweave_optical_receiver` by composing the proven `image_receiver` sampling logic with the installed strict-Adreno decoder. | Preserves original apps, avoids repeating the long runtime build, and makes optical transport evidence distinct from reconstruction evidence. |
 
 ## Public references
 
@@ -726,3 +759,4 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-06 | Attempted read-only two-board discovery after the receiver was connected; only transmitter `123900964`/COM3 enumerated, so receiver inspection remains pending a second USB data connection. |
 | 2026-08-06 | Resolved two-board discovery and mapped transmitter `123900964`/COM3 versus receiver `371371094`/COM4; read-only inspection found `image_receiver` waveform-compatible but fixed at 2,048 monochrome bytes, while `laser_receiver_ui` uses an incompatible text protocol. |
 | 2026-08-06 | Added and installed the separate variable-length byte receiver plus automated verifier; the first physical two-board test received `00 FF AA 55` exactly with matching SHA-256 and a valid stop bit while preserving all original receiver apps. |
+| 2026-08-06 | Published the byte diagnostic as commit `80ba103`, then installed and exercised the separate production optical image receiver: two exact 80-byte transfers reconstructed to 64 by 64 through all 16 Adreno layers with strict fallback disabled, including a live App Lab UI run with PNG download and no browser errors. |

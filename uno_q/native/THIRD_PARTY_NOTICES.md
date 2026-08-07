@@ -21,13 +21,14 @@ checkpoint redistribution terms before distributing an offline bundle.
 
 ## App Lab transport companions
 
-The tracked `uno_q/transmitter_app` and `uno_q/byte_receiver_app` sources include
-`Arduino_RouterBridge.h`. RouterBridge 0.4.3, RPClite 0.3.0, MessagePack 0.4.2,
-and the Arduino Zephyr core 0.90.0 are supplied by the target UNO Q/App Lab
-installation; LightWeave does not vendor or redistribute those platform files.
-Review the licenses shipped with the installed Arduino platform before
-redistributing a complete board image or App Lab runtime.
+The tracked `uno_q/transmitter_app`, `uno_q/byte_receiver_app`, and
+`uno_q/optical_receiver_app` sources include `Arduino_RouterBridge.h`.
+RouterBridge 0.4.3, RPClite 0.3.0, MessagePack 0.4.2, and the Arduino Zephyr
+core 0.90.0 are supplied by the target UNO Q/App Lab installation; LightWeave
+does not vendor or redistribute those platform files. Review the licenses
+shipped with the installed Arduino platform before redistributing a complete
+board image or App Lab runtime.
 
-The byte-receiver installer clones the board's existing App Lab WebUI shell and
-retains its platform-supplied Socket.IO browser asset. That asset is not
-vendored here; the installed Arduino runtime carries its corresponding notice.
+The byte and optical receiver installers retain the board's platform-supplied
+Socket.IO browser asset. That asset is not vendored here; the installed Arduino
+runtime carries its corresponding notice.

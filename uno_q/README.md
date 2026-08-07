@@ -2,7 +2,7 @@
 
 This target reconstructs existing header-free LightWeave image and EnCodec
 audio payloads on the Arduino UNO Q. It is receiver-only: encoding, optical
-firmware, MCU integration, and mobile delivery remain deferred.
+audio reception, waveform redesign, and mobile delivery remain deferred.
 
 For images, entropy decoding and PNG packaging run on the ARM64 CPU. The
 complete CompressAI `g_s` graph runs through ncnn Vulkan on Turnip Adreno 702;
@@ -66,8 +66,51 @@ plus SHA-256 evidence.
 ```
 
 This diagnostic does not invoke CompressAI, EnCodec, ncnn, or the accelerated
-receiver. Length remains trusted out-of-band data. Media reconstruction will
-consume the verified bytes in a later milestone.
+receiver. Length remains trusted out-of-band data. It is kept as a focused
+transport troubleshooting tool.
+
+## Production optical image receiver
+
+[`optical_receiver_app`](optical_receiver_app) joins the diagnostic's proven
+variable-length optical sampling with the already installed native image
+decoder. The tracked app is installed as `lightweave_optical_receiver`; the
+diagnostic and original `image_receiver` projects are not modified.
+
+Install the base decoder once with `install_uno_q.ps1`, then deploy only the
+small optical integration layer:
+
+```powershell
+$env:LIGHTWEAVE_UNO_Q_RECEIVER_SERIAL = "371371094"
+.\scripts\install_uno_q_optical_receiver.ps1 -DeviceSerial 371371094 -DryRun
+.\scripts\install_uno_q_optical_receiver.ps1 -DeviceSerial 371371094 -StopRunningApp
+```
+
+The installer verifies the board's decoder source against this repository,
+clones its hash-verified models/runtime, preserves the original receiver source
+hashes, installs tracked App Lab/STM32 code, and supports `-NoStart`. It never
+rebuilds ncnn or regenerates models.
+
+In App Lab, select the same image preset used by the transmitter, enter the
+exact payload byte count, and arm the receiver before sending. The page
+automatically displays/downloads the reconstructed PNG and reports payload
+SHA-256, stop-bit state, entropy time, Adreno time, device, model hash, compute
+layers, and no-fallback evidence.
+
+Automated two-board acceptance:
+
+```powershell
+.\.venv-x64\Scripts\python.exe scripts\verify_uno_q_optical_image.py `
+  artifacts\generated\uno_q\tiny.payload.bin `
+  --preset I64-Q1-B128 `
+  --output artifacts\generated\uno_q\optical-reconstruction.png `
+  --transmitter-serial 123900964 `
+  --receiver-serial 371371094
+```
+
+The exercised 80-byte fixture arrived with an exact SHA-256 and valid stop bit,
+then reconstructed to 64 by 64 through all 16 image compute layers on Turnip
+Adreno 702 with strict CPU fallback disabled. Optical audio reception remains a
+later extension of the same boundary.
 
 ## Runtime architecture
 

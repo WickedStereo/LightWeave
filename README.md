@@ -175,6 +175,40 @@ and `stop_bit_valid: true`. The expected byte count travels only through the
 local ADB control plane; the optical payload remains unchanged and header-free.
 The original receiver projects are not edited.
 
+### Reconstruct an optically received image
+
+The production [`uno_q/optical_receiver_app`](uno_q/optical_receiver_app)
+combines the proven A0/25-ms receiver with the installed native LightWeave
+decoder. It receives the exact raw image bytes, then runs the complete image
+synthesis graph on UNO Q's Adreno 702 with CPU fallback disabled.
+
+Install the accelerated base once, then deploy the lightweight optical app:
+
+```powershell
+$env:LIGHTWEAVE_UNO_Q_RECEIVER_SERIAL = "371371094"
+.\scripts\install_uno_q_optical_receiver.ps1 -DeviceSerial 371371094 -DryRun
+.\scripts\install_uno_q_optical_receiver.ps1 -DeviceSerial 371371094 -StopRunningApp
+```
+
+Open **LightWeave Optical Receiver** in App Lab, select the same image preset,
+enter the exact `payload.bin` byte count, and arm it before pressing **Send to
+Arduino** in the Windows transmitter dashboard. For an automated physical
+acceptance run using a prepared raw payload:
+
+```powershell
+.\.venv-x64\Scripts\python.exe scripts\verify_uno_q_optical_image.py `
+  artifacts\generated\uno_q\tiny.payload.bin `
+  --preset I64-Q1-B128 `
+  --output artifacts\generated\uno_q\optical-reconstruction.png `
+  --transmitter-serial 123900964 `
+  --receiver-serial 371371094
+```
+
+Success requires matching optical SHA-256, a valid stop bit, exact output
+dimensions, an Adreno device, and `strict_no_fallback: true`. The diagnostic,
+original `image_receiver`, and installed base decoder remain separate and
+unchanged.
+
 ## Android text/image receiver
 
 The [`android/`](android/) Android Studio project prepares the phone side of a
@@ -225,11 +259,10 @@ API details.
 
 ## Scope and records
 
-Photodiodes, optical reception, faster modulation, physical USB-to-phone
-validation, Galaxy audio playback, and Cloud AI remain outside the verified
-milestone. The tracked UNO Q transmitter adapter carries raw codec bytes
-without changing their existing format; its receiver and performance work are
-later phases.
+Analog/optical redesign, faster modulation, optical audio reception, physical
+USB-to-phone validation, Galaxy audio playback, and Cloud AI remain outside the
+verified milestone. The tracked UNO Q pair now carries and reconstructs raw
+image codec bytes without changing their existing format.
 
 - [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) is the living source of truth.
 - [docs/QUALCOMM_DEVELOPER_EXPERIENCE.md](docs/QUALCOMM_DEVELOPER_EXPERIENCE.md)

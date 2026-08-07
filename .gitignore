@@ -108,6 +108,7 @@ uno_q/app/runtime/
 uno_q/app/uno_q.manifest.json
 /uno_q/transmitter_app/data/
 /uno_q/byte_receiver_app/data/
+/uno_q/optical_receiver_app/data/
 *.onnx.data
 *.ort
 *.dlc
