@@ -1,0 +1,5 @@
+name: LightWeave Parallel Transmitter
+description: Send three-lane LWF1 text, image, and audio frames.
+ports: []
+bricks: []
+icon: "🔱"

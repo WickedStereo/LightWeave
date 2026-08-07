@@ -6,8 +6,8 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | Standalone S25 + UNO Q optical text receive passes; publication and optional direct image/audio proof remain |
-| Primary milestone | Publish the boot-safe Router transport and direct S25 optical acceptance evidence |
+| Phase | Three-lane UNO Q optical sketch pair passes exact text transfer; publication remains |
+| Primary milestone | Publish the separate three-lane sketch apps without changing the proven single-lane pair |
 | Secondary milestone | Submission hardening and presentation evidence |
 | Last updated | 2026-08-07 |
 | Approval gate | Application implementation explicitly approved on 2026-08-05 |
@@ -78,6 +78,12 @@ The implemented milestone assumes a reliable ordered byte pipe and includes:
   reconstructs through the installed strict image-Adreno or truthful
   CPU/Adreno audio path. The former `lightweave_optical_receiver` is retained
   stopped as rollback.
+- Separate experimental `lightweave_parallel_transmitter` and
+  `lightweave_parallel_receiver` App Lab clones that reuse the standard Python,
+  UI, phone, codec, and reconstruction services unchanged. Their STM32 sketches
+  byte-stripe the complete existing `LWF1` frame over D5/D7/D9 and reassemble it
+  from A0/A2/A5. The original single-lane applications remain installed and
+  unchanged.
 - Persistent system-aware light/dark controls across the Windows dashboard and
   production UNO Q receiver WebUI.
 - Per-operation presentation evidence: Windows process CPU time/RSS and QNN
@@ -432,6 +438,24 @@ preserved failed-frame evidence and prevented reconstruction. Explicit
 
 ## Confirmed architecture
 
+### Three-lane optical sketch variant
+
+The optional parallel pair preserves every byte of the existing `LWF1` frame.
+After the transmitter buffers the complete raw payload, its STM32 constructs
+the same ten-byte header and two-byte CRC, then emits three consecutive frame
+bytes per parallel byte slot: byte indices `0,3,6,...` on D5, `1,4,7,...` on
+D7, and `2,5,8,...` on D9. All lanes share the existing high start bit, eight
+MSB-first data bits per slot, 25-ms bit duration, and low stop bit. Unused lanes
+in the final slot remain low and are not part of the reassembled frame.
+
+The receiver samples A0/A2/A5 at the existing calibrated 24,991-us interval,
+interleaves each three-byte slot back into original frame order, learns the
+exact dynamic payload length from byte 9 of the common header, and ignores only
+final-slot padding after the declared frame length. It then applies the same
+profile, media-parameter, ASCII/audio, CRC-16, and stop-bit checks exposed by
+the standard RouterBridge interface. The Linux services therefore require no
+parallel-specific codec, UI, reconstruction, or phone code.
+
 ### `.lwv` envelope
 
 The common little-endian header contains magic `LWV1`, format version, media
@@ -727,6 +751,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | UNO Q optical image receiver | Complete and published | Commit `506eee9`; two 80-byte physical image transfers passed exact-byte, stop-bit, 64-by-64 PNG, 16-layer Adreno, strict-no-fallback, App Lab UI, and zero-console-error gates |
 | Self-describing optical image/audio framing | Complete and published | Commit `c8600c7`; `LWF1` carries profile, length, audio sample count, and CRC; all image routes plus one-second audio passed physical reconstruction |
 | Integrated text transport | Complete and published | Commit `62c540d`; exact 16-byte optical transfer passed profile `0x20`, CRC/stop-bit, TXT persistence, no-AI evidence, paired App Lab names, local browser UI, and protected legacy-source hashes |
+| Three-lane optical sketch pair | Physical STM32 gate passed; publication pending | Separate clones compile on Zephyr 0.90.0; isolated D5/A0, D7/A2, and D9/A5 masks pass at threshold 800; exact `3-LANE` LWF1 text arrived in 1.25 seconds with matching CRC and valid stop bit |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
 | GitHub Actions unit CI | Complete | Windows run `31147024146` passed on text-integration head `62c540d`; accelerator/hardware gates stay local |
@@ -774,6 +799,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Five-second optical audio is slow | Codec/board decode is validated to five seconds, but the owner elected not to spend 190.45 seconds on the optical stress transfer; one-second optical audio is the physical acceptance evidence |
 | Legacy and production text waveforms differ | The stopped `laser_*` apps remain unchanged and their 100-ms character framing is documented. Production uses `T1-ASCII-B100` in the common 25-ms LWF1 frame; do not present the two as wire-compatible. |
 | Mobile access to the App Lab WebUI is intermittent | Direct board IPv4 port 7000 currently returns HTTP 200 and Wi-Fi signal is strong, while `.local` discovery did not resolve from Windows. Use the current DHCP IPv4 address on the same trusted subnet; avoid `localhost`, HTTPS, VPN/cellular fallback, and client-isolated Wi-Fi. Reserve the address or use a dedicated demo router/hotspot for stability. |
+| Three optical lanes are not physically isolated | Per-lane ADC diagnostics initially showed A0 receiving D7/D9 and a weak D5 path. Realignment produced exact masks 1/2/4, all-on mask 7, and a 60-second D5/A0 run with 60/60 samples above 800. Preserve beam isolation; any unintended sensor crossing threshold corrupts parallel symbols and is caught by `LWF1` CRC. |
 
 ## Open questions
 
@@ -804,6 +830,8 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
   receiver calibration while preserving the simple 25-ms waveform?
 - Is the existing 25 ms bit duration intentional for the optical hardware, and
   what faster rate passes sustained end-to-end tests?
+- Do the physically aligned three lanes preserve exact CRC-checked image/audio
+  frames over sustained transfers, beyond the passing short text fixture?
 
 ## Decision log
 
@@ -865,6 +893,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | D-054 | 2026-08-06 | Preserve all reconstruction on UNO Q and add only a durable bidirectional USB presentation/control channel. | `LWCT/1` and `LWRX/2` sit after the unchanged optical/decode path; the phone runs no AI, the transmitter is untouched, and decoded results survive temporary phone disconnects. |
 | D-055 | 2026-08-07 | Use the existing fresh `android/` Android Studio project as the canonical mobile project and install that build on the S25 Ultra. | The earlier prototype was already replaced; creating a second project would duplicate the supported app and break the repository's single-source installation model. |
 | D-056 | 2026-08-07 | Route phone CDC bytes through UNO Q's boot-managed Arduino Router monitor instead of opening `/dev/ttyGS0` in the App Lab container. | Official `mon/read`/`mon/write` reuse the enabled system serial bridge, eliminate the unsupported Compose override and cgroup failure, preserve default-app startup, and pass direct S25 Status/Listen/Cancel plus decoded optical text delivery. |
+| D-057 | 2026-08-07 | Add a separate three-lane sketch pair that byte-stripes the unchanged complete `LWF1` frame over D5/D7/D9 and reassembles it from A0/A2/A5. | The owner required the working single-lane apps and all codec/UI/reconstruction logic to remain unchanged. Round-robin frame bytes balance lane work, preserve the existing header/CRC contract, and reduce elapsed bit periods to approximately one third; only clone/install metadata, sketch tests, and documentation accompany the two new sketches. |
 
 ## Public references
 
@@ -940,3 +969,4 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-07 | Verified from the live UNO Q that LightWeave Receiver is running and stored as the App Lab default startup application; confirmed the enabled App CLI boot service and documented that the final receiver needs power plus the phone cable, not a PC. |
 | 2026-08-07 | Exercised the direct S25 host path: Android enumerated the real receiver and LightWeave opened CDC and sent controls, but no response arrived because App Lab default boot omitted the Compose device allow-list; reproduced `/dev/ttyGS0` `EPERM` in the live container and marked standalone boot blocked pending a persistent mapping. |
 | 2026-08-07 | Replaced direct gadget-node access with the boot-managed Arduino Router monitor, removed the unsupported Compose override, deployed the default-started receiver, passed 15 focused tests, direct S25 Status/Listen/Cancel, and a complete 9-byte optical text transfer rendered with matching CRC/hash/stop-bit evidence. |
+| 2026-08-07 | Added and exercised separate three-lane App Lab sketch clones: D5/D7/D9 and A0/A2/A5 passed isolated threshold-800 sensor masks, D5/A0 remained above threshold for 60 seconds, and the receiver reassembled exact text `3-LANE` with matching CRC and a valid stop bit in 1.25 seconds while the original single-lane app hashes remained unchanged. |

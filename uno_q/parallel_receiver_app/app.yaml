@@ -1,0 +1,6 @@
+name: LightWeave Parallel Receiver
+description: Receive three-lane LWF1 text, image, and audio frames.
+ports: []
+bricks:
+- arduino:web_ui: {}
+icon: "🔱"

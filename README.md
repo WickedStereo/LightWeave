@@ -262,6 +262,52 @@ sample count, an Adreno device, and strict no-fallback evidence for the image
 graph or audio suffix. The diagnostic, original `image_receiver`, and installed
 base decoder remain separate and unchanged.
 
+### Optional three-lane optical sketches
+
+For the three-laser workshop setup, the repository also tracks separate
+**LightWeave Parallel Transmitter** and **LightWeave Parallel Receiver** App Lab
+clones. The standard apps remain installed and their source hashes are checked
+before and after every parallel-app installation. The clones reuse the existing
+Python services, codecs, receiver WebUI, phone transport, and accelerated media
+reconstruction unchanged; only their STM32 sketches implement the parallel
+wire behavior.
+
+- Transmitter lanes: D5, D7, and D9.
+- Receiver lanes: A0, A2, and A5, each with threshold 800.
+- Complete `LWF1` frame bytes are striped round-robin across the three lanes.
+- All lanes retain the common high start bit, 25-ms MSB-first data timing, and
+  common low stop bit.
+- The receiver restores the original frame before applying the existing
+  profile, length, CRC-16, text/audio, and stop-bit checks.
+
+Install the standard pair first, align each laser to only its matching sensor,
+then install the separate clones:
+
+```powershell
+.\scripts\install_uno_q_parallel_transmitter.ps1 `
+  -DeviceSerial 123900964 -DryRun
+.\scripts\install_uno_q_parallel_receiver.ps1 `
+  -DeviceSerial 371371094 -DryRun
+
+.\scripts\install_uno_q_parallel_transmitter.ps1 `
+  -DeviceSerial 123900964 -StopRunningApp
+.\scripts\install_uno_q_parallel_receiver.ps1 `
+  -DeviceSerial 371371094 -StopRunningApp
+
+.\.venv-x64\Scripts\python.exe scripts\verify_uno_q_parallel_text.py `
+  --text "3-LANE" `
+  --transmitter-serial 123900964 `
+  --receiver-serial 371371094
+```
+
+App Lab runs only one application per board, so starting a parallel clone stops
+the active standard app but does not delete or overwrite it. The physical gate
+received exact `3-LANE` bytes in six parallel byte slots: 1.25 seconds versus
+3.65 seconds for the same 18-byte frame on one lane. D5/A0 also passed a
+60-second alignment hold with all 60 readings above threshold. Isolate the
+three optical paths before media tests; a lane seeing another laser can corrupt
+symbols even though CRC prevents reconstruction of a bad frame.
+
 ## Standalone Galaxy receiver/display
 
 The fresh [`android/`](android/) Android Studio project replaces the earlier

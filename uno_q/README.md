@@ -141,6 +141,33 @@ samples at 24,991 microseconds after CRC evidence isolated cumulative phase
 drift on the workshop board pair. This is calibration, not general clock
 recovery; future transport work should replace it with transition-based timing.
 
+## Optional three-lane sketch pair
+
+[`parallel_transmitter_app`](parallel_transmitter_app) and
+[`parallel_receiver_app`](parallel_receiver_app) are separate clones of the
+standard applications. Their Python, WebUI, phone, codec, and reconstruction
+components are reused unchanged; only the STM32 sketches differ. The complete
+existing `LWF1` frame is striped over D5/D7/D9 and reassembled from A0/A2/A5.
+
+```powershell
+.\scripts\install_uno_q_parallel_transmitter.ps1 -DeviceSerial 123900964 -DryRun
+.\scripts\install_uno_q_parallel_receiver.ps1 -DeviceSerial 371371094 -DryRun
+.\scripts\install_uno_q_parallel_transmitter.ps1 -DeviceSerial 123900964 -StopRunningApp
+.\scripts\install_uno_q_parallel_receiver.ps1 -DeviceSerial 371371094 -StopRunningApp
+
+.\.venv-x64\Scripts\python.exe scripts\verify_uno_q_parallel_text.py `
+  --text "3-LANE" `
+  --transmitter-serial 123900964 `
+  --receiver-serial 371371094
+```
+
+Before sending, verify that D5 alone crosses only A0 threshold 800, D7 alone
+crosses only A2, and D9 alone crosses only A5. The exercised board pair passed
+high masks 1, 2, 4, and 7, a 60-second D5/A0 hold, and exact six-byte LWF1 text
+reassembly with matching CRC and valid stop bit. App Lab permits one active app
+per board; the installers preserve the standard app sources and stop another
+app only when `-StopRunningApp` is explicitly supplied.
+
 ## Runtime architecture
 
 `lightweave-uno` is a native host CLI and does not need Docker at runtime. Its
