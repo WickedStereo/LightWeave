@@ -607,6 +607,20 @@ private endpoints, and confidential material must never appear here.
 | Workaround | Map a small allow-list of known tracked app identities, verify its manifest plus running display name through App CLI, retain serial override for multiple boards, and expose the selected variant in status evidence. |
 | Suggested improvement | App CLI should expose a stable machine-readable application capability/role identifier independent of display name and path, allowing host tools to discover “LightWeave transmitter” implementations without duplicating identity rules. |
 
+### DX-041 - Parallel optical timing needs topology-aware presentation
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-07; prevent the Windows dashboard from presenting a single-laser duration as the three-laser transmitter's duration |
+| Environment | Snapdragon X Elite Windows 11 dashboard; default **LightWeave Parallel Transmitter** on UNO Q; D5/D7/D9 round-robin LWF1 byte striping at 25 ms per bit |
+| Tool/source | Existing browser UI, LWF1 12-byte frame contract, and the physically accepted three-lane slot assignment |
+| Intended workflow | Preserve useful timing guidance while making the active physical topology explicit |
+| Actual result and evidence | Generated text/image/audio metrics, confirmation text, and launch evidence now display both estimates. One channel uses every framed byte; three channels use `ceil(frame bytes / 3)` simultaneous byte slots. Both include eight bit periods per slot plus the shared start and stop bit. A live two-byte text payload rendered 2.85 seconds for one channel and 1.05 seconds for three channels, and the same values appeared in the guarded send confirmation while the parallel adapter remained ready. The generic busy badge no longer displays the cloned worker's conservative single-channel countdown. Backend timing evidence remains unchanged for compatibility. |
+| Usefulness | Makes the parallel speedup understandable without overstating measured throughput and keeps the original one-channel value available for comparison or rollback. |
+| Friction and owner | The App Lab worker inherited its original one-channel busy model because the owner intentionally limited the parallel milestone to sketch changes. UI consumers therefore cannot treat that field as topology-aware completion evidence. |
+| Workaround | Derive both labeled estimates from the immutable frame size and known sketch topology, while continuing to call send success “launch accepted” rather than physical completion. |
+| Suggested improvement | Host/device protocols should report a stable physical-link topology and a completion event so dashboards can show measured completion instead of reconstructing estimates from implementation details. |
+
 ## Change log
 
 | Date | Change |
@@ -660,3 +674,4 @@ private endpoints, and confidential material must never appear here.
 | 2026-08-07 | Made the parallel receiver the reversible boot default, moved it to the direct S25 host path, and confirmed owner-observed `PHONE 3-LANE` display through the unchanged Android/Router service after a 1.65-second optical send. |
 | 2026-08-07 | Added and live-tested the existing Windows executable's constrained standard/parallel App Lab selector; the real dashboard status API identified the running parallel transmitter as ready without changing its Python worker or media pipeline. |
 | 2026-08-07 | Changed the dashboard's default App Lab transmitter identity to the three-lane parallel clone, restarted its existing default App Lab service, and verified ready/running status without an environment selector while preserving the original through explicit `standard`. |
+| 2026-08-07 | Replaced the ambiguous single optical duration in the dashboard with explicitly labeled one-channel and three-channel estimates derived from LWF1 frame bytes and parallel byte slots. |

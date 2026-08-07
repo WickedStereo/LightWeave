@@ -63,7 +63,7 @@ def test_dashboard_serves_only_local_assets() -> None:
         page = client.get("/transmit")
         assert page.status_code == 200
         assert 'href="/static/styles.css"' in page.text
-        assert 'src="/static/transmit.js"' in page.text
+        assert 'src="/static/transmit.js?v=three-channel-timing"' in page.text
         assert 'src="/static/theme.js"' in page.text
         assert "data-theme-toggle" in page.text
         assert "hardware usage" in page.text
@@ -75,6 +75,11 @@ def test_dashboard_serves_only_local_assets() -> None:
         transmitter_script = client.get("/static/transmit.js")
         assert transmitter_script.status_code == 200
         assert "confirm send" in transmitter_script.text
+        assert "Optical / 1 channel" in transmitter_script.text
+        assert "Optical / 3 channels" in transmitter_script.text
+        assert "1-channel optical time" in transmitter_script.text
+        assert "3-channel optical time" in transmitter_script.text
+        assert "busy for about" not in transmitter_script.text
         assert "window.confirm" not in transmitter_script.text
         receive = client.get("/receive")
         assert receive.status_code == 200

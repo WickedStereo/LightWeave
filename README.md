@@ -114,7 +114,8 @@ generates no-AI text, image, and audio payloads and downloads the exact raw
 their out-of-band settings codes, and `/loopback` preserves
 the `.lwv` development workbench. The monochrome text-first UI defaults to the
 balanced 128 x 128 profile, includes tiny and quality alternatives plus three
-local test patterns, and shows transfer estimates, quality/latency metrics,
+local test patterns, and shows separately labeled one-channel and three-channel
+optical time estimates, quality/latency metrics,
 playable media, QNN device selection, and strict provider evidence.
 Every Windows and production UNO Q page includes a persistent light/dark mode
 control that also respects the browser's initial system preference.

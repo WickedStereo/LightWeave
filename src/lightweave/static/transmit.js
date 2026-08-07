@@ -5,6 +5,14 @@ const state = {
   arduino: { ready: false, busy: false, confirming: null, confirmUntil: 0 },
 };
 const formatSeconds = (value) => `${Number(value).toFixed(3)} s`;
+const OPTICAL_FRAME_OVERHEAD_BYTES = 12;
+const OPTICAL_BIT_DURATION_SECONDS = 0.025;
+
+function opticalTransferSeconds(payloadBytes, channels) {
+  const framedBytes = Number(payloadBytes) + OPTICAL_FRAME_OVERHEAD_BYTES;
+  const channelSlots = Math.ceil(framedBytes / channels);
+  return (channelSlots * 8 + 2) * OPTICAL_BIT_DURATION_SECONDS;
+}
 
 function renderMetrics(target, entries) {
   target.replaceChildren(...entries.map(([label, value]) => {
@@ -112,8 +120,8 @@ document.querySelector("#text-transmit-form").addEventListener("submit", async (
       ["Raw payload", `${body.raw_bytes} / ${body.maximum_bytes} bytes`],
       ["Characters", String(body.characters)],
       ["Encoding", "printable ASCII / no AI"],
-      ["Transfer / 1 kbps", formatSeconds(body.at_1_kbps_seconds)],
-      ["Transfer / 2 kbps", formatSeconds(body.at_2_kbps_seconds)],
+      ["Optical / 1 channel", formatSeconds(opticalTransferSeconds(body.raw_bytes, 1))],
+      ["Optical / 3 channels", formatSeconds(opticalTransferSeconds(body.raw_bytes, 3))],
     ]);
     renderHardware("text", body.hardware_usage);
     result.hidden = false;
@@ -133,9 +141,8 @@ async function loadArduinoStatus() {
     const status = await responseBody(await fetch("/api/adapters/uno-q/status"));
     state.arduino.ready = Boolean(status.ready);
     state.arduino.busy = Boolean(status.busy);
-    const remaining = Number(status.busy_remaining_seconds || 0);
     let message = `${status.app_status} / ${status.transport}`;
-    if (status.busy) message += ` / busy for about ${remaining.toFixed(1)} s`;
+    if (status.busy) message += " / busy";
     if (status.error) message = status.error;
     box.querySelector("span").textContent = message;
     box.classList.toggle("ready", status.ready && !status.busy);
@@ -153,13 +160,14 @@ async function sendToArduino(mediaType) {
   const button = document.querySelector(`#${mediaType}-arduino`);
   const result = document.querySelector(`#${mediaType}-arduino-result`);
   const error = document.querySelector(`#${mediaType}-error`);
-  const seconds = ((current.payload.length + 12) * 8 + 2) * 0.025;
+  const singleChannelSeconds = opticalTransferSeconds(current.payload.length, 1);
+  const threeChannelSeconds = opticalTransferSeconds(current.payload.length, 3);
   const now = Date.now();
   if (state.arduino.confirming !== mediaType || now > state.arduino.confirmUntil) {
     clearArduinoConfirmation();
     state.arduino.confirming = mediaType;
     state.arduino.confirmUntil = now + 10000;
-    button.textContent = `confirm send / ${current.payload.length} B / ${seconds.toFixed(2)} s`;
+    button.textContent = `confirm send / ${current.payload.length} B / 1-channel ${singleChannelSeconds.toFixed(2)} s / 3-channel ${threeChannelSeconds.toFixed(2)} s`;
     window.setTimeout(() => {
       if (state.arduino.confirming === mediaType && Date.now() > state.arduino.confirmUntil) {
         clearArduinoConfirmation();
@@ -187,7 +195,8 @@ async function sendToArduino(mediaType) {
       `${body.buffered_bytes} raw payload bytes buffered unchanged`,
       `${body.wire_mode} / ${body.total_optical_bytes} framed bytes / ${body.optical_bits} optical bits`,
       `header ${body.header_hex} / CRC ${body.wire_crc_hex}`,
-      `${Number(body.estimated_transmission_seconds).toFixed(2)} s estimated at 25 ms/bit`,
+      `1-channel optical time ${singleChannelSeconds.toFixed(2)} s`,
+      `3-channel optical time ${threeChannelSeconds.toFixed(2)} s`,
       `request ${body.request_id}`,
       "launch accepted; physical completion is not claimed",
       "",
@@ -245,8 +254,8 @@ document.querySelector("#image-transmit-form").addEventListener("submit", async 
       ["Effective detail", body.effective_detail ? `${body.effective_detail} x ${body.effective_detail}` : body.fallback],
       ["Fallback", body.fallback],
       ["Bits / output pixel", Number(body.bits_per_pixel).toFixed(3)],
-      ["Transfer / 1 kbps", formatSeconds(body.at_1_kbps_seconds)],
-      ["Transfer / 2 kbps", formatSeconds(body.at_2_kbps_seconds)],
+      ["Optical / 1 channel", formatSeconds(opticalTransferSeconds(body.raw_bytes, 1))],
+      ["Optical / 3 channels", formatSeconds(opticalTransferSeconds(body.raw_bytes, 3))],
       ["Encode", formatSeconds(body.encode_seconds)],
     ]);
     renderHardware("image", body.hardware_usage);
@@ -320,8 +329,8 @@ document.querySelector("#audio-transmit-form").addEventListener("submit", async 
       ["Chunks", `${body.chunk_count} x 188 bytes`],
       ["Duration", `${Number(body.duration_seconds).toFixed(3)} s`],
       ["Payload rate", `${Number(body.code_payload_bps).toFixed(0)} bps`],
-      ["Transfer / 1 kbps", formatSeconds(body.at_1_kbps_seconds)],
-      ["Transfer / 2 kbps", formatSeconds(body.at_2_kbps_seconds)],
+      ["Optical / 1 channel", formatSeconds(opticalTransferSeconds(body.raw_bytes, 1))],
+      ["Optical / 3 channels", formatSeconds(opticalTransferSeconds(body.raw_bytes, 3))],
       ["Encode", formatSeconds(body.encode_seconds)],
     ]);
     renderHardware("audio", body.hardware_usage);
@@ -374,13 +383,15 @@ document.querySelector("#audio-verify").addEventListener("click", async (event) 
 bindPreview("#image-input", "#image-preview");
 bindPreview("#audio-input", "#audio-preview");
 
-const presetNotes = {
-  "I64-Q1-B128": "Worst case: 1.024 s at 1 kbps or 0.512 s at 2 kbps.",
-  "I128-Q1-B768": "Worst case: 6.144 s at 1 kbps or 3.072 s at 2 kbps.",
-  "I256-Q1-B2048": "Worst case: 16.384 s at 1 kbps or 8.192 s at 2 kbps.",
+const presetBudgets = {
+  "I64-Q1-B128": 128,
+  "I128-Q1-B768": 768,
+  "I256-Q1-B2048": 2048,
 };
 document.querySelector("#image-preset").addEventListener("change", (event) => {
-  document.querySelector("#image-preset-note").textContent = presetNotes[event.target.value];
+  const budget = presetBudgets[event.target.value];
+  document.querySelector("#image-preset-note").textContent =
+    `Maximum framed optical time: ${opticalTransferSeconds(budget, 1).toFixed(2)} s / 1 channel; ${opticalTransferSeconds(budget, 3).toFixed(2)} s / 3 channels.`;
 });
 
 for (const button of document.querySelectorAll("[data-sample]")) {
