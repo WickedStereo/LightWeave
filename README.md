@@ -282,9 +282,12 @@ Q retains all optical validation and reconstruction work. The app:
 The receiver service now exposes `/dev/ttyGS0` through a narrow App Lab Compose
 override, retains completed outputs in a durable phone outbox, and has passed
 duplex control/status plus a real reconstructed-PNG delivery test through the
-UNO Q USB gadget. Direct Galaxy enumeration and sustained phone power remain
-the final physical gate. See [android/README.md](android/README.md) for setup,
-standalone usage, powered-hub guidance, and both USB protocols.
+UNO Q USB gadget. The same debug build is installed and visually verified on a
+real Galaxy S25 Ultra (`SM-S938U1`, Android 15), including its disconnected
+state and light/dark UI. Direct Galaxy-to-UNO-Q enumeration, CDC exchange, and
+sustained phone power remain the final physical gate. See
+[android/README.md](android/README.md) for setup, standalone usage, powered-hub
+guidance, and both USB protocols.
 
 ## UNO Q accelerated media receiver
 

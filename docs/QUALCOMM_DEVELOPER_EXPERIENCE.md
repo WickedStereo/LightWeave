@@ -37,11 +37,11 @@ private endpoints, and confidential material must never appear here.
 | [AnythingLLM NPU chatbot](https://github.com/thatrandomfrenchdude/simple-npu-chatbot) | Later reference | Local NPU demo structure | Not a runtime dependency |
 | Scaler Chatbot | Unavailable reference | Potential local chatbot sample | No unambiguous public link supplied |
 | [Awesome Qualcomm Developer](https://qualcomm.github.io/awesome-qualcomm-developer/) | Discovery reference | Comparable projects and samples | Available |
-| [Arduino UNO Q documentation](https://docs.arduino.cc/hardware/uno-q) | Active hardware documentation | QRB2210 receiver, Debian/App Lab deployment, and direct USB phone interface | Board receiver exercised; phone path pending |
+| [Arduino UNO Q documentation](https://docs.arduino.cc/hardware/uno-q) | Active hardware documentation | QRB2210 receiver, Debian/App Lab deployment, and direct USB phone interface | Board receiver and S25 app exercised separately; direct cable pending |
 | [ncnn](https://github.com/Tencent/ncnn) Vulkan runtime | Active third-party tooling | Complete image synthesis and EnCodec suffix execution on UNO Q Adreno 702 | All image graphs and the selected 39-layer audio suffix exercised with strict no-fallback |
 | [Meta EnCodec](https://github.com/facebookresearch/encodec) | Model/preparation dependency | 24 kHz raw audio codebooks and decoder conversion | Native UNO Q conversion validated; upstream Python runtime is not installed on board |
-| [Android USB host documentation](https://developer.android.com/develop/connectivity/usb/host) | Platform documentation | Galaxy S25 USB enumeration, permission, and endpoint workflow | Used for Android receiver design; phone path not exercised |
-| [usb-serial-for-android](https://github.com/mik3y/usb-serial-for-android) 3.10.0 | Third-party Android library | CDC/ACM transport for decoded UNO Q results | Integrated and built; real UNO Q/S25 match not exercised |
+| [Android USB host documentation](https://developer.android.com/develop/connectivity/usb/host) | Platform documentation | Galaxy S25 USB enumeration, permission, and endpoint workflow | App installed and rendered on S25 with USB-host feature; direct board path pending |
+| [usb-serial-for-android](https://github.com/mik3y/usb-serial-for-android) 3.10.0 | Third-party Android library | CDC/ACM transport for decoded UNO Q results | Integrated, built, and installed on S25; real UNO Q/S25 match not exercised |
 | Provided `qualcomm/edge-ai-labs-arduino` RPC path | Later hardware reference | Future UNO Q byte adapter | Stale/404 |
 | [Arduino MessagePack RPC router](https://github.com/arduino/arduino-router) | Later hardware reference | Maintained UNO Q RPC alternative | Available; hardware phase deferred |
 
@@ -509,6 +509,20 @@ private endpoints, and confidential material must never appear here.
 | Workaround | Keep the decoder and base OS unchanged; track a minimal Compose override containing only `/dev/ttyGS0`; have the hash-checking installer apply it after App Lab restart and fail unless the service can read/write the node; use a blocking reader thread for host sessions; persist decoded results until delivery; use a compliant OTG/PD powered hub if the S25 cannot sustain board power |
 | Suggested improvement | App Lab should support a reviewed `devices` declaration in `app.yaml`, show effective cgroup/device permissions in Doctor output, preserve that declaration across lifecycle commands, and publish an official UNO Q-to-Android bidirectional CDC sample with power-role guidance and offline binary framing. Qualcomm/Arduino samples would also benefit from carrying per-stage heterogeneous-compute evidence through the mobile presentation layer. |
 
+### DX-034 - The standalone receiver installs cleanly on the real Galaxy S25 Ultra
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-07; build the canonical Android Studio project, install it on the project S25 Ultra, and verify real-device startup/UI behavior before moving the phone cable to UNO Q |
+| Environment | Snapdragon Windows 11 ARM64 build host; Android Studio with JDK 17; SDK/target 36; AGP 9.0.0; Gradle 9.1.0; Samsung Galaxy S25 Ultra `SM-S938U1`, Android 15/API 35, ARM64 |
+| Tool/source | Repository `android/` project, Android Studio/Gradle, ADB, Android USB-host framework, and `usb-serial-for-android` 3.10.0 |
+| Intended workflow | Rebuild and test the single-source Android project, install its APK, cold-start it on the real phone, and confirm that the offline receiver surface is ready for a matching UNO Q USB device |
+| Actual result and evidence | `clean lintDebug testDebugUnitTest assembleDebug` passed with seven unit tests, zero lint errors, and nine non-blocking style/typography warnings. Debug APK version 1.0.0/code 2 installed successfully. The first cold launch completed in 228 ms. The app was the top resumed activity, rendered the complete monochrome receiver screen in both light and dark modes, showed the correct unattached-board state and disabled transport controls, exposed no Internet permission in its manifest, and produced no crash-buffer entry. Android reported `android.hardware.usb.host`. Direct UNO Q enumeration, permission, power, CDC data, media playback, and reconnect are not claimed yet. |
+| Usefulness | Removes Android build, packaging, install, launch, layout, theme, and basic device-compatibility uncertainty before the cable is moved; the remaining risk is isolated to the physical UNO Q-to-phone connection and downstream protocol exercise |
+| Friction and owner | Wired ADB occupies the phone's only USB-C port, while this phone had no active Wi-Fi address for wireless ADB. Automated observation therefore cannot continue when the cable is moved unless wireless debugging is prepared or a powered OTG/PD topology exposes a separate debug path. This is a mobile hardware/debug topology constraint rather than a Qualcomm compute limitation. |
+| Workaround | Use Android Studio/ADB for one-time installation and UI checks, then test UNO Q directly with on-screen evidence; when available, enable trusted-network wireless debugging before moving the cable. Use a standards-compliant powered OTG/PD hub if UNO Q power is unstable. |
+| Suggested improvement | Publish a maintained UNO Q-to-Android sample and test checklist covering USB roles, permission filters, CDC endpoint selection, phone power budgets, powered-hub topology, wireless-debug handoff, reconnect, and offline binary result delivery. |
+
 ## Change log
 
 | Date | Change |
@@ -553,3 +567,4 @@ private endpoints, and confidential material must never appear here.
 | 2026-08-06 | Recorded publication of the presentation-telemetry milestone as commit `98481a8` after live Windows/UNO Q UI checks, physical text evidence, and 124 passing portable tests. |
 | 2026-08-06 | Replaced the old Android prototype with the no-laptop LightWeave Mobile text/image/audio receiver, exposed the UNO Q gadget endpoint narrowly through App Lab, passed 137 Python tests plus Android build/lint/7 tests, and recorded exact duplex control/status plus reconstructed-PNG USB evidence while keeping direct S25 behavior as the final gate. |
 | 2026-08-06 | Published the standalone Galaxy receiver source, board bridge, tests, setup guidance, and evidence as commit `81c8888`, with the pre-rebuild receiver baseline preserved by a pushed annotated tag. |
+| 2026-08-07 | Rebuilt and installed the canonical app on a real S25 Ultra, verified cold startup, light/dark rendering, USB-host capability, disconnected control state, manifest network boundary, and a clean crash buffer; retained direct UNO Q cable exchange as the remaining hardware gate. |

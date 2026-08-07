@@ -113,7 +113,11 @@ minimal optical payload or `LWF1` transmitter protocol.
 ## Verification boundary
 
 The Android parser, controls, lint, unit tests, and APK build are verified on
-the Snapdragon Windows development system. UNO Q-to-Windows CDC delivery was
-also verified byte-for-byte through `/dev/ttyGS0`. The final remaining hardware
-gate is direct S25 enumeration, sustained board power, and an end-to-end
-text/image/audio run while the phone owns the USB cable.
+the Snapdragon Windows development system. Version 1.0.0/code 2 was installed
+on a real Galaxy S25 Ultra (`SM-S938U1`, Android 15/API 35, ARM64): it cold-
+started successfully, rendered the complete light/dark receiver UI, advertised
+USB-host capability, entered the expected disconnected state, and produced no
+crash entry. UNO Q-to-Windows CDC delivery was also verified byte-for-byte
+through `/dev/ttyGS0`. The final remaining hardware gate is direct S25-to-UNO-Q
+enumeration and permission, sustained board power, CDC controls/results, and an
+end-to-end text/image/audio run while the phone owns the USB cable.

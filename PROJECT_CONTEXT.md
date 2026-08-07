@@ -6,10 +6,10 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | Standalone UNO Q + Galaxy receiver software complete; final phone hardware validation pending |
-| Primary milestone | Validate the final no-laptop Galaxy S25 Ultra + receiver UNO Q display path |
+| Phase | Galaxy app installed and rendered; direct UNO Q-to-phone hardware validation pending |
+| Primary milestone | Validate the final direct USB-C Galaxy S25 Ultra + receiver UNO Q data path |
 | Secondary milestone | Submission hardening and presentation evidence |
-| Last updated | 2026-08-06 |
+| Last updated | 2026-08-07 |
 | Approval gate | Application implementation explicitly approved on 2026-08-05 |
 
 ## Required maintenance
@@ -88,8 +88,7 @@ The following remain out of scope:
 
 - Analog/photodiode redesign, clock recovery, serial framing, retransmission,
   faster modulation, and changes to the existing laser waveform/timing.
-- Direct Galaxy S25 cable/power validation, WebSockets, and Cloud AI in the
-  runtime path.
+- Galaxy-hosted neural inference, WebSockets, and Cloud AI in the runtime path.
 - UNO Q media encoding and MCU performance optimization beyond the approved
   variable-length framed receive/transmit loop.
 - Medical, regulatory, safety, or absolute-security claims.
@@ -128,16 +127,21 @@ The board-local CLI and App Lab WebUI both reconstruct real payloads. Direct
 board evidence now also proves exact host-to-board `LWCT/1` Status and
 Listen/Cancel, an `LWRX/2` status response, and delivery of an existing strict-
 Adreno reconstructed 4,469-byte PNG with its 1,909-byte evidence metadata and
-correct PNG signature. The remaining uncertainty is S25 enumeration, power,
-and on-device UI behavior, not the UNO Q USB gadget or reconstruction path.
+correct PNG signature. The fresh APK was then built, installed, and cold-started
+on the real S25 Ultra. Its complete receiver UI rendered in both light and dark
+modes with no crash, and Android reported USB-host capability. The remaining
+uncertainty is direct S25-to-UNO-Q enumeration, permission, power, CDC exchange,
+and decoded-media delivery, not the independent app UI, UNO Q USB gadget, or
+reconstruction path.
 
 Documentation claims: Arduino specifies that UNO Q has a Qualcomm Dragonwing
 QRB2210 MPU running Debian, an STM32U585 MCU, Bridge/RPC, Wi-Fi, Bluetooth, and
 USB-C role switching. Samsung specifies USB-C/USB 3.2 Gen 1 for the Galaxy S25
 Ultra. Direct local PC observation: UNO Q enumerated as Arduino USB composite
-`2341:0078` with ADB and a standard USB serial interface. UNO Q-to-S25
-enumeration, sustained power, Android CDC matching, and throughput remain
-unexercised.
+`2341:0078` with ADB and a standard USB serial interface. Direct S25 evidence:
+Samsung `SM-S938U1`, Android 15/API 35, ARM64, successful APK installation and
+rendering, and `android.hardware.usb.host`. UNO Q-to-S25 enumeration, sustained
+power, Android CDC matching, and throughput remain unexercised.
 
 ### Qualcomm edge-device inference targets
 
@@ -186,11 +190,12 @@ download/verification scripts are tracked.
 ### Deferred next milestones
 
 The direct Windows-to-UNO-Q optical workflow and standalone Android receiver
-software are implemented. The next gate is installing the APK on the S25 and
-physically validating USB enumeration/power, Listen/Cancel, text/image/audio
-presentation, reconnect, and an end-to-end optical transfer with no receiver-
-side laptop. Faster modulation, transition-based clock recovery, retries, and
-sustained adverse-light testing remain later transport work.
+software are implemented. The APK is installed and its complete disconnected
+state is rendered on the S25 Ultra. The next gate is physically validating
+direct USB enumeration/power, Listen/Cancel, text/image/audio presentation,
+reconnect, and an end-to-end optical transfer with no receiver-side laptop.
+Faster modulation, transition-based clock recovery, retries, and sustained
+adverse-light testing remain later transport work.
 
 ### Existing App Lab transmitter discovery
 
@@ -617,9 +622,9 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Check | Result |
 | --- | --- |
 | Toolchain | Java 17, Android SDK/target 36, AGP 9.0.0, Gradle 9.1.0 |
-| Fresh debug APK | Builds successfully; package `com.lightweave.mobile`, version `1.0.0` |
+| Fresh debug APK | Clean build succeeds; package `com.lightweave.mobile`, version `1.0.0`/code 2; installed successfully on the S25 Ultra |
 | Unit tests | 7 passing tests for exact control vectors, Python/Android canonical parity, all four result types, single-byte fragmentation, CRC/resync, invalid headers, and USB identity |
-| Android lint | Pass, 0 errors |
+| Android lint | Pass, 0 errors and 9 non-blocking style/typography warnings |
 | USB host declaration | Present; exact UNO Q filter `2341:0078` |
 | App network permission | None |
 | Supported result types | Status, UTF-8 text, PNG image, and playable PCM WAV audio |
@@ -627,7 +632,9 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | UNO Q USB service | `/dev/ttyGS0` exposed only to receiver service; read/write preflight passed |
 | Physical USB protocol | Status round trip passed; Listen changed board state to `phone-usb`/`listening`; Cancel returned it to idle |
 | Real decoded result delivery | Existing strict-Adreno 64 by 64 PNG delivered as a valid 6,398-byte `LWRX/2` frame; 4,469 PNG bytes and 1,909 metadata bytes |
-| S25/UNO Q cable, power, and screen | Not yet exercised; final hardware gate |
+| S25 install and screen | Pass on `SM-S938U1`, Android 15/API 35, ARM64; cold launch in 228 ms, light/dark receiver UI rendered, app resumed, and no crash entries |
+| S25 USB-host capability | Present as `android.hardware.usb.host`; disconnected controls correctly remain disabled until a matching board is attached |
+| Direct S25/UNO Q cable, power, and CDC | Not yet exercised; final hardware gate |
 
 ### Product surface and packaging
 
@@ -642,7 +649,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Monochrome dashboard refresh | Pass; text-first square layout, no gradients/shadows, responsive at 390 px without horizontal overflow |
 | Multi-size browser workflow | Pass; balanced sample transmit/verify and separate receiver upload both reconstructed 128 by 128 with 0 CPU profile nodes |
 | Raw disconnected-runtime smoke | Pass for balanced strict image QNN and audio hybrid; 216/376 raw bytes and exact outputs |
-| Android standalone receiver | Fresh APK, text/image/audio/status, Listen/Cancel, save/playback, evidence UI, unit tests, and lint pass; direct S25 hardware pending |
+| Android standalone receiver | Fresh APK, text/image/audio/status, Listen/Cancel, save/playback, evidence UI, unit tests, lint, S25 install, and real-device rendering pass; direct UNO Q cable pending |
 | UNO Q native receiver | All image profiles reconstruct on Adreno Vulkan with strict no-fallback and at least 36.34 dB accelerator/CPU parity |
 | UNO Q App Lab WebUI | Rendered browser upload/reconstruction/download and oversize error pass; balanced accelerator time about 524 ms; no console errors |
 | UNO Q audio receiver | One- and five-second raw payloads reconstruct through CPU plus a strict 39-layer Adreno suffix at 52.07 dB or better PyTorch parity |
@@ -681,12 +688,12 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Raw 128 by 128 strict QNN decoder | Complete locally | QUInt16 QDQ, 66.74 dB minimum CPU parity, no fallback, 0 CPU nodes, 51.29 dB minimum NPU/CPU parity |
 | Raw milestone publication | Complete | Commit `140f9ae`; GitHub Actions run `31047777514` passed |
 | Multi-size dashboard publication | Complete | Commit `9aee230`; GitHub Actions run `31057418505` passed |
-| Android standalone receiver | Software and UNO Q USB side complete; S25 pending | Fresh APK builds; 7 unit tests/lint pass; duplex controls/status and real reconstructed-PNG USB delivery pass on UNO Q gadget |
+| Android standalone receiver | App installed/rendered on S25; direct UNO Q cable pending | Fresh APK, 7 unit tests/lint, real S25 cold launch/UI/no-crash check, plus duplex controls/status and reconstructed-PNG USB delivery on the UNO Q gadget |
 | UNO Q accelerator feasibility | Complete | ncnn Vulkan executes all three complete graphs on Adreno 702; QNN/FastRPC is absent on the exercised image |
 | UNO Q native receiver | Complete locally | Native rANS, strict runner, CLI, rendered API/WebUI, manifest, SPDX SBOM, offline bundle, dry-run/idempotent installer, and 60-test repository suite pass |
 | UNO Q receiver publication | Complete | Source/evidence commit `8074645` and Android-preservation commit `fa19c64` published to `origin/main` |
 | UNO Q audio receiver | Complete and published | Commit `03b0bd7`; native unpack/codebook parity, earliest valid split 5, strict 39-layer Adreno suffix, 1/5-second parity, CLI/API/WebUI, offline bundle, installer, and offline smoke pass |
-| Android receiver UI and hardware path | Published; physical S25 gate remains | Commit `81c8888`; no-laptop phone/UNO topology, text/image/audio app, UNO Q USB controls/results, tests, and setup are on `origin/main` |
+| Android receiver UI and hardware path | Published and installed; direct cable gate remains | Commit `81c8888`; no-laptop app, UNO Q USB controls/results, tests, setup, and real S25 install/render evidence complete; direct board enumeration/data remains |
 | Windows-to-UNO Q transmitter flow | Complete and published | Commit `028f9d9`; dashboard image/audio Send actions, USB/ADB sink, atomic App Lab inbox, variable-length STM32 loop, tracked clone source, installer, and real 104/124/188-byte board acceptance pass |
 | UNO Q optical byte diagnostic | Complete and published | Commit `80ba103`; exact `00 FF AA 55` received twice with matching SHA-256 and valid stop bit |
 | UNO Q optical image receiver | Complete and published | Commit `506eee9`; two 80-byte physical image transfers passed exact-byte, stop-bit, 64-by-64 PNG, 16-layer Adreno, strict-no-fallback, App Lab UI, and zero-console-error gates |
@@ -827,6 +834,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | D-052 | 2026-08-06 | Track an evidence-based submission checklist and classify the repository as ready for open-source distribution, not commercially certified. | Reproducible source installation, verified hardware behavior, tests, and licenses satisfy the open-source-platform path; no signed/store package, authentication, or production clock recovery is claimed. Team roster and form completion remain owner actions. |
 | D-053 | 2026-08-06 | Replace the old Android prototype from scratch and make Galaxy S25 Ultra + receiver UNO Q the final no-laptop receiver/display. | Owner explicitly retired the prior Android work and clarified that the phone must replace the receiver WebUI, including Listen/Cancel plus text, image, audio, and evidence. |
 | D-054 | 2026-08-06 | Preserve all reconstruction on UNO Q and add only a durable bidirectional USB presentation/control channel. | `LWCT/1` and `LWRX/2` sit after the unchanged optical/decode path; the phone runs no AI, the transmitter is untouched, and decoded results survive temporary phone disconnects. |
+| D-055 | 2026-08-07 | Use the existing fresh `android/` Android Studio project as the canonical mobile project and install that build on the S25 Ultra. | The earlier prototype was already replaced; creating a second project would duplicate the supported app and break the repository's single-source installation model. |
 
 ## Public references
 
@@ -898,3 +906,4 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-06 | Retired the previous Android prototype, selected a final no-laptop Galaxy S25 Ultra + receiver UNO Q topology, and created the `lightweave-pre-android-rebuild` backup tag at the last published working receiver head. |
 | 2026-08-06 | Rebuilt LightWeave Mobile for bidirectional USB Listen/Cancel/Status and decoded text/PNG/WAV/evidence, added the receiver's durable `LWRX/2` outbox and narrow `/dev/ttyGS0` App Lab mapping, passed 137 Python tests plus Android build/lint/7 tests, and physically verified status, listen/cancel, and real reconstructed-PNG delivery through the UNO Q USB gadget. Direct S25 validation remains pending. |
 | 2026-08-06 | Published the standalone Galaxy receiver implementation as commit `81c8888` and pushed the annotated `lightweave-pre-android-rebuild` backup tag; transmitter source and logic remained unchanged. |
+| 2026-08-07 | Rebuilt the canonical Android Studio project, passed lint and all seven unit tests, installed version 1.0.0/code 2 on the real S25 Ultra, and verified its light/dark disconnected UI, USB-host feature, resumed activity, and crash-free startup; direct UNO Q cable exchange remains the final gate. |
