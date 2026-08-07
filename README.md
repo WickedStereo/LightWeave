@@ -146,6 +146,35 @@ payload length without padding, so the UI shows a separate 40-bit/s estimate.
 The accepted result proves buffer count and launch; it does not claim optical
 completion or receiver reconstruction.
 
+### Verify optical bytes on a second UNO Q
+
+The repository also tracks a minimal diagnostic receiver in
+[`uno_q/byte_receiver_app`](uno_q/byte_receiver_app). It does not reconstruct
+media. It receives an explicitly declared number of raw bits using the existing
+A0 photodiode threshold and 25-ms timing, saves `received_payload.bin`, and
+reports its SHA-256 and stop-bit result.
+
+With both boards connected, pin their ADB serials so the dashboard never sends
+to the receiver by mistake:
+
+```powershell
+$env:LIGHTWEAVE_UNO_Q_SERIAL = "123900964"
+$env:LIGHTWEAVE_UNO_Q_RECEIVER_SERIAL = "371371094"
+
+.\scripts\install_uno_q_byte_receiver.ps1 -DeviceSerial 371371094 -DryRun
+.\scripts\install_uno_q_byte_receiver.ps1 -DeviceSerial 371371094 -StopRunningApp
+
+.\.venv-x64\Scripts\python.exe scripts\verify_uno_q_optical_link.py `
+  --transmitter-serial 123900964 `
+  --receiver-serial 371371094 `
+  --payload-hex 00ffaa55
+```
+
+Success requires `exact_match: true`, matching sent/received SHA-256 values,
+and `stop_bit_valid: true`. The expected byte count travels only through the
+local ADB control plane; the optical payload remains unchanged and header-free.
+The original receiver projects are not edited.
+
 ## Android text/image receiver
 
 The [`android/`](android/) Android Studio project prepares the phone side of a

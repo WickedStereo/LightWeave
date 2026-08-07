@@ -142,6 +142,20 @@ rmdir '$stage/source/python' '$stage/source/sketch' '$stage/source' '$stage'
 & $AdbPath -s $DeviceSerial shell $installCommand
 if ($LASTEXITCODE -ne 0) { throw "Could not install tracked transmitter files." }
 
+$targetListJson = (& $AdbPath -s $DeviceSerial shell "arduino-app-cli --format json app list") -join "`n"
+if ($LASTEXITCODE -ne 0) { throw "Could not inspect the transmitter app state." }
+$targetList = $targetListJson | ConvertFrom-Json
+$targetRunning = @(
+    $targetList.apps |
+        Where-Object {
+            $_.name -eq "lightweave_transmitter" -and $_.status -eq "running"
+        }
+).Count -gt 0
+if ($targetRunning) {
+    & $AdbPath -s $DeviceSerial shell "arduino-app-cli app stop '$targetApp'"
+    if ($LASTEXITCODE -ne 0) { throw "Could not stop the running transmitter for its update." }
+}
+
 & $AdbPath -s $DeviceSerial shell "arduino-app-cli app clean-cache '$targetApp'"
 if ($LASTEXITCODE -ne 0) { throw "Could not clear the cloned app cache." }
 

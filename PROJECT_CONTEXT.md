@@ -6,8 +6,8 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | Windows-to-UNO Q transmitter milestone complete; Android receiver deferred |
-| Primary milestone | Generated raw image/audio payloads now reach the UNO Q transmitter from the Windows dashboard |
+| Phase | Basic two-UNO-Q optical byte verification complete; media handoff deferred |
+| Primary milestone | The optical link now preserves a known variable-length binary payload byte-for-byte |
 | Secondary milestone | Android receiver UI and hardware validation |
 | Last updated | 2026-08-06 |
 | Approval gate | Application implementation explicitly approved on 2026-08-05 |
@@ -63,6 +63,9 @@ The implemented milestone assumes a reliable ordered byte pipe and includes:
 - A USB/ADB `RawByteSink` that hands generated image and audio payloads to a
   tracked `lightweave_transmitter` App Lab application, which buffers the exact
   variable byte count on the STM32 and launches the existing laser waveform.
+- A separate `lightweave_byte_receiver` diagnostic that accepts an out-of-band
+  expected length, captures the matching raw optical bytes, and reports binary,
+  SHA-256, length, and stop-bit evidence without invoking media reconstruction.
 
 The following remain out of scope:
 
@@ -228,12 +231,45 @@ visually observed the physical laser blinking. This proves the commanded laser
 activity reached the hardware; it does not yet prove optical byte correctness
 or receiver reconstruction.
 
-On the first receiver-connection attempt later on 2026-08-06, Windows PnP and
-ADB still exposed only the transmitter board (`123900964`, hostname `UNOQ-1`,
-COM3). No second Arduino USB composite, serial, or ADB interface appeared after
-an additional delayed rescan. The running transmitter app was not stopped or
-modified. Receiver inspection is blocked until its USB data connection
-enumerates independently.
+The first receiver-connection attempt exposed only the transmitter, but a
+subsequent cable/port reconnect resolved enumeration. Two boards are now mapped
+without stopping either app: transmitter `123900964`/`UNOQ-1`/COM3 and receiver
+`371371094`/`unoq2`/COM4. The transmitter continues running
+`lightweave_transmitter`; all receiver-side apps remain stopped.
+
+Read-only inspection found that `image_receiver` is the closest optical
+receiver base. Its STM32 sketch already matches the transmitter's 25 ms/bit,
+single leading bit, raw MSB-first data, and low stop bit. It samples analog A0
+with threshold 800. However, it is fixed to 128-by-128 monochrome data—exactly
+2,048 bytes—and its Python app converts the result into a one-bit PNG. It cannot
+finish a typical variable-length LightWeave payload or feed raw bytes into the
+existing accelerated decoder. `laser_receiver_ui` is not a suitable base
+because it uses 100 ms/bit, per-character leading bits, and ASCII strings. All
+inspected receiver source remained unchanged; important `image_receiver`
+source hashes were recorded before any future clone.
+
+### Basic optical byte receiver
+
+The repository now tracks `uno_q/byte_receiver_app/`, installed only on receiver
+`371371094` as `lightweave_byte_receiver`. Existing `image_receiver`,
+`laser_receiver_ui`, and accelerated LightWeave receiver apps remain unchanged.
+The new STM32 sketch retains the proven A0 threshold 800, one high start bit,
+25 ms/bit, MSB-first data, and one low stop bit, but accepts an explicit
+1-2,048-byte length. After timing-sensitive reception finishes, Python retrieves
+the buffer in 32-byte hexadecimal RPC chunks and atomically saves the exact
+binary plus SHA-256 evidence. A local App Lab page can arm a manual length and
+download the result; an ADB verifier can arm, transmit, retrieve, and compare
+automatically.
+
+Installation on 2026-08-06 stopped only the receiver board's unrelated default
+`Copy of connect to phone` app. The transmitter remained running on the other
+board. App Lab built/flashed the receiver in about 95 seconds; its sketch used
+87,756 bytes of flash and 33,678 bytes of global RAM. The first physical test
+sent `00 FF AA 55` in 0.85 seconds. The receiver returned the exact same four
+bytes, matching SHA-256
+`df7d75aad696b49ea81cbddff8c30a794ce0243bf9895db26e8127e0485f4de5`,
+and a valid stop bit. This proves byte correctness for that diagnostic pattern,
+not yet for full media payloads or adverse optical conditions.
 
 ## Confirmed architecture
 
@@ -523,7 +559,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | GitHub Actions unit CI | Complete | Corrected-history Windows Python 3.11 run `31034723025` passed; QNN gates stay local |
 | Second Snapdragon PC | Pending external device | Transfer the same `.lwv` plus generated artifacts and verify |
 | AI Hub/QAIRT Visualizer | Pending access/install | Compare only when account/SDK are available |
-| Arduino/optical adapter | Transmitter complete; receiver deferred | Existing 40 bit/s waveform is unchanged; the cloned app now transmits the exact 1-2,048-byte length and rejects concurrent work |
+| Arduino/optical adapter | Basic byte transport complete locally; publication pending | Separate receiver clone captured `00 FF AA 55` exactly with matching SHA-256 and valid stop bit; full media payload and decoder handoff remain deferred |
 | GitHub push | Complete | Transmitter implementation commit `028f9d9` was pushed directly to `origin/main` without force-pushing |
 
 ## Risks and mitigations
@@ -557,6 +593,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | App Lab allows only one active application | Installer does not stop anything by default; the explicit `-StopRunningApp` option performs the reversible stop before starting `lightweave_transmitter` |
 | USB inbox is interrupted or stale | Publish payload/metadata atomically, publish the descriptor last, verify SHA-256/length/request ID, ignore partial files, and return per-request result files |
 | Transmitter has no physical completion callback | Report only exact buffering plus launch acceptance; enforce an estimated busy window and never claim optical completion from the dashboard |
+| Fixed analog threshold and open-loop timing may be environment-sensitive | Byte test passed at threshold 800 and 25 ms/bit in the current alignment; repeat longer/stress payloads and measure errors before claiming general reliability |
 
 ## Open questions
 
@@ -634,6 +671,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | D-039 | 2026-08-06 | Use USB/ADB plus an atomic watched inbox as the Windows-dashboard-to-App-Lab transport. | Works offline, preserves the existing `RawByteSink` boundary, handles multiple attached ADB devices safely, and does not alter optical bytes. |
 | D-040 | 2026-08-06 | Clone the backup as `lightweave_transmitter`, retain per-byte RouterBridge loading and the existing waveform, and change only the active payload length on the STM32. | Owner explicitly prohibited backup edits and approved variable-length transmission without hardware/timing changes. |
 | D-041 | 2026-08-06 | Keep SHA-256 and request metadata in the local USB control plane and report launch acceptance rather than physical completion. | Raw optical mode stays header-free and the unchanged MCU interface exposes no completion callback. |
+| D-042 | 2026-08-06 | Add a separate variable-length optical byte diagnostic before connecting the accelerated media receiver. | Preserves all existing receiver apps, proves the transport independently, and keeps expected length as out-of-band control data. |
 
 ## Public references
 
@@ -686,3 +724,5 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-06 | Published the complete Windows-dashboard-to-UNO Q transmitter milestone as commit `028f9d9` on `origin/main` without force-pushing. |
 | 2026-08-06 | Recorded the owner's independent visual observation that a dashboard-initiated request made the physical laser blink; optical byte correctness and reception remain the next gate. |
 | 2026-08-06 | Attempted read-only two-board discovery after the receiver was connected; only transmitter `123900964`/COM3 enumerated, so receiver inspection remains pending a second USB data connection. |
+| 2026-08-06 | Resolved two-board discovery and mapped transmitter `123900964`/COM3 versus receiver `371371094`/COM4; read-only inspection found `image_receiver` waveform-compatible but fixed at 2,048 monochrome bytes, while `laser_receiver_ui` uses an incompatible text protocol. |
+| 2026-08-06 | Added and installed the separate variable-length byte receiver plus automated verifier; the first physical two-board test received `00 FF AA 55` exactly with matching SHA-256 and a valid stop bit while preserving all original receiver apps. |

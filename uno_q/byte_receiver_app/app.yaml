@@ -1,0 +1,6 @@
+name: lightweave_byte_receiver
+description: Receive and verify variable-length LightWeave optical bytes.
+ports: []
+bricks:
+  - arduino:web_ui: {}
+icon: "📥"

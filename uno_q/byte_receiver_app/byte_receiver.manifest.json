@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "app_id": "lightweave_byte_receiver",
+  "source_app": "laser_receiver_ui",
+  "receiver_logic_source": "image_receiver",
+  "maximum_payload_bytes": 2048,
+  "bit_duration_ms": 25,
+  "sensor_pin": "A0",
+  "sensor_threshold": 800,
+  "wire_format": "start-high/raw-msb-first/stop-low"
+}

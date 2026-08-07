@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>LightWeave / byte receiver</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <p class="eyebrow">LIGHTWEAVE / OPTICAL DIAGNOSTIC</p>
+    <h1>Byte receiver</h1>
+    <p>Capture exact raw bytes before connecting media reconstruction.</p>
+
+    <section class="status" aria-live="polite">
+      <strong id="connection">connecting</strong>
+      <span id="receiver-status">idle</span>
+    </section>
+
+    <form id="arm-form">
+      <label for="expected-bytes">Expected payload bytes</label>
+      <input id="expected-bytes" type="number" min="1" max="2048" value="4" required>
+      <button type="submit">arm receiver</button>
+    </form>
+
+    <p class="warning">
+      The length is local control data. It is not added to the optical bytes.
+      Arm this receiver before pressing Send on the transmitter dashboard.
+    </p>
+
+    <section id="result" hidden>
+      <h2>Received payload</h2>
+      <dl>
+        <dt>Bytes</dt><dd id="result-bytes"></dd>
+        <dt>SHA-256</dt><dd id="result-sha"></dd>
+        <dt>Stop bit</dt><dd id="result-stop"></dd>
+        <dt>Hex preview</dt><dd><code id="result-hex"></code></dd>
+      </dl>
+      <a id="download" download="received_payload.bin">download received_payload.bin</a>
+    </section>
+
+    <p id="error" role="alert" hidden></p>
+  </main>
+  <script src="/libs/socket.io.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

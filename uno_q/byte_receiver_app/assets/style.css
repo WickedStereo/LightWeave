@@ -1,0 +1,21 @@
+:root { color-scheme: light; font-family: "Courier New", monospace; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #fff; color: #000; }
+main { width: min(760px, calc(100% - 32px)); margin: 48px auto; }
+.eyebrow { margin: 0 0 8px; font-size: 12px; letter-spacing: .14em; }
+h1 { margin: 0 0 8px; font-size: clamp(32px, 7vw, 64px); font-weight: 400; }
+h2 { font-size: 20px; }
+.status, form, .warning, #result, #error { border-top: 1px solid #000; padding: 18px 0; margin-top: 24px; }
+.status { display: flex; justify-content: space-between; gap: 16px; }
+label { display: block; margin-bottom: 8px; }
+input, button { border: 1px solid #000; border-radius: 0; background: #fff; color: #000; font: inherit; padding: 10px 12px; }
+input { width: 180px; }
+button { margin-left: 8px; cursor: pointer; }
+button:disabled { color: #777; border-color: #777; cursor: wait; }
+.warning { line-height: 1.5; }
+dl { display: grid; grid-template-columns: 130px 1fr; gap: 10px; }
+dt { color: #555; }
+dd { margin: 0; overflow-wrap: anywhere; }
+a { color: #000; text-decoration: underline; }
+#error { color: #a00; }
+@media (max-width: 520px) { input, button { width: 100%; margin: 6px 0 0; } dl { grid-template-columns: 1fr; } }

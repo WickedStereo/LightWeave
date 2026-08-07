@@ -369,7 +369,7 @@ private endpoints, and confidential material must never appear here.
 | Workaround | Make stopping another app opt-in, detect the UNO Q by a successful App CLI probe, decode subprocess output as UTF-8, test result-file existence before reading it, publish inbox files atomically with SHA-256/length validation, maintain an estimated busy window, and report only buffer/launch acceptance. |
 | Suggested improvement | Add an official App Lab host-to-app USB inbox/upload recipe, stable machine-readable status without decorative Unicode, explicit multi-device selection guidance, a lifecycle API that explains the one-active-app rule, bulk binary RouterBridge examples, and an MCU-to-MPU completion/progress callback pattern. |
 
-### DX-024 - Initial two-board USB discovery exposed only the transmitter
+### DX-024 - Two-board USB discovery requires an independently enumerated data connection
 
 | Field | Observation |
 | --- | --- |
@@ -377,11 +377,39 @@ private endpoints, and confidential material must never appear here.
 | Environment | Windows 11 build 26100 x64; Android Debug Bridge 1.0.41/platform-tools 36.0.2; transmitting UNO Q `123900964`/`UNOQ-1` on COM3 with App CLI 0.12.1 |
 | Tool/source | Read-only ADB device/app discovery plus Windows PnP and serial-port enumeration |
 | Intended workflow | Enumerate two independent UNO Q serials, preserve the running transmitter, and map the second board before inspecting its receiver application |
-| Actual result and evidence | ADB and Windows both continued to expose only one Arduino `2341:0078` composite device, one ADB interface, and COM3 after a delayed rescan. `lightweave_transmitter` remained running; no app was stopped, started, flashed, or modified. |
+| Actual result and evidence | The initial scan exposed only one Arduino `2341:0078` composite device, one ADB interface, and COM3. After the receiver cable/port was reconnected, both boards enumerated independently: transmitter `123900964`/`UNOQ-1`/COM3 and receiver `371371094`/`unoq2`/COM4. `lightweave_transmitter` remained running; no receiver app was stopped, started, flashed, or modified. |
 | Usefulness | Capability-based discovery prevented the connected transmitter from being mistaken for an unverified receiver and avoided changing the wrong board. |
-| Friction and owner | The second board has not enumerated as a USB data device, so this is currently a cable/port/power/enumeration blocker rather than an App Lab or LightWeave software failure. |
-| Workaround | Verify receiver power and a known data-capable cable/direct host port, then rescan for a second USB composite/ADB/serial identity before any receiver action. |
+| Friction and owner | The second board did not enumerate on the first attempt, making a cable/port/power issue look like device-selection failure; this was a physical USB setup issue rather than an App Lab or LightWeave software failure. |
+| Workaround | Verify receiver power and a known data-capable cable/direct host port, then require a distinct composite/ADB/serial identity before any receiver action. Capability plus explicit serial selection keeps the boards deterministic. |
 | Suggested improvement | Provide a concise official two-UNO-Q host setup guide covering unique USB identities, expected composite interfaces, power/cable requirements, and deterministic App CLI device selection. |
+
+### DX-025 - Existing optical receiver matches timing but not the raw payload contract
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-06; inspect receiver App Lab projects read-only and find the safest base for LightWeave optical-byte verification |
+| Environment | Receiver UNO Q `371371094`/`unoq2`/COM4; Arduino App CLI 0.12.1; stopped `image_receiver`, `laser_receiver_ui`, and LightWeave accelerated receiver apps |
+| Tool/source | Read-only ADB source listing, SHA-256 capture, and inspection of App Lab Python/STM32 sketches |
+| Intended workflow | Reuse an existing optical receiver only if its waveform matches the running LightWeave transmitter and it can preserve arbitrary variable-length binary payloads |
+| Actual result and evidence | `image_receiver` samples analog A0 at threshold 800 and matches one leading bit, 25 ms/bit, MSB-first data, and a low stop bit. It is hard-coded to 16,384 data bits/2,048 bytes and converts them into a 128-by-128 monochrome PNG. `laser_receiver_ui` instead uses 100 ms/bit, one leading bit per ASCII character, and a text string, so it is incompatible. The accelerated `LightWeave UNO Q Receiver` is installed but stopped and currently accepts uploaded files rather than optical bytes. |
+| Usefulness | Most timing-sensitive receiver logic can be retained from `image_receiver`; the already validated LightWeave decoder can remain a separate raw-byte consumer. |
+| Friction and owner | App Lab examples couple optical framing, fixed image dimensions, transport buffering, and media rendering. There is no variable-length binary handoff between the timing-sensitive STM32 receiver and the Linux inference app. This is application architecture friction, with room for a stronger Arduino binary-transport sample. |
+| Workaround | Clone rather than edit `image_receiver`; pass an explicit trusted payload length, stop after that many bytes, retrieve binary-safe chunks below RouterBridge limits, validate exact bytes first, then hand the unchanged payload and preset to the existing decoder. |
+| Suggested improvement | Publish an App Lab optical/serial receiver example with explicit length, arbitrary binary data, chunked MPU/MCU transfer, byte-integrity evidence, and a clean adapter boundary independent of image dimensions. |
+
+### DX-026 - Separate App Lab byte receiver proves the two-board optical path
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-06; build a minimal receiver that proves exact optical bytes before connecting Qualcomm-accelerated reconstruction |
+| Environment | Transmitter `123900964`/COM3 and receiver `371371094`/COM4; UNO Q QRB2210 plus STM32U585; App CLI 0.12.1; Python 3.13.14; Arduino Zephyr core 0.90.0; RouterBridge 0.4.3; RPClite 0.3.0; MessagePack 0.4.2 |
+| Tool/source | Tracked `lightweave_byte_receiver` App Lab clone, ADB atomic arm/result inbox, A0 analog receiver at threshold 800, 25-ms STM32 sampling, and Windows byte-verification script |
+| Intended workflow | Preserve every existing receiver app, arm a trusted expected length out of band, capture arbitrary raw binary, retrieve it in RouterBridge-safe chunks, and compare the exact sent/received bytes before invoking AI |
+| Actual result and evidence | The hash-checking installer preserved both source apps, stopped only the receiver's unrelated default `Copy of connect to phone`, and compiled/flashed the new app in about 95 seconds. The sketch used 87,756 bytes of flash and 33,678 bytes of global RAM. A physical 34-bit transmission carried four data bytes `00 FF AA 55`; the receiver returned the identical four bytes, matching SHA-256 `df7d75aad696b49ea81cbddff8c30a794ce0243bf9895db26e8127e0485f4de5`, and a valid low stop bit. The transmitter app continued running on the other board. |
+| Usefulness | Separates optical reliability from CompressAI/EnCodec/ncnn behavior and gives a reproducible exact-byte gate using the same two-board hardware and waveform as future media transfers. |
+| Friction and owner | App Lab rejected a textual `[RX]` icon because the manifest requires one emoji, and the receiver's default app could start between discovery and installation. A first build/flash still takes about 95 seconds. RouterBridge response sizing makes chunked retrieval preferable to one large return value. These are App Lab schema/lifecycle/documentation and application-integration issues. |
+| Workaround | Use a valid single-emoji icon, recheck running apps immediately before start, require explicit device serials, make stopping another app opt-in, preserve original hashes, retrieve 32 bytes per RPC, and keep the expected length in the local ADB/UI control plane. |
+| Suggested improvement | Validate App Lab manifests before deployment with clear field constraints, expose deterministic default-app lifecycle controls, document safe RPC payload sizes, and publish a two-board binary optical loopback example with exact-byte evidence. |
 
 ## Change log
 
@@ -413,3 +441,5 @@ private endpoints, and confidential material must never appear here.
 | 2026-08-06 | Published the dashboard-to-App-Lab transmitter source, installer, tests, setup guidance, and board evidence to `origin/main` as commit `028f9d9`. |
 | 2026-08-06 | Added the owner's direct visual observation of laser activity from a dashboard send while keeping optical byte correctness and reception explicitly unverified. |
 | 2026-08-06 | Recorded that the first two-board discovery attempt exposed only transmitter `123900964`/COM3, leaving receiver inspection blocked on USB data enumeration while preserving the running app. |
+| 2026-08-06 | Resolved independent enumeration of both UNO Q boards and documented that `image_receiver` matches the transmitter waveform but requires a variable-length binary clone, while the installed text receiver is protocol-incompatible. |
+| 2026-08-06 | Installed a separate variable-length App Lab byte receiver and proved the physical two-board link with exact `00 FF AA 55`, matching SHA-256, valid stop bit, preserved source hashes, and explicit App Lab build/lifecycle friction. |

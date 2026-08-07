@@ -48,6 +48,27 @@ supports `-NoStart`. The dashboard never starts or flashes an app when Send is
 clicked. See [`transmitter_app/README.md`](transmitter_app/README.md) for the
 wire behavior and milestone boundary.
 
+## Optical byte receiver diagnostic
+
+[`byte_receiver_app`](byte_receiver_app) is a separate App Lab project for
+validating transport before reconstruction. It is armed with an expected byte
+count, samples the existing A0/threshold-800 receiver at 25 ms per bit,
+retrieves the STM32 result in 32-byte chunks, and saves the exact binary payload
+plus SHA-256 evidence.
+
+```powershell
+.\scripts\install_uno_q_byte_receiver.ps1 -DeviceSerial 371371094 -DryRun
+.\scripts\install_uno_q_byte_receiver.ps1 -DeviceSerial 371371094 -StopRunningApp
+.\.venv-x64\Scripts\python.exe scripts\verify_uno_q_optical_link.py `
+  --transmitter-serial 123900964 `
+  --receiver-serial 371371094 `
+  --payload-hex 00ffaa55
+```
+
+This diagnostic does not invoke CompressAI, EnCodec, ncnn, or the accelerated
+receiver. Length remains trusted out-of-band data. Media reconstruction will
+consume the verified bytes in a later milestone.
+
 ## Runtime architecture
 
 `lightweave-uno` is a native host CLI and does not need Docker at runtime. Its
