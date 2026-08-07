@@ -583,14 +583,14 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Android receiver UI and hardware path | Next milestone; deferred for now | Refine the existing prototype, then validate S25/UNO Q enumeration, power, text/image rendering, reconnects, throughput, and later WAV playback |
 | Windows-to-UNO Q transmitter flow | Complete and published | Commit `028f9d9`; dashboard image/audio Send actions, USB/ADB sink, atomic App Lab inbox, variable-length STM32 loop, tracked clone source, installer, and real 104/124/188-byte board acceptance pass |
 | UNO Q optical byte diagnostic | Complete and published | Commit `80ba103`; exact `00 FF AA 55` received twice with matching SHA-256 and valid stop bit |
-| UNO Q optical image receiver | Complete locally; publication pending | Two 80-byte physical image transfers passed exact-byte, stop-bit, 64-by-64 PNG, 16-layer Adreno, strict-no-fallback, App Lab UI, and zero-console-error gates |
+| UNO Q optical image receiver | Complete and published | Commit `506eee9`; two 80-byte physical image transfers passed exact-byte, stop-bit, 64-by-64 PNG, 16-layer Adreno, strict-no-fallback, App Lab UI, and zero-console-error gates |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
 | GitHub Actions unit CI | Complete | Corrected-history Windows Python 3.11 run `31034723025` passed; QNN gates stay local |
 | Second Snapdragon PC | Pending external device | Transfer the same `.lwv` plus generated artifacts and verify |
 | AI Hub/QAIRT Visualizer | Pending access/install | Compare only when account/SDK are available |
-| Arduino/optical adapter | Image path complete locally; publication pending | The separate diagnostic proves bytes; the production receiver reconstructs an exact 80-byte raw image payload on strict Adreno. Audio remains deferred |
-| GitHub push | Complete | Transmitter implementation commit `028f9d9` was pushed directly to `origin/main` without force-pushing |
+| Arduino/optical adapter | Image path complete and published | Diagnostic commit `80ba103`; production image-receiver commit `506eee9`. Optical audio remains deferred |
+| GitHub push | Complete | Latest production image-receiver commit `506eee9` was pushed directly to `origin/main` without force-pushing |
 
 ## Risks and mitigations
 
@@ -760,3 +760,4 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-06 | Resolved two-board discovery and mapped transmitter `123900964`/COM3 versus receiver `371371094`/COM4; read-only inspection found `image_receiver` waveform-compatible but fixed at 2,048 monochrome bytes, while `laser_receiver_ui` uses an incompatible text protocol. |
 | 2026-08-06 | Added and installed the separate variable-length byte receiver plus automated verifier; the first physical two-board test received `00 FF AA 55` exactly with matching SHA-256 and a valid stop bit while preserving all original receiver apps. |
 | 2026-08-06 | Published the byte diagnostic as commit `80ba103`, then installed and exercised the separate production optical image receiver: two exact 80-byte transfers reconstructed to 64 by 64 through all 16 Adreno layers with strict fallback disabled, including a live App Lab UI run with PNG download and no browser errors. |
+| 2026-08-06 | Published the production optical image receiver, installer, acceptance harness, tests, setup instructions, and evidence as commit `506eee9` on `origin/main` without force-pushing. |
