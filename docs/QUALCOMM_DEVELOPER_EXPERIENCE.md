@@ -439,6 +439,20 @@ private endpoints, and confidential material must never appear here.
 | Workaround | Share the frame contract between Python and C++, reject request-schema mismatches, select the single board running the tracked transmitter marker, preserve the raw diagnostic, store rejected-frame evidence atomically, keep the measured 24,991-us receiver calibration explicit, and avoid claiming general optical reliability from this board pair |
 | Suggested improvement | Publish a two-board App Lab binary-link sample with machine-readable lifecycle/device roles, incremental build progress, CRC/error telemetry, and transition-based clock recovery or a synchronization pattern robust to oscillator drift. |
 
+### DX-029 - App Lab WebUI health and mobile LAN discovery are separate gates
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-06; diagnose intermittent access to the UNO Q optical receiver WebUI from a mobile browser |
+| Environment | Arduino UNO Q/Qualcomm QRB2210 receiver; Debian 13.1 ARM64; App CLI 0.12.1; App Lab WebUI Brick; Wi-Fi DHCP; Android mobile browser path not instrumented directly |
+| Tool/source | Read-only ADB inspection, NetworkManager status/logs, socket inspection, loopback HTTP, and a Windows LAN HTTP probe |
+| Intended workflow | Reach the board-hosted receiver consistently from a phone on the same trusted local network |
+| Actual result and evidence | The LightWeave receiver app was running, the WebUI listener was bound to IPv4/IPv6 on port 7000, local HTTP returned 200, the board had an active DHCP IPv4 route with 100-percent reported signal, and Windows reached that direct IPv4 address with HTTP 200. The `.local` hostname did not resolve from Windows. No post-association Wi-Fi disconnect appeared in the inspected interval. This isolates the observed intermittency from the App Lab process itself; phone subnet/routing, multicast name discovery, DHCP address changes, VPN/cellular fallback, or access-point client policy remain candidate causes. |
+| Usefulness | Separates inference/UI process health from LAN discovery and gives the demo a deterministic direct-IP test before changing application code |
+| Friction and owner | The WebUI Brick is reachable on the board but does not provide a stable user-facing discovery URL or authentication; `.local` support and guest-network client reachability vary by host/network. This is primarily local-network/discovery friction around the App Lab experience, not a Qualcomm accelerator issue. |
+| Workaround | Use `http://<current-board-ip>:7000` on the same IPv4 subnet, confirm plain HTTP, disable phone VPN/cellular fallback during testing, and reserve the DHCP address or use a controlled demo router/hotspot. Keep the page on a trusted LAN because it has no authentication. |
+| Suggested improvement | App Lab should display the active LAN URL, connection/interface state, and WebUI reachability in a device status panel, with clear guidance for mDNS, guest-network isolation, and secure remote access. |
+
 ## Change log
 
 | Date | Change |
@@ -475,3 +489,4 @@ private endpoints, and confidential material must never appear here.
 | 2026-08-06 | Published the complete production optical image receiver and its reproducible App Lab installer/acceptance workflow as commit `506eee9` on `origin/main`. |
 | 2026-08-06 | Implemented and exercised common `LWF1` image/audio framing, diagnosed long-frame clock drift through preserved CRC evidence, calibrated the receiver board pair, passed all image profiles plus one-second hybrid audio, retained exact `raw-v0`, and recorded the owner's choice to skip further long transfers. |
 | 2026-08-06 | Published the complete dynamic optical media milestone, including tracked App Lab source and reproducible setup, as commit `c8600c7` on `origin/main`. |
+| 2026-08-06 | Separated a healthy App Lab port-7000 receiver from intermittent mobile LAN discovery and documented direct-IP, same-subnet, DHCP, and trusted-network guidance. |

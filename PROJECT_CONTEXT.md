@@ -663,6 +663,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Fixed analog threshold and open-loop timing may be environment-sensitive | CRC caught a repeatable long-frame bit slip; a 24,991-us receiver interval passes this board pair while the transmitter stays at 25 ms, but true clock recovery and broader alignment/light testing remain necessary |
 | `LWF1` is not cryptographically self-describing | It supplies routing, bounds, sample count, and CRC but no model hash; pinned artifacts remain required and `.lwv` is used where model negotiation/SHA-256 matter |
 | Five-second optical audio is slow | Codec/board decode is validated to five seconds, but the owner elected not to spend 190.45 seconds on the optical stress transfer; one-second optical audio is the physical acceptance evidence |
+| Mobile access to the App Lab WebUI is intermittent | Direct board IPv4 port 7000 currently returns HTTP 200 and Wi-Fi signal is strong, while `.local` discovery did not resolve from Windows. Use the current DHCP IPv4 address on the same trusted subnet; avoid `localhost`, HTTPS, VPN/cellular fallback, and client-isolated Wi-Fi. Reserve the address or use a dedicated demo router/hotspot for stability. |
 
 ## Open questions
 
@@ -807,3 +808,4 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-06 | Honored the owner's request to skip further long transfers, omitted the five-second optical audio run, revalidated exact `00 FF AA 55` in `raw-v0`, and left the production optical receiver running. |
 | 2026-08-06 | Published the dynamic `LWF1` image/audio transmitter/receiver implementation, App Lab sources, installers, tests, setup guidance, SBOM/notices, and physical evidence as commit `c8600c7` on `origin/main`. |
 | 2026-08-06 | Recorded publication in commit `db6cf62`; GitHub Actions run `31140365004` passed the Windows lint/unit gate on that head. |
+| 2026-08-06 | Diagnosed intermittent phone access: the receiver app and `0.0.0.0:7000` listener were healthy and direct IPv4 returned HTTP 200, isolating the remaining instability to DHCP/name discovery, phone routing, or Wi-Fi client policy. |
