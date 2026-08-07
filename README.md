@@ -279,16 +279,19 @@ Q retains all optical validation and reconstruction work. The app:
 - provides a plain persistent light/dark UI; and
 - requests neither Internet nor broad storage permission.
 
-The receiver service now exposes `/dev/ttyGS0` through a narrow App Lab Compose
-override, retains completed outputs in a durable phone outbox, and has passed
-duplex control/status plus a real reconstructed-PNG delivery test through the
-UNO Q USB gadget. The same debug build is installed and visually verified on a
-real Galaxy S25 Ultra (`SM-S938U1`, Android 15), including its disconnected
-state and light/dark UI. Direct Galaxy-to-UNO-Q enumeration and Android CDC
-control writes also pass. The remaining blocker is on UNO Q: App Lab default
-boot omits the custom `/dev/ttyGS0` container grant, so the board cannot answer
-until that boot-safe mapping is fixed. Decoded-media exchange, reconnect, and
-sustained phone power remain physical gates. See
+The receiver service uses UNO Q's boot-managed Arduino Router monitor rather
+than opening `/dev/ttyGS0` inside its App Lab container. This removes the custom
+Compose device grant that App Lab dropped on default-app boot. The durable phone
+outbox has passed duplex control/status plus a real reconstructed-PNG delivery
+test through the UNO Q USB gadget, and the supported Router path has returned a
+valid CRC-checked status frame over the physical CDC interface. The same debug
+build is installed and visually verified on a real Galaxy S25 Ultra
+(`SM-S938U1`, Android 15), including its light/dark UI. Direct Galaxy-to-UNO-Q
+enumeration, Status, Listen, Cancel, and result display now pass. A physical
+9-byte `S25 PROOF` payload crossed the existing laser link as a 21-byte `LWF1`
+frame and rendered on the phone with matching CRC, stop-bit, payload hash, and
+hardware evidence. Direct image/audio display, reconnect, and longer sustained
+phone power remain physical gates. See
 [android/README.md](android/README.md) for setup, standalone usage, powered-hub
 guidance, and both USB protocols.
 

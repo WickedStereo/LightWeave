@@ -28,12 +28,14 @@ from phone_usb import (
     PhoneUsbError,
     PhoneUsbOutbox,
     PhoneUsbUnavailable,
+    RouterMonitorTransport,
 )
 
 ui = WebUI()
 store = ReceiverStore(app_root())
-phone_control = PhoneControlReader()
-phone_outbox = PhoneUsbOutbox(app_root())
+phone_transport = RouterMonitorTransport(Bridge)
+phone_control = PhoneControlReader(phone_transport)
+phone_outbox = PhoneUsbOutbox(app_root(), transport=phone_transport)
 listen_queue: queue.Queue[ReceiveRequest] = queue.Queue()
 frame_finished_event = threading.Event()
 cancel_event = threading.Event()

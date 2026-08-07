@@ -1,30 +1,17 @@
-"""Durable decoded-result delivery over the UNO Q USB CDC gadget."""
+"""Durable decoded-result delivery through the UNO Q Router monitor."""
 
 from __future__ import annotations
 
-import errno
 import json
 import os
 import queue
-import select
 import struct
-import threading
 import time
 import uuid
 import zlib
-from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-
-try:
-    import termios
-    import tty
-except ModuleNotFoundError:  # Protocol and outbox tests also run on Windows.
-    termios = None  # type: ignore[assignment]
-    tty = None  # type: ignore[assignment]
-
-TERMINAL_ERRORS = (OSError,) if termios is None else (OSError, termios.error)
 
 MAGIC = b"LWRX"
 VERSION = 2
@@ -63,6 +50,98 @@ class ParsedPhoneFrame:
     metadata: dict[str, Any]
     payload: bytes
     crc32: int
+
+
+class RouterMonitorTransport:
+    """Use UNO Q's boot-managed serial monitor as the CDC byte transport."""
+
+    name = "arduino-router-monitor"
+
+    def __init__(self, bridge: Any, *, timeout_seconds: float = 2.0) -> None:
+        self.bridge = bridge
+        self.timeout_seconds = timeout_seconds
+        self.last_error: str | None = None
+
+    def connected(self) -> bool:
+        try:
+            value = self.bridge.call(
+                "mon/connected",
+                timeout=max(1, int(self.timeout_seconds)),
+            )
+        except Exception as exc:
+            self.last_error = str(exc)
+            return False
+        connected = value is True
+        self.last_error = (
+            None if connected else "Router serial monitor is disconnected."
+        )
+        return connected
+
+    def read(self, maximum_bytes: int = 4096) -> bytes:
+        if not 1 <= maximum_bytes <= 65536:
+            raise PhoneUsbError("Router monitor read size is invalid.")
+        if not self.connected():
+            raise PhoneUsbUnavailable(
+                "UNO Q serial Router is not connected to the USB gadget service."
+            )
+        try:
+            value = self.bridge.call(
+                "mon/read",
+                maximum_bytes,
+                timeout=max(1, int(self.timeout_seconds)),
+            )
+        except Exception as exc:
+            self.last_error = str(exc)
+            raise PhoneUsbUnavailable(
+                f"Could not read the UNO Q serial Router: {exc}."
+            ) from exc
+        if isinstance(value, bytes | bytearray | memoryview) or (
+            isinstance(value, list)
+            and all(isinstance(item, int) and 0 <= item <= 255 for item in value)
+        ):
+            data = bytes(value)
+        else:
+            self.last_error = f"Unexpected Router read type: {type(value).__name__}."
+            raise PhoneUsbError(self.last_error)
+        self.last_error = None
+        return data
+
+    def write(self, data: bytes, timeout_seconds: float | None = None) -> int:
+        if not data:
+            raise PhoneUsbError("Refusing to write an empty phone frame.")
+        if not self.connected():
+            raise PhoneUsbUnavailable(
+                "UNO Q serial Router is not connected to the USB gadget service."
+            )
+        timeout = self.timeout_seconds if timeout_seconds is None else timeout_seconds
+        try:
+            written = self.bridge.call(
+                "mon/write",
+                data,
+                timeout=max(1, int(timeout)),
+            )
+        except Exception as exc:
+            self.last_error = str(exc)
+            raise PhoneUsbUnavailable(
+                f"Could not write through the UNO Q serial Router: {exc}."
+            ) from exc
+        if not isinstance(written, int) or written != len(data):
+            self.last_error = (
+                f"Router accepted {written!r} of {len(data)} phone frame bytes."
+            )
+            raise PhoneUsbError(self.last_error)
+        self.last_error = None
+        return written
+
+    def status(self) -> dict[str, Any]:
+        connected = self.connected()
+        return {
+            "transport": self.name,
+            "router_connected": connected,
+            "read_method": "mon/read",
+            "write_method": "mon/write",
+            "last_error": self.last_error,
+        }
 
 
 def _canonical_metadata(metadata: dict[str, Any]) -> bytes:
@@ -170,18 +249,14 @@ def parse_control_frame(frame: bytes) -> str:
 
 
 class PhoneControlReader:
-    """Receive controls on a blocking worker so gadget bytes are never missed."""
+    """Poll controls from the boot-managed Router monitor without device access."""
 
-    def __init__(self, device: Path = Path("/dev/ttyGS0")) -> None:
-        self.device = device
-        self.descriptor: int | None = None
-        self.original_attributes: list[Any] | None = None
+    def __init__(self, transport: RouterMonitorTransport) -> None:
+        self.transport = transport
         self.buffer = bytearray()
         self.last_error: str | None = None
         self.commands: queue.Queue[str] = queue.Queue()
-        self.stop_event = threading.Event()
-        self.thread: threading.Thread | None = None
-        self.lock = threading.Lock()
+        self.running = False
 
     def _accept(self, data: bytes) -> None:
         self.buffer.extend(data)
@@ -205,72 +280,24 @@ class PhoneControlReader:
             self.commands.put(command)
             del self.buffer[: CONTROL.size]
 
-    def _close_descriptor(self) -> None:
-        with self.lock:
-            descriptor = self.descriptor
-            attributes = self.original_attributes
-            self.descriptor = None
-            self.original_attributes = None
-        if descriptor is None:
-            return
-        if attributes is not None and termios is not None:
-            with suppress(termios.error):
-                termios.tcsetattr(descriptor, termios.TCSANOW, attributes)
-        with suppress(OSError):
-            os.close(descriptor)
-
-    def _run(self) -> None:
-        while not self.stop_event.is_set():
-            try:
-                descriptor = os.open(self.device, os.O_RDONLY | os.O_NOCTTY)
-                attributes = None
-                try:
-                    if termios is None or tty is None:
-                        raise OSError("POSIX terminal control is unavailable.")
-                    attributes = termios.tcgetattr(descriptor)
-                    tty.setraw(descriptor, when=termios.TCSANOW)
-                except TERMINAL_ERRORS:
-                    attributes = None
-                with self.lock:
-                    self.descriptor = descriptor
-                    self.original_attributes = attributes
-                self.last_error = None
-                while not self.stop_event.is_set():
-                    data = os.read(descriptor, 4096)
-                    if not data:
-                        break
-                    print(
-                        f"Phone USB received {len(data)} control bytes",
-                        flush=True,
-                    )
-                    self._accept(data)
-            except OSError as exc:
-                if not self.stop_event.is_set():
-                    self.last_error = str(exc)
-            finally:
-                self._close_descriptor()
-            self.stop_event.wait(0.1)
-
     def start(self) -> None:
-        if self.thread is not None and self.thread.is_alive():
-            return
-        self.stop_event.clear()
-        self.thread = threading.Thread(
-            target=self._run,
-            name="lightweave-phone-usb",
-            daemon=True,
-        )
-        self.thread.start()
+        self.running = True
 
     def close(self) -> None:
-        self.stop_event.set()
-        self._close_descriptor()
-        if self.thread is not None:
-            self.thread.join(timeout=1.0)
-        self.thread = None
+        self.running = False
 
     def poll(self) -> list[str]:
         self.start()
+        try:
+            data = self.transport.read(4096)
+            if data:
+                print(f"Phone USB received {len(data)} control bytes", flush=True)
+                self._accept(data)
+            self.last_error = None
+        except PhoneUsbUnavailable as exc:
+            self.last_error = str(exc)
+        except PhoneUsbError as exc:
+            self.last_error = str(exc)
         commands: list[str] = []
         while True:
             try:
@@ -280,73 +307,13 @@ class PhoneControlReader:
         return commands
 
     def status(self) -> dict[str, Any]:
-        return {
-            "device": str(self.device),
-            "reader_open": self.descriptor is not None,
-            "reader_running": self.thread is not None and self.thread.is_alive(),
+        status = self.transport.status()
+        status.update({
+            "reader_running": self.running,
             "queued_commands": self.commands.qsize(),
             "last_error": self.last_error,
-        }
-
-
-def _write_all(device: Path, data: bytes, timeout_seconds: float) -> int:
-    deadline = time.monotonic() + timeout_seconds
-    try:
-        descriptor = os.open(device, os.O_WRONLY | os.O_NOCTTY | os.O_NONBLOCK)
-    except OSError as exc:
-        if exc.errno in {
-            errno.EACCES,
-            errno.EAGAIN,
-            errno.EBUSY,
-            errno.ENODEV,
-            errno.ENXIO,
-            errno.EPERM,
-        }:
-            raise PhoneUsbUnavailable(
-                "Galaxy USB receiver is not connected or has not opened CDC."
-            ) from exc
-        raise PhoneUsbError(f"Could not open phone USB endpoint: {exc}.") from exc
-    original_attributes = None
-    try:
-        try:
-            if termios is None or tty is None:
-                raise OSError("POSIX terminal control is unavailable.")
-            original_attributes = termios.tcgetattr(descriptor)
-            tty.setraw(descriptor, when=termios.TCSANOW)
-        except TERMINAL_ERRORS:
-            original_attributes = None
-        view = memoryview(data)
-        written = 0
-        while written < len(data):
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise PhoneUsbUnavailable("Galaxy USB write timed out.")
-            _, writable, _ = select.select([], [descriptor], [], remaining)
-            if not writable:
-                raise PhoneUsbUnavailable("Galaxy USB write timed out.")
-            try:
-                count = os.write(descriptor, view[written:])
-            except BlockingIOError:
-                continue
-            if count <= 0:
-                raise PhoneUsbUnavailable("Galaxy USB endpoint stopped accepting data.")
-            written += count
-        if termios is not None:
-            termios.tcdrain(descriptor)
-        return written
-    except OSError as exc:
-        if exc.errno in {errno.EAGAIN, errno.EIO, errno.ENODEV, errno.ENXIO}:
-            raise PhoneUsbUnavailable("Galaxy USB connection was interrupted.") from exc
-        raise PhoneUsbError(f"Galaxy USB write failed: {exc}.") from exc
-    finally:
-        if original_attributes is not None and termios is not None:
-            with suppress(termios.error):
-                termios.tcsetattr(
-                    descriptor,
-                    termios.TCSANOW,
-                    original_attributes,
-                )
-        os.close(descriptor)
+        })
+        return status
 
 
 class PhoneUsbOutbox:
@@ -356,13 +323,13 @@ class PhoneUsbOutbox:
         self,
         root: Path,
         *,
-        device: Path = Path("/dev/ttyGS0"),
+        transport: RouterMonitorTransport,
         timeout_seconds: float = 5.0,
     ) -> None:
         self.root = root
         self.outbox = root / "data" / "phone-outbox"
         self.results = root / "data" / "results"
-        self.device = device
+        self.transport = transport
         self.timeout_seconds = timeout_seconds
         self.outbox.mkdir(parents=True, exist_ok=True)
 
@@ -392,7 +359,7 @@ class PhoneUsbOutbox:
         return {
             "status": "queued",
             "protocol": "LWRX/2",
-            "device": str(self.device),
+            "transport": self.transport.name,
             "frame_bytes": len(frame),
             "metadata_bytes": len(_canonical_metadata(metadata)),
             "media_bytes": len(payload),
@@ -427,12 +394,12 @@ class PhoneUsbOutbox:
         frame = frame_path.read_bytes()
         parsed = parse_phone_frame(frame)
         started = time.perf_counter()
-        written = _write_all(self.device, frame, self.timeout_seconds)
+        written = self.transport.write(frame, self.timeout_seconds)
         elapsed = time.perf_counter() - started
         receipt = {
             "status": "sent",
             "protocol": "LWRX/2",
-            "device": str(self.device),
+            "transport": self.transport.name,
             "request_id": request_id,
             "media_type": parsed.media_type,
             "frame_bytes": len(frame),
@@ -461,7 +428,7 @@ class PhoneUsbOutbox:
         ).encode("utf-8")
         frame = build_phone_frame("status", metadata, payload)
         started = time.perf_counter()
-        written = _write_all(self.device, frame, min(self.timeout_seconds, 1.0))
+        written = self.transport.write(frame, min(self.timeout_seconds, 1.0))
         return {
             "status": "sent",
             "protocol": "LWRX/2",
@@ -472,10 +439,9 @@ class PhoneUsbOutbox:
         }
 
     def status(self) -> dict[str, Any]:
-        return {
+        status = self.transport.status()
+        status.update({
             "protocol": "LWRX/2",
-            "device": str(self.device),
-            "device_present": self.device.exists(),
-            "device_writable": os.access(self.device, os.W_OK),
             "queued_results": len(list(self.outbox.glob("*.lwr2"))),
-        }
+        })
+        return status

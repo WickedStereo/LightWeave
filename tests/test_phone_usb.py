@@ -20,11 +20,32 @@ from phone_usb import (  # noqa: E402
     HEADER,
     PhoneUsbError,
     PhoneUsbOutbox,
+    PhoneUsbUnavailable,
+    RouterMonitorTransport,
     build_control_frame,
     build_phone_frame,
     parse_control_frame,
     parse_phone_frame,
 )
+
+
+class FakeBridge:
+    def __init__(self) -> None:
+        self.connected = True
+        self.reads: list[object] = []
+        self.writes: list[bytes] = []
+
+    def call(self, method: str, *params, timeout: int = 10):
+        del timeout
+        if method == "mon/connected":
+            return self.connected
+        if method == "mon/read":
+            return self.reads.pop(0) if self.reads else b""
+        if method == "mon/write":
+            data = bytes(params[0])
+            self.writes.append(data)
+            return len(data)
+        raise AssertionError(method)
 
 
 @pytest.mark.parametrize(
@@ -86,16 +107,18 @@ def test_phone_control_crc_and_contract_fail_closed() -> None:
         parse_control_frame(b"LWCT")
 
 
-def test_outbox_is_atomic_and_records_delivery(tmp_path: Path, monkeypatch) -> None:
+def test_outbox_is_atomic_and_records_delivery(tmp_path: Path) -> None:
     request_id = str(uuid.uuid4())
     results = tmp_path / "data" / "results"
     results.mkdir(parents=True)
     (results / f"{request_id}.json").write_text(
         json.dumps({"request_id": request_id}), encoding="utf-8"
     )
-    device = tmp_path / "ttyGS0"
-    device.write_bytes(b"")
-    outbox = PhoneUsbOutbox(tmp_path, device=device)
+    bridge = FakeBridge()
+    outbox = PhoneUsbOutbox(
+        tmp_path,
+        transport=RouterMonitorTransport(bridge),
+    )
     queued = outbox.enqueue(
         request_id,
         "audio",
@@ -105,35 +128,47 @@ def test_outbox_is_atomic_and_records_delivery(tmp_path: Path, monkeypatch) -> N
     assert queued["status"] == "queued"
     assert not list(outbox.outbox.glob("*.partial"))
 
-    written: list[bytes] = []
-
-    def fake_write(_device: Path, data: bytes, _timeout: float) -> int:
-        written.append(data)
-        return len(data)
-
-    monkeypatch.setattr("phone_usb._write_all", fake_write)
     receipt = outbox.deliver_once()
     assert receipt is not None
     assert receipt["status"] == "sent"
     assert receipt["media_type"] == "audio"
     assert not list(outbox.outbox.glob("*.lwr2"))
-    assert parse_phone_frame(written[0]).payload == b"RIFFfixtureWAVE"
+    assert parse_phone_frame(bridge.writes[0]).payload == b"RIFFfixtureWAVE"
     stored = json.loads((results / f"{request_id}.json").read_text())
     assert stored["phone_usb"]["status"] == "sent"
 
 
-def test_outbox_sends_ephemeral_status(tmp_path: Path, monkeypatch) -> None:
-    device = tmp_path / "ttyGS0"
-    device.write_bytes(b"")
-    written: list[bytes] = []
-
-    def fake_write(_device: Path, data: bytes, _timeout: float) -> int:
-        written.append(data)
-        return len(data)
-
-    monkeypatch.setattr("phone_usb._write_all", fake_write)
-    receipt = PhoneUsbOutbox(tmp_path, device=device).send_status({"status": "idle"})
+def test_outbox_sends_ephemeral_status(tmp_path: Path) -> None:
+    bridge = FakeBridge()
+    receipt = PhoneUsbOutbox(
+        tmp_path,
+        transport=RouterMonitorTransport(bridge),
+    ).send_status({"status": "idle"})
     assert receipt["status"] == "sent"
-    parsed = parse_phone_frame(written[0])
+    parsed = parse_phone_frame(bridge.writes[0])
     assert parsed.media_type == "status"
     assert json.loads(parsed.payload) == {"status": "idle"}
+
+
+def test_router_monitor_transport_reads_bytes_and_integer_lists() -> None:
+    bridge = FakeBridge()
+    bridge.reads.extend([b"LW", [67, 84]])
+    transport = RouterMonitorTransport(bridge)
+    assert transport.read() == b"LW"
+    assert transport.read() == b"CT"
+    assert transport.status()["router_connected"] is True
+
+
+def test_router_monitor_transport_fails_closed() -> None:
+    bridge = FakeBridge()
+    bridge.connected = False
+    transport = RouterMonitorTransport(bridge)
+    with pytest.raises(PhoneUsbUnavailable, match="not connected"):
+        transport.read()
+    with pytest.raises(PhoneUsbUnavailable, match="not connected"):
+        transport.write(b"value")
+
+    bridge.connected = True
+    bridge.reads.append("not binary")
+    with pytest.raises(PhoneUsbError, match="Unexpected Router read type"):
+        transport.read()

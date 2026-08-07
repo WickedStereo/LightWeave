@@ -53,7 +53,7 @@ The ignored development APK is produced at
 ## Prepare the receiver UNO Q
 
 Install the accelerated receiver artifacts first, then the production App Lab
-receiver and its narrow USB-device permission:
+receiver and its checked Arduino Router monitor transport:
 
 ```powershell
 .\scripts\install_uno_q.ps1 -DeviceSerial <RX_SERIAL> -DryRun
@@ -64,9 +64,10 @@ receiver and its narrow USB-device permission:
 ```
 
 The installer keeps the original `image_receiver`, `laser_receiver_ui`, and
-`lightweave_optical_receiver` source unchanged. It grants only the running
-LightWeave Receiver service access to `/dev/ttyGS0`; it does not modify the
-base OS or transmitter.
+`lightweave_optical_receiver` source unchanged. LightWeave uses the UNO Q's
+boot-managed `arduino-router-serial.service` plus `mon/read`/`mon/write`, so the
+application container does not need direct `/dev/ttyGS0` access and the
+installer does not modify the base OS or transmitter.
 
 For standalone boot, verify that the production receiver is the App Lab
 default. The exercised receiver is already configured this way:
@@ -84,13 +85,11 @@ adb -s <RX_SERIAL> shell arduino-app-cli properties set default user:lightweave_
 ```
 
 Arduino App Lab launches the receiver application whenever UNO Q powers on.
-However, direct testing found that App Lab 0.12.1 does not merge the tracked
-`usb-compose.override.yaml` on that default-app boot path. The application can
-therefore appear running while `/dev/ttyGS0` remains cgroup-blocked. Until the
-repository supplies and validates a boot-safe mapping, reapply the installer
-after a power cycle before phone use; fully PC-free cold boot is not yet an
-accepted capability. The board also needs adequate power and a data-capable
-USB connection to the phone.
+The receiver's phone transport follows that supported boot path: the system
+serial service owns `/dev/ttyGS0` and exposes its bytes through Arduino Router,
+whose socket is already available to App Lab applications. No post-boot
+Compose override or laptop repair step is required. The board still needs
+adequate power and a data-capable USB connection to the phone.
 
 ## Standalone runtime
 
@@ -141,7 +140,12 @@ the Snapdragon Windows development system. Version 1.0.0/code 2 was installed
 on a real Galaxy S25 Ultra (`SM-S938U1`, Android 15/API 35, ARM64): it cold-
 started successfully, rendered the complete light/dark receiver UI, advertised
 USB-host capability, entered the expected disconnected state, and produced no
-crash entry. UNO Q-to-Windows CDC delivery was also verified byte-for-byte
-through `/dev/ttyGS0`. The final remaining hardware gate is direct S25-to-UNO-Q
-enumeration and permission, sustained board power, CDC controls/results, and an
-end-to-end text/image/audio run while the phone owns the USB cable.
+crash entry. The boot-managed Router path accepted an exact 12-byte Status
+control over the real USB CDC interface and returned a valid 192-byte `LWRX/2`
+idle response with a correct CRC. Direct S25 enumeration, permission, CDC
+opening, and control writes pass. Status, Listen, Cancel, and board-to-S25
+result display also pass. The exercised end-to-end run sent the exact 9-byte
+text `S25 PROOF` as a 21-byte `LWF1` optical frame, validated CRC `f8f8` and the
+stop bit on UNO Q, and rendered the text plus hardware evidence on the phone.
+Direct image/audio display, reconnect, and longer sustained power remain
+hardware gates.

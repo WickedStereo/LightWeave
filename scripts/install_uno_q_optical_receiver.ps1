@@ -30,7 +30,6 @@ $targetApp = "/home/arduino/ArduinoApps/lightweave_receiver"
 $targetDisplayName = "LightWeave Receiver"
 $requiredFiles = @(
     "app.yaml",
-    "usb-compose.override.yaml",
     "README.md",
     "optical_receiver.manifest.json",
     "assets/index.html",
@@ -97,6 +96,10 @@ if ($doctorText -notmatch 'APP_CLI=Arduino App CLI version') {
 & $AdbPath -s $DeviceSerial shell "test -c /dev/ttyGS0"
 if ($LASTEXITCODE -ne 0) {
     throw "Receiver UNO Q does not expose the expected /dev/ttyGS0 USB CDC gadget."
+}
+& $AdbPath -s $DeviceSerial shell "systemctl is-active --quiet arduino-router arduino-router-serial && systemctl is-enabled --quiet arduino-router-serial"
+if ($LASTEXITCODE -ne 0) {
+    throw "UNO Q's boot-managed Arduino Router serial bridge is unavailable."
 }
 $freeMatch = [regex]::Match($doctorText, 'FREE_KB=(\d+)')
 if (-not $freeMatch.Success -or [int64]$freeMatch.Groups[1].Value -lt 131072) {
@@ -201,7 +204,6 @@ $installCommand = @"
 set -eu
 mkdir -p '$targetApp/assets/libs' '$targetApp/python' '$targetApp/sketch' '$targetApp/data/inbox' '$targetApp/data/processing' '$targetApp/data/results' '$targetApp/data/phone-outbox'
 install -m 0644 '$stage/source/app.yaml' '$targetApp/app.yaml'
-install -m 0644 '$stage/source/usb-compose.override.yaml' '$targetApp/usb-compose.override.yaml'
 install -m 0644 '$stage/source/README.md' '$targetApp/README.md'
 install -m 0644 '$stage/source/optical_receiver.manifest.json' '$targetApp/optical_receiver.manifest.json'
 install -m 0644 '$stage/source/THIRD_PARTY_NOTICES.md' '$targetApp/THIRD_PARTY_NOTICES.md'
@@ -219,6 +221,7 @@ install -m 0644 '$stage/source/sketch/lightweave_optical_frame.h' '$targetApp/sk
 install -m 0644 '$uiSource/assets/libs/socket.io.min.js' '$targetApp/assets/libs/socket.io.min.js'
 test -x '$targetApp/runtime/lightweave-uno-runner'
 test -f '$targetApp/uno_q.manifest.json'
+rm -f '$targetApp/usb-compose.override.yaml'
 find '$stage/source' -type f -delete
 rmdir '$stage/source/assets' '$stage/source/python' '$stage/source/sketch' '$stage/source' '$stage'
 "@
@@ -271,23 +274,33 @@ if (-not $NoStart) {
     }
     & $AdbPath -s $DeviceSerial shell "arduino-app-cli app restart '$targetApp'"
     if ($LASTEXITCODE -ne 0) { throw "App Lab could not start lightweave_receiver." }
-    $usbComposeCommand = @'
+    $routerProbePython = @'
+from arduino.app_utils import Bridge
+
+if Bridge.call("mon/connected", timeout=2) is not True:
+    raise SystemExit("Arduino Router serial monitor is disconnected")
+print("Arduino Router monitor bridge is connected")
+'@
+    $routerProbeBase64 = [Convert]::ToBase64String(
+        [Text.Encoding]::UTF8.GetBytes($routerProbePython)
+    )
+    $routerProbeCommand = @'
 set -eu
 cd '__TARGET_APP__/.cache'
-docker compose -f app-compose.yaml -f ../usb-compose.override.yaml up -d --force-recreate
-container=$(docker compose -f app-compose.yaml -f ../usb-compose.override.yaml ps -q main)
+container=$(docker compose -f app-compose.yaml ps -q main)
 test -n "$container"
-docker exec "$container" test -r /dev/ttyGS0 -a -w /dev/ttyGS0
+printf %s '__PROBE_BASE64__' | base64 -d | docker exec -i "$container" python -
 '@
-    $usbComposeCommand = $usbComposeCommand.Replace('__TARGET_APP__', $targetApp)
-    & $AdbPath -s $DeviceSerial shell $usbComposeCommand
+    $routerProbeCommand = $routerProbeCommand.Replace('__TARGET_APP__', $targetApp)
+    $routerProbeCommand = $routerProbeCommand.Replace('__PROBE_BASE64__', $routerProbeBase64)
+    & $AdbPath -s $DeviceSerial shell $routerProbeCommand
     if ($LASTEXITCODE -ne 0) {
-        throw "The receiver service could not access the UNO Q USB CDC gadget."
+        throw "The receiver service could not access the Arduino Router monitor."
     }
 }
 
 Write-Host "Reusable source hashes are unchanged."
 if (-not $NoStart) {
-    Write-Host "Phone USB endpoint: /dev/ttyGS0 is readable and writable in the receiver service."
+    Write-Host "Phone USB transport: boot-managed Arduino Router mon/read and mon/write."
 }
 Write-Host "LightWeave receiver installation completed."
