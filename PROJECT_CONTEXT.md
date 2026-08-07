@@ -6,8 +6,8 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | Galaxy app installed and rendered; direct UNO Q-to-phone hardware validation pending |
-| Primary milestone | Validate the final direct USB-C Galaxy S25 Ultra + receiver UNO Q data path |
+| Phase | Direct S25 USB enumeration passed; boot-safe UNO Q CDC service mapping is blocked |
+| Primary milestone | Make the default receiver boot path retain `/dev/ttyGS0` access, then revalidate phone controls/results |
 | Secondary milestone | Submission hardening and presentation evidence |
 | Last updated | 2026-08-07 |
 | Approval gate | Application implementation explicitly approved on 2026-08-05 |
@@ -119,10 +119,16 @@ override grants only that service access to `/dev/ttyGS0`; the base OS,
 receiver decode path, STM32 sketch, and transmitter are unchanged. The
 installer reapplies and checks that override after App Lab deployment. Direct
 board inspection on 2026-08-07 reports **LightWeave Receiver** as both `running`
-and the persisted App Lab `default`; the enabled App CLI boot service therefore
-launches it automatically whenever the UNO Q powers on. A receiver-side PC is
-not required after installation, although the board still needs adequate power
-and its USB data connection to the phone.
+and the persisted App Lab `default`; the enabled App CLI boot service launches
+the application whenever the UNO Q powers on. A later direct S25 test exposed a
+critical qualification: App Lab's default-app boot path generated the base
+container without applying the adjacent Compose override. The live container
+could see `/dev/ttyGS0` through its broad `/dev` mount, but its Docker device
+allow-list was empty and an actual open failed with `Operation not permitted`.
+The receiver therefore starts after boot but cannot serve the phone until this
+boot-path mapping is made persistent. A receiver-side PC is not part of the
+intended final runtime; adequate power and the phone USB data link are still
+required.
 
 The UNO Q reconstruction boundary is now verified independently of the phone.
 Its native ARM64 rANS decoder produces the same latent tensor as CompressAI for
@@ -135,9 +141,13 @@ Adreno reconstructed 4,469-byte PNG with its 1,909-byte evidence metadata and
 correct PNG signature. The fresh APK was then built, installed, and cold-started
 on the real S25 Ultra. Its complete receiver UI rendered in both light and dark
 modes with no crash, and Android reported USB-host capability. The remaining
-uncertainty is direct S25-to-UNO-Q enumeration, permission, power, CDC exchange,
-and decoded-media delivery, not the independent app UI, UNO Q USB gadget, or
-reconstruction path.
+S25 host logs subsequently proved direct enumeration of `UNO Q - unoq2` as
+`2341:0078`, exposed its expected ADB plus CDC/ACM interfaces, and showed the
+LightWeave app opening serial and sending exact 12-byte control frames. No
+response arrived because the boot-started receiver container lacked permission
+to open `/dev/ttyGS0`. Remaining work is the persistent App Lab device mapping,
+followed by status/control and decoded-media delivery; phone enumeration and
+application CDC opening are no longer uncertain.
 
 Documentation claims: Arduino specifies that UNO Q has a Qualcomm Dragonwing
 QRB2210 MPU running Debian, an STM32U585 MCU, Bridge/RPC, Wi-Fi, Bluetooth, and
@@ -145,8 +155,10 @@ USB-C role switching. Samsung specifies USB-C/USB 3.2 Gen 1 for the Galaxy S25
 Ultra. Direct local PC observation: UNO Q enumerated as Arduino USB composite
 `2341:0078` with ADB and a standard USB serial interface. Direct S25 evidence:
 Samsung `SM-S938U1`, Android 15/API 35, ARM64, successful APK installation and
-rendering, and `android.hardware.usb.host`. UNO Q-to-S25 enumeration, sustained
-power, Android CDC matching, and throughput remain unexercised.
+rendering, and `android.hardware.usb.host`. The S25 then enumerated the real
+receiver through an Anker USB-C host hub, matched its CDC interfaces, opened the
+serial link, and sent controls. Sustained power, board responses, decoded-media
+throughput, and reconnect remain unverified until the boot mapping is fixed.
 
 ### Qualcomm edge-device inference targets
 
@@ -639,7 +651,10 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Real decoded result delivery | Existing strict-Adreno 64 by 64 PNG delivered as a valid 6,398-byte `LWRX/2` frame; 4,469 PNG bytes and 1,909 metadata bytes |
 | S25 install and screen | Pass on `SM-S938U1`, Android 15/API 35, ARM64; cold launch in 228 ms, light/dark receiver UI rendered, app resumed, and no crash entries |
 | S25 USB-host capability | Present as `android.hardware.usb.host`; disconnected controls correctly remain disabled until a matching board is attached |
-| Direct S25/UNO Q cable, power, and CDC | Not yet exercised; final hardware gate |
+| Direct S25 UNO Q enumeration | Pass through the exercised USB-C host hub: `UNO Q - unoq2`, `2341:0078`, ADB plus CDC/ACM interfaces |
+| Android CDC open/control transmit | Pass: app reported receiver ready and sent exact 12-byte Status/Listen/Cancel controls |
+| UNO Q boot-started CDC service | Fail: live container device allow-list empty; `/dev/ttyGS0` open returns `Operation not permitted`, so no board response reaches the phone |
+| Direct decoded-media delivery/power/reconnect | Pending boot-safe device mapping and retest |
 
 ### Product surface and packaging
 
@@ -654,7 +669,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Monochrome dashboard refresh | Pass; text-first square layout, no gradients/shadows, responsive at 390 px without horizontal overflow |
 | Multi-size browser workflow | Pass; balanced sample transmit/verify and separate receiver upload both reconstructed 128 by 128 with 0 CPU profile nodes |
 | Raw disconnected-runtime smoke | Pass for balanced strict image QNN and audio hybrid; 216/376 raw bytes and exact outputs |
-| Android standalone receiver | Fresh APK, text/image/audio/status, Listen/Cancel, save/playback, evidence UI, unit tests, lint, S25 install, and real-device rendering pass; direct UNO Q cable pending |
+| Android standalone receiver | Fresh APK, text/image/audio/status, Listen/Cancel, save/playback, evidence UI, tests/lint, S25 install/render, direct enumeration, CDC open, and control writes pass; board response blocked by boot container permissions |
 | UNO Q native receiver | All image profiles reconstruct on Adreno Vulkan with strict no-fallback and at least 36.34 dB accelerator/CPU parity |
 | UNO Q App Lab WebUI | Rendered browser upload/reconstruction/download and oversize error pass; balanced accelerator time about 524 ms; no console errors |
 | UNO Q audio receiver | One- and five-second raw payloads reconstruct through CPU plus a strict 39-layer Adreno suffix at 52.07 dB or better PyTorch parity |
@@ -693,12 +708,12 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Raw 128 by 128 strict QNN decoder | Complete locally | QUInt16 QDQ, 66.74 dB minimum CPU parity, no fallback, 0 CPU nodes, 51.29 dB minimum NPU/CPU parity |
 | Raw milestone publication | Complete | Commit `140f9ae`; GitHub Actions run `31047777514` passed |
 | Multi-size dashboard publication | Complete | Commit `9aee230`; GitHub Actions run `31057418505` passed |
-| Android standalone receiver | App installed/rendered on S25; direct UNO Q cable pending | Fresh APK, 7 unit tests/lint, real S25 cold launch/UI/no-crash check, plus duplex controls/status and reconstructed-PNG USB delivery on the UNO Q gadget |
+| Android standalone receiver | Direct phone enumeration/control passed; boot mapping blocked | S25 enumerated/opened CDC and sent controls; default-started receiver container cannot open `/dev/ttyGS0` because the Compose override was not applied |
 | UNO Q accelerator feasibility | Complete | ncnn Vulkan executes all three complete graphs on Adreno 702; QNN/FastRPC is absent on the exercised image |
 | UNO Q native receiver | Complete locally | Native rANS, strict runner, CLI, rendered API/WebUI, manifest, SPDX SBOM, offline bundle, dry-run/idempotent installer, and 60-test repository suite pass |
 | UNO Q receiver publication | Complete | Source/evidence commit `8074645` and Android-preservation commit `fa19c64` published to `origin/main` |
 | UNO Q audio receiver | Complete and published | Commit `03b0bd7`; native unpack/codebook parity, earliest valid split 5, strict 39-layer Adreno suffix, 1/5-second parity, CLI/API/WebUI, offline bundle, installer, and offline smoke pass |
-| Android receiver UI and hardware path | Published and installed; direct cable gate remains | Commit `81c8888`; no-laptop app, UNO Q USB controls/results, tests, setup, and real S25 install/render evidence complete; direct board enumeration/data remains |
+| Android receiver UI and hardware path | Published/installed; boot-safe board mapping required | Commit `81c8888`; phone enumeration and control writes now pass, but App Lab autostart omits the device allow-list and prevents board responses |
 | Windows-to-UNO Q transmitter flow | Complete and published | Commit `028f9d9`; dashboard image/audio Send actions, USB/ADB sink, atomic App Lab inbox, variable-length STM32 loop, tracked clone source, installer, and real 104/124/188-byte board acceptance pass |
 | UNO Q optical byte diagnostic | Complete and published | Commit `80ba103`; exact `00 FF AA 55` received twice with matching SHA-256 and valid stop bit |
 | UNO Q optical image receiver | Complete and published | Commit `506eee9`; two 80-byte physical image transfers passed exact-byte, stop-bit, 64-by-64 PNG, 16-layer Adreno, strict-no-fallback, App Lab UI, and zero-console-error gates |
@@ -741,6 +756,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Phone receives an unsafe allocation | Reject metadata above 256 KiB, decoded media above 16 MiB, and decoded images above 16 megapixels before rendering |
 | App Lab container cannot access gadget CDC by default | The generated service cgroup rejected major 505 even with the device visible; a checked Compose override maps only `/dev/ttyGS0` and the installer verifies read/write access after restart |
 | Phone may not sustain UNO Q power | Direct S25 behavior remains a hardware gate; use a standards-compliant USB-C OTG/PD powered hub while preserving S25 host and UNO Q device roles if needed |
+| App Lab default boot omits the tracked USB Compose override | Directly reproduced: app is running/default, but container device allow-list is empty and `/dev/ttyGS0` open fails `EPERM`; make the device grant part of the supported boot lifecycle before claiming standalone operation |
 | Multiple ADB devices are connected | Automatically select the only UNO Q running the tracked transmitter marker; fail on ambiguity and retain the serial override |
 | App Lab allows only one active application | Installer does not stop anything by default; the explicit `-StopRunningApp` option performs the reversible stop before starting `lightweave_transmitter` |
 | USB inbox is interrupted or stale | Publish payload/metadata atomically, publish the descriptor last, verify SHA-256/length/request ID, ignore partial files, and return per-request result files |
@@ -913,3 +929,4 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-06 | Published the standalone Galaxy receiver implementation as commit `81c8888` and pushed the annotated `lightweave-pre-android-rebuild` backup tag; transmitter source and logic remained unchanged. |
 | 2026-08-07 | Rebuilt the canonical Android Studio project, passed lint and all seven unit tests, installed version 1.0.0/code 2 on the real S25 Ultra, and verified its light/dark disconnected UI, USB-host feature, resumed activity, and crash-free startup; direct UNO Q cable exchange remains the final gate. |
 | 2026-08-07 | Verified from the live UNO Q that LightWeave Receiver is running and stored as the App Lab default startup application; confirmed the enabled App CLI boot service and documented that the final receiver needs power plus the phone cable, not a PC. |
+| 2026-08-07 | Exercised the direct S25 host path: Android enumerated the real receiver and LightWeave opened CDC and sent controls, but no response arrived because App Lab default boot omitted the Compose device allow-list; reproduced `/dev/ttyGS0` `EPERM` in the live container and marked standalone boot blocked pending a persistent mapping. |

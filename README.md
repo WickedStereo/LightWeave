@@ -284,8 +284,11 @@ override, retains completed outputs in a durable phone outbox, and has passed
 duplex control/status plus a real reconstructed-PNG delivery test through the
 UNO Q USB gadget. The same debug build is installed and visually verified on a
 real Galaxy S25 Ultra (`SM-S938U1`, Android 15), including its disconnected
-state and light/dark UI. Direct Galaxy-to-UNO-Q enumeration, CDC exchange, and
-sustained phone power remain the final physical gate. See
+state and light/dark UI. Direct Galaxy-to-UNO-Q enumeration and Android CDC
+control writes also pass. The remaining blocker is on UNO Q: App Lab default
+boot omits the custom `/dev/ttyGS0` container grant, so the board cannot answer
+until that boot-safe mapping is fixed. Decoded-media exchange, reconnect, and
+sustained phone power remain physical gates. See
 [android/README.md](android/README.md) for setup, standalone usage, powered-hub
 guidance, and both USB protocols.
 

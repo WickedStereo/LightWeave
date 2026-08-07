@@ -83,9 +83,14 @@ manual default-app change, restore it once with:
 adb -s <RX_SERIAL> shell arduino-app-cli properties set default user:lightweave_receiver
 ```
 
-Arduino App Lab then launches the receiver automatically whenever UNO Q powers
-on. The receiver no longer needs a PC, but it still needs adequate power and a
-data-capable USB connection to the phone.
+Arduino App Lab launches the receiver application whenever UNO Q powers on.
+However, direct testing found that App Lab 0.12.1 does not merge the tracked
+`usb-compose.override.yaml` on that default-app boot path. The application can
+therefore appear running while `/dev/ttyGS0` remains cgroup-blocked. Until the
+repository supplies and validates a boot-safe mapping, reapply the installer
+after a power cycle before phone use; fully PC-free cold boot is not yet an
+accepted capability. The board also needs adequate power and a data-capable
+USB connection to the phone.
 
 ## Standalone runtime
 

@@ -37,11 +37,11 @@ private endpoints, and confidential material must never appear here.
 | [AnythingLLM NPU chatbot](https://github.com/thatrandomfrenchdude/simple-npu-chatbot) | Later reference | Local NPU demo structure | Not a runtime dependency |
 | Scaler Chatbot | Unavailable reference | Potential local chatbot sample | No unambiguous public link supplied |
 | [Awesome Qualcomm Developer](https://qualcomm.github.io/awesome-qualcomm-developer/) | Discovery reference | Comparable projects and samples | Available |
-| [Arduino UNO Q documentation](https://docs.arduino.cc/hardware/uno-q) | Active hardware documentation | QRB2210 receiver, Debian/App Lab deployment, and direct USB phone interface | Board receiver and S25 app exercised separately; direct cable pending |
+| [Arduino UNO Q documentation](https://docs.arduino.cc/hardware/uno-q) | Active hardware documentation | QRB2210 receiver, Debian/App Lab deployment, and direct USB phone interface | Direct S25 enumeration/control exercised; App Lab boot device mapping blocked |
 | [ncnn](https://github.com/Tencent/ncnn) Vulkan runtime | Active third-party tooling | Complete image synthesis and EnCodec suffix execution on UNO Q Adreno 702 | All image graphs and the selected 39-layer audio suffix exercised with strict no-fallback |
 | [Meta EnCodec](https://github.com/facebookresearch/encodec) | Model/preparation dependency | 24 kHz raw audio codebooks and decoder conversion | Native UNO Q conversion validated; upstream Python runtime is not installed on board |
-| [Android USB host documentation](https://developer.android.com/develop/connectivity/usb/host) | Platform documentation | Galaxy S25 USB enumeration, permission, and endpoint workflow | App installed and rendered on S25 with USB-host feature; direct board path pending |
-| [usb-serial-for-android](https://github.com/mik3y/usb-serial-for-android) 3.10.0 | Third-party Android library | CDC/ACM transport for decoded UNO Q results | Integrated, built, and installed on S25; real UNO Q/S25 match not exercised |
+| [Android USB host documentation](https://developer.android.com/develop/connectivity/usb/host) | Platform documentation | Galaxy S25 USB enumeration, permission, and endpoint workflow | Real UNO Q enumeration, interface match, and CDC open exercised successfully |
+| [usb-serial-for-android](https://github.com/mik3y/usb-serial-for-android) 3.10.0 | Third-party Android library | CDC/ACM transport for decoded UNO Q results | Real S25 opened UNO Q CDC and wrote controls; board response blocked downstream |
 | Provided `qualcomm/edge-ai-labs-arduino` RPC path | Later hardware reference | Future UNO Q byte adapter | Stale/404 |
 | [Arduino MessagePack RPC router](https://github.com/arduino/arduino-router) | Later hardware reference | Maintained UNO Q RPC alternative | Available; hardware phase deferred |
 
@@ -523,7 +523,7 @@ private endpoints, and confidential material must never appear here.
 | Workaround | Use Android Studio/ADB for one-time installation and UI checks, then test UNO Q directly with on-screen evidence; when available, enable trusted-network wireless debugging before moving the cable. Use a standards-compliant powered OTG/PD hub if UNO Q power is unstable. |
 | Suggested improvement | Publish a maintained UNO Q-to-Android sample and test checklist covering USB roles, permission filters, CDC endpoint selection, phone power budgets, powered-hub topology, wireless-debug handoff, reconnect, and offline binary result delivery. |
 
-### DX-035 - App Lab default state makes the receiver independent of a PC after installation
+### DX-035 - App Lab default state identifies the boot app but not full device readiness
 
 | Field | Observation |
 | --- | --- |
@@ -532,10 +532,24 @@ private endpoints, and confidential material must never appear here.
 | Tool/source | Live `arduino-app-cli` state, systemd service configuration, container inspection, and the official Arduino UNO Q user manual's startup-app section |
 | Intended workflow | Persist LightWeave Receiver as the board's boot application so the final display contains only the powered receiver UNO Q and Galaxy phone |
 | Actual result and evidence | `arduino-app-cli properties get default` returned **LightWeave Receiver** at `/home/arduino/ArduinoApps/lightweave_receiver`; the app list marked it `running` and `default: true`. `arduino-app-cli.service` is enabled for `multi-user.target` with `Restart=always`. The application container itself has Docker restart policy `no`, so App Lab's persisted default/boot daemon—not Docker—is the correct startup owner. Arduino's manual states that the DEFAULT app runs automatically on boot. No reboot was needed for this read-only verification. |
-| Usefulness | Confirms the receiver-side laptop can be removed after installation; power-on launches the Linux application and its paired MCU workflow through the supported App Lab lifecycle |
-| Friction and owner | Docker restart policy alone gives the misleading impression that the app will not return after boot, while the authoritative state is split across App Lab's default property and its systemd daemon. This is an Arduino App Lab observability/documentation concern. |
-| Workaround | Check `arduino-app-cli properties get default` rather than Docker policy. After a reimage or manual app change, set `user:lightweave_receiver` as default once and verify the application list. |
+| Usefulness | Confirms which Linux application App Lab launches after power-on; DX-036 later proves that this alone does not preserve the custom CDC device grant required for a standalone receiver |
+| Friction and owner | Docker restart policy alone gives the misleading impression that the app will not return after boot, while DEFAULT/running state gives the opposite misleading impression that all required devices are usable. State is split across App Lab's default property, its systemd daemon, and generated container policy. This is an Arduino App Lab observability/documentation concern. |
+| Workaround | Check `arduino-app-cli properties get default` for boot identity, then separately verify every required device with an actual open from the live container. After a reimage or manual app change, set `user:lightweave_receiver` as default once and verify the application list. |
 | Suggested improvement | App CLI Doctor/status should print one explicit line combining default-app identity, boot-service health, current runtime state, and whether the app will launch after the next power cycle. |
+
+### DX-036 - Default-app boot drops the custom CDC device grant
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-07; diagnose why the installed S25 app detected UNO Q and sent controls but displayed no receiver output |
+| Environment | Galaxy S25 Ultra `SM-S938U1`, Android 15/API 35; `usb-serial-for-android` 3.10.0; receiver UNO Q `371371094`/`unoq2`, QRB2210 Debian ARM64, App CLI 0.12.1, Docker 26.1.5+dfsg1; Anker USB-C host hub |
+| Tool/source | Android USB manager/logcat and retained LightWeave UI event log; live App CLI/container state; Docker inspect; direct `/dev/ttyGS0` open probe |
+| Intended workflow | Power the default receiver independently, let S25 enumerate its composite gadget, send `LWCT/1` controls over CDC, and receive `LWRX/2` status/media without a laptop |
+| Actual result and evidence | Android enumerated `UNO Q - unoq2` as `2341:0078` with ADB, CDC control, and CDC data interfaces. LightWeave reported `USB connected / receiver ready` and multiple exact 12-byte controls, including Listen. The serial reader remained open until physical detach. On UNO Q, LightWeave Receiver was running/default, but Docker inspect showed an empty device allow-list. The node was visible via the base `/dev` mount, yet `dd if=/dev/ttyGS0 ... count=0` failed `Operation not permitted`. The adjacent `usb-compose.override.yaml` correctly declares `/dev/ttyGS0`, but App Lab's default boot did not apply it. No controls reached the receiver worker and no phone outbox response was created. |
+| Usefulness | Proves the Android USB identity, host role, CDC probing, permission, serial open, and control-write path are functional, and isolates the failure to reproducible UNO Q container lifecycle policy rather than the phone app or optical decoder |
+| Friction and owner | App Lab can persist an application as DEFAULT but does not persist or automatically merge its adjacent Compose override. The UI reports the app running even though a required device is cgroup-blocked. This is Arduino App Lab lifecycle/observability friction. |
+| Workaround | The existing installer can manually recreate the service with both Compose files, but that state is lost on the unsupported default-app boot path; treat it only as a temporary diagnostic until a boot-safe, repository-managed device grant is implemented. |
+| Suggested improvement | App Lab should support reviewed per-app device declarations in `app.yaml`, persist them through default boot/restart, and fail application health when a declared device exists but cannot be opened. |
 
 ## Change log
 
@@ -583,3 +597,4 @@ private endpoints, and confidential material must never appear here.
 | 2026-08-06 | Published the standalone Galaxy receiver source, board bridge, tests, setup guidance, and evidence as commit `81c8888`, with the pre-rebuild receiver baseline preserved by a pushed annotated tag. |
 | 2026-08-07 | Rebuilt and installed the canonical app on a real S25 Ultra, verified cold startup, light/dark rendering, USB-host capability, disconnected control state, manifest network boundary, and a clean crash buffer; retained direct UNO Q cable exchange as the remaining hardware gate. |
 | 2026-08-07 | Verified that the live production receiver is the persisted App Lab DEFAULT app and that the boot daemon is enabled; documented the one-time verification/recovery command and clarified that Docker restart policy is not the startup authority. |
+| 2026-08-07 | Directly proved S25 USB-host enumeration and LightWeave CDC/control writes, then isolated the missing response to App Lab default boot dropping the custom `/dev/ttyGS0` device grant; recorded the exact empty allow-list and `EPERM` evidence. |
