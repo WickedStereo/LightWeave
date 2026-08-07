@@ -523,6 +523,20 @@ private endpoints, and confidential material must never appear here.
 | Workaround | Use Android Studio/ADB for one-time installation and UI checks, then test UNO Q directly with on-screen evidence; when available, enable trusted-network wireless debugging before moving the cable. Use a standards-compliant powered OTG/PD hub if UNO Q power is unstable. |
 | Suggested improvement | Publish a maintained UNO Q-to-Android sample and test checklist covering USB roles, permission filters, CDC endpoint selection, phone power budgets, powered-hub topology, wireless-debug handoff, reconnect, and offline binary result delivery. |
 
+### DX-035 - App Lab default state makes the receiver independent of a PC after installation
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-07; determine whether the production receiver will start after power-on without a development PC |
+| Environment | Receiver UNO Q `371371094`; Qualcomm QRB2210/Debian ARM64; Arduino App CLI 0.12.1; production `lightweave_receiver` App Lab application |
+| Tool/source | Live `arduino-app-cli` state, systemd service configuration, container inspection, and the official Arduino UNO Q user manual's startup-app section |
+| Intended workflow | Persist LightWeave Receiver as the board's boot application so the final display contains only the powered receiver UNO Q and Galaxy phone |
+| Actual result and evidence | `arduino-app-cli properties get default` returned **LightWeave Receiver** at `/home/arduino/ArduinoApps/lightweave_receiver`; the app list marked it `running` and `default: true`. `arduino-app-cli.service` is enabled for `multi-user.target` with `Restart=always`. The application container itself has Docker restart policy `no`, so App Lab's persisted default/boot daemon—not Docker—is the correct startup owner. Arduino's manual states that the DEFAULT app runs automatically on boot. No reboot was needed for this read-only verification. |
+| Usefulness | Confirms the receiver-side laptop can be removed after installation; power-on launches the Linux application and its paired MCU workflow through the supported App Lab lifecycle |
+| Friction and owner | Docker restart policy alone gives the misleading impression that the app will not return after boot, while the authoritative state is split across App Lab's default property and its systemd daemon. This is an Arduino App Lab observability/documentation concern. |
+| Workaround | Check `arduino-app-cli properties get default` rather than Docker policy. After a reimage or manual app change, set `user:lightweave_receiver` as default once and verify the application list. |
+| Suggested improvement | App CLI Doctor/status should print one explicit line combining default-app identity, boot-service health, current runtime state, and whether the app will launch after the next power cycle. |
+
 ## Change log
 
 | Date | Change |
@@ -568,3 +582,4 @@ private endpoints, and confidential material must never appear here.
 | 2026-08-06 | Replaced the old Android prototype with the no-laptop LightWeave Mobile text/image/audio receiver, exposed the UNO Q gadget endpoint narrowly through App Lab, passed 137 Python tests plus Android build/lint/7 tests, and recorded exact duplex control/status plus reconstructed-PNG USB evidence while keeping direct S25 behavior as the final gate. |
 | 2026-08-06 | Published the standalone Galaxy receiver source, board bridge, tests, setup guidance, and evidence as commit `81c8888`, with the pre-rebuild receiver baseline preserved by a pushed annotated tag. |
 | 2026-08-07 | Rebuilt and installed the canonical app on a real S25 Ultra, verified cold startup, light/dark rendering, USB-host capability, disconnected control state, manifest network boundary, and a clean crash buffer; retained direct UNO Q cable exchange as the remaining hardware gate. |
+| 2026-08-07 | Verified that the live production receiver is the persisted App Lab DEFAULT app and that the boot daemon is enabled; documented the one-time verification/recovery command and clarified that Docker restart policy is not the startup authority. |

@@ -117,7 +117,12 @@ The receiver App Lab service receives controls and persists every decoded
 result in `data/phone-outbox` until USB delivery succeeds. A narrow Compose
 override grants only that service access to `/dev/ttyGS0`; the base OS,
 receiver decode path, STM32 sketch, and transmitter are unchanged. The
-installer reapplies and checks that override after App Lab deployment.
+installer reapplies and checks that override after App Lab deployment. Direct
+board inspection on 2026-08-07 reports **LightWeave Receiver** as both `running`
+and the persisted App Lab `default`; the enabled App CLI boot service therefore
+launches it automatically whenever the UNO Q powers on. A receiver-side PC is
+not required after installation, although the board still needs adequate power
+and its USB data connection to the phone.
 
 The UNO Q reconstruction boundary is now verified independently of the phone.
 Its native ARM64 rANS decoder produces the same latent tensor as CompressAI for
@@ -907,3 +912,4 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-06 | Rebuilt LightWeave Mobile for bidirectional USB Listen/Cancel/Status and decoded text/PNG/WAV/evidence, added the receiver's durable `LWRX/2` outbox and narrow `/dev/ttyGS0` App Lab mapping, passed 137 Python tests plus Android build/lint/7 tests, and physically verified status, listen/cancel, and real reconstructed-PNG delivery through the UNO Q USB gadget. Direct S25 validation remains pending. |
 | 2026-08-06 | Published the standalone Galaxy receiver implementation as commit `81c8888` and pushed the annotated `lightweave-pre-android-rebuild` backup tag; transmitter source and logic remained unchanged. |
 | 2026-08-07 | Rebuilt the canonical Android Studio project, passed lint and all seven unit tests, installed version 1.0.0/code 2 on the real S25 Ultra, and verified its light/dark disconnected UI, USB-host feature, resumed activity, and crash-free startup; direct UNO Q cable exchange remains the final gate. |
+| 2026-08-07 | Verified from the live UNO Q that LightWeave Receiver is running and stored as the App Lab default startup application; confirmed the enabled App CLI boot service and documented that the final receiver needs power plus the phone cable, not a PC. |

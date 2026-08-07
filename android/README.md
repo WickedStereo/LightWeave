@@ -68,6 +68,25 @@ The installer keeps the original `image_receiver`, `laser_receiver_ui`, and
 LightWeave Receiver service access to `/dev/ttyGS0`; it does not modify the
 base OS or transmitter.
 
+For standalone boot, verify that the production receiver is the App Lab
+default. The exercised receiver is already configured this way:
+
+```powershell
+adb -s <RX_SERIAL> shell arduino-app-cli properties get default
+```
+
+The expected value is `LightWeave Receiver` at
+`/home/arduino/ArduinoApps/lightweave_receiver`. After a board reimage or a
+manual default-app change, restore it once with:
+
+```powershell
+adb -s <RX_SERIAL> shell arduino-app-cli properties set default user:lightweave_receiver
+```
+
+Arduino App Lab then launches the receiver automatically whenever UNO Q powers
+on. The receiver no longer needs a PC, but it still needs adequate power and a
+data-capable USB connection to the phone.
+
 ## Standalone runtime
 
 1. Ensure **LightWeave Receiver** is already running on the receiver UNO Q.
