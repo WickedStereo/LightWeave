@@ -23,9 +23,11 @@ Three data representations coexist:
 
 ## Team
 
-The final public names and email addresses are intentionally not guessed from
-Git metadata. The repository owner must replace this note with the complete
-team roster before submitting the GitHub link.
+| Name | Email |
+| --- | --- |
+| Anish Miryala | <amiryala@qti.qualcomm.com> |
+| Rakshithraj Pulluri | <rpulluri@qti.qualcomm.com> |
+| Lalana Palwaye | <lpalwaye@qti.qualcomm.com> |
 
 The image path is fully NPU-backed. CompressAI creates an entropy-coded image
 payload, the receiver restores the latent tensor on CPU, and the complete
@@ -397,15 +399,11 @@ reconstructs image and one-second audio fixtures through `LWF1`; the supported
 five-second audio decoder was not subjected to the intentionally long optical
 stress transfer.
 
-- [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) is the living source of truth.
 - [docs/QUALCOMM_DEVELOPER_EXPERIENCE.md](docs/QUALCOMM_DEVELOPER_EXPERIENCE.md)
   records Qualcomm tools, evidence, friction, and improvement suggestions.
 - [data/demo_manifest.json](data/demo_manifest.json) defines the public image
   acceptance set and oversize stress case.
 - [models/manifest.json](models/manifest.json) pins model sources, hashes,
   profiles, shapes, and expected generated artifacts.
-- [docs/SUBMISSION_CHECKLIST.md](docs/SUBMISSION_CHECKLIST.md) audits the
-  repository against the hackathon delivery requirements and identifies the
-  remaining owner-only actions.
 
 Licensed under the [MIT License](LICENSE).
