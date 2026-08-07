@@ -1,9 +1,14 @@
-# LightWeave UNO Q optical receiver
+# LightWeave UNO Q receiver
 
 This App Lab project combines one-shot self-describing optical reception with
 the installed native LightWeave image and audio decoders. It remains separate
 from `lightweave_byte_receiver`, which is the unchanged `raw-v0` transport
 diagnostic.
+
+The production App Lab ID is `lightweave_receiver` and its display name is
+**LightWeave Receiver**. Installation leaves the original
+`laser_receiver_ui`, `image_receiver`, and former
+`lightweave_optical_receiver` projects untouched.
 
 The WebUI has a single **Listen for transfer** action and optional cancel. The
 STM32 reads and validates the ten-byte LWF1 header, declared raw payload, CRC,
@@ -17,6 +22,8 @@ not transition-based clock recovery; general clock recovery remains deferred.
 
 Profile routing is automatic:
 
+- `0x20` validates and stores 1-100 printable ASCII bytes as text. This path
+  uses no AI model or accelerator.
 - `0x01`, `0x02`, and `0x03` run the complete 64-, 128-, or 256-pixel image
   synthesis graph on Adreno Vulkan with neural CPU fallback forbidden.
 - `0x10` reconstructs up to five seconds of audio using CPU codebooks and

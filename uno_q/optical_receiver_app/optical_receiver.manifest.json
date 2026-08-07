@@ -1,7 +1,8 @@
 {
-  "schema_version": 2,
-  "application_id": "lightweave_optical_receiver",
-  "media_types": ["image", "audio"],
+  "schema_version": 3,
+  "application_id": "lightweave_receiver",
+  "display_name": "LightWeave Receiver",
+  "media_types": ["text", "image", "audio"],
   "source_runtime": "lightweave-uno",
   "wire_format": "LWF1",
   "optical_contract": {
@@ -21,7 +22,14 @@
     "0x01": "I64-Q1-B128",
     "0x02": "I128-Q1-B768",
     "0x03": "I256-Q1-B2048",
-    "0x10": "A1-E15-S<n>"
+    "0x10": "A1-E15-S<n>",
+    "0x20": "T1-ASCII-B100"
+  },
+  "text": {
+    "maximum_bytes": 100,
+    "encoding": "printable ASCII",
+    "ai_model": false,
+    "output": "txt"
   },
   "audio": {
     "chunk_bytes": 188,

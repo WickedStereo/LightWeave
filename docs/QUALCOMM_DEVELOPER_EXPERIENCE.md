@@ -453,6 +453,34 @@ private endpoints, and confidential material must never appear here.
 | Workaround | Use `http://<current-board-ip>:7000` on the same IPv4 subnet, confirm plain HTTP, disable phone VPN/cellular fallback during testing, and reserve the DHCP address or use a controlled demo router/hotspot. Keep the page on a trusted LAN because it has no authentication. |
 | Suggested improvement | App Lab should display the active LAN URL, connection/interface state, and WebUI reachability in a device status panel, with clear guidance for mDNS, guest-network isolation, and secure remote access. |
 
+### DX-030 - The original App Lab text demo is useful logic, not a production protocol
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-06; inspect the original text transmitter/receiver and integrate its useful behavior into LightWeave |
+| Environment | Two stopped Arduino UNO Q App Lab projects; Arduino Zephyr/RouterBridge path; Python WebUI backends and browser assets inspected read-only over ADB |
+| Tool/source | `laser_transmitter_ui`, `laser_receiver_ui`, Arduino App Lab WebUI Brick, RouterBridge, and STM32 sketches |
+| Intended workflow | Preserve simple text-over-light behavior without introducing an AI codec, while fitting the production image/audio application and repository |
+| Actual result and evidence | The transmitter validates 1-100 printable ASCII characters and emits a 100-ms high leading bit plus eight MSB-first bits per character after one low interval. The receiver detects the first rising edge on digital pin 2, majority-votes three center samples, and ends when the next leading-bit slot is low. Both apps were stopped and left unchanged. There is no length/version/CRC, the frontend and backend duration formulas disagree, browser HTML loads a remote Socket.IO CDN despite bundled local assets, metadata/docs remain from an LED example, and received text is volatile. |
+| Usefulness | Confirms that text requires only deterministic ASCII byte handling and provides a legacy waveform reference for interoperability demonstrations |
+| Friction and owner | App Lab makes the WebUI-to-RouterBridge path approachable, but copied examples can retain stale documentation/assets and silently diverge between frontend timing and MCU behavior. This is sample/application hygiene friction rather than Qualcomm inference friction. |
+| Workaround | Preserve the originals, record the legacy protocol, encode printable ASCII directly, and route production text as profile `0x20` through the existing offline `LWF1` frame and paired LightWeave applications. No AI or accelerator claim is made for text. |
+| Suggested improvement | App Lab templates should keep metadata/docs synchronized with generated code, default to local WebUI assets, expose protocol timing from one shared definition, and include framed text/binary examples with length and integrity checks. |
+
+### DX-031 - One App Lab pair can route no-AI text and accelerated media honestly
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-06; deploy the matched production transmitter/receiver pair and prove text over the same optical link without implying AI usage |
+| Environment | Two Arduino UNO Q boards with QRB2210 Linux hosts and STM32U585 MCUs; Debian ARM64; Arduino App CLI 0.12.1; Arduino Zephyr 0.90.0; RouterBridge 0.4.3; USB/ADB from Windows 11 ARM64 |
+| Tool/source | Arduino App Lab lifecycle/build, WebUI Brick, RouterBridge/RPClite, tracked `lightweave_transmitter` and `lightweave_receiver` sources |
+| Intended workflow | Generate exact ASCII in the Windows dashboard, buffer it over USB, frame it dynamically on the transmitter MCU, auto-detect it on the receiver MCU, and persist/render it without a codec model |
+| Actual result and evidence | Both apps built and started in about 92-95 seconds. The transmitter sketch used 88,252 bytes flash/35,766 bytes global RAM; the receiver used 93,044/35,146. A 16-byte `Hello LightWeave` payload crossed as LWF1 profile `0x20` in 5.65 seconds and matched exactly. Both boards agreed on header `4c570120100000000000`, CRC `0xa62b`, payload SHA-256, and valid stop bit. The receiver atomically stored TXT/BIN/JSON, labeled the path `printable-ascii`, and reported that no accelerator was required. Both local WebUIs loaded without remote assets or browser console errors. Legacy and rollback source hashes were unchanged. |
+| Usefulness | Reuses one offline application pair, control plane, dynamic frame, CRC, persistence layer, and UI for text/image/audio while keeping AI claims scoped only to media reconstruction |
+| Friction and owner | App Lab identifies applications by display name in status output while deployment paths use app IDs, so production naming changes must be updated consistently across app YAML, ADB discovery, installers, and verifiers. The first build still recompiles/flashes even for a lightweight protocol/UI extension. This is Arduino App Lab lifecycle/tooling friction, not a Qualcomm inference limitation. |
+| Workaround | Keep stable lowercase app IDs and paired title-case display names, track both in manifests, fail closed when the expected running display name/marker is absent, and preserve original apps with before/after source hashes. Use one shared profile table in Python and C++ tests. |
+| Suggested improvement | App CLI should expose stable app ID and display name as separate first-class fields in every lifecycle response, support source-only incremental updates, and provide an official binary-framing/RouterBridge sample that demonstrates dynamic length, CRC, local assets, and persisted output. |
+
 ## Change log
 
 | Date | Change |
@@ -490,3 +518,5 @@ private endpoints, and confidential material must never appear here.
 | 2026-08-06 | Implemented and exercised common `LWF1` image/audio framing, diagnosed long-frame clock drift through preserved CRC evidence, calibrated the receiver board pair, passed all image profiles plus one-second hybrid audio, retained exact `raw-v0`, and recorded the owner's choice to skip further long transfers. |
 | 2026-08-06 | Published the complete dynamic optical media milestone, including tracked App Lab source and reproducible setup, as commit `c8600c7` on `origin/main`. |
 | 2026-08-06 | Separated a healthy App Lab port-7000 receiver from intermittent mobile LAN discovery and documented direct-IP, same-subnet, DHCP, and trusted-network guidance. |
+| 2026-08-06 | Inspected the stopped legacy text apps, retained their protocol as compatibility reference, and selected a no-AI ASCII profile plus matched production App Lab identities. |
+| 2026-08-06 | Built and installed the paired production App Lab apps, preserved original/rollback hashes, and proved exact 16-byte no-AI text reception with automatic LWF1 routing, valid CRC/stop bit, persisted TXT output, and browser-clean local UIs. |

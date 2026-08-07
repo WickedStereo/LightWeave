@@ -7,6 +7,9 @@ const listen = document.querySelector("#listen");
 const cancel = document.querySelector("#cancel");
 const result = document.querySelector("#result");
 const resultTitle = document.querySelector("#result-title");
+const textResult = document.querySelector("#text-result");
+const textContent = document.querySelector("#text-content");
+const textDownload = document.querySelector("#text-download");
 const imageResult = document.querySelector("#image-result");
 const image = document.querySelector("#image");
 const imageDownload = document.querySelector("#image-download");
@@ -56,7 +59,7 @@ function renderMetrics(values) {
       ["output", `${reconstruction.output_width} × ${reconstruction.output_height}`],
       ["model SHA-256", reconstruction.model_sha256],
     );
-  } else {
+  } else if (values.media_type === "audio") {
     rows.push(
       ["output samples", values.media_parameter],
       ["CPU codebook", milliseconds(reconstruction.cpu_codebook_seconds)],
@@ -68,6 +71,12 @@ function renderMetrics(values) {
       ["CPU suffix fallback", reconstruction.strict_suffix_no_fallback ? "disabled" : "ERROR"],
       ["boundary correction", reconstruction.boundary_correction],
       ["model SHA-256", reconstruction.model_sha256],
+    );
+  } else {
+    rows.push(
+      ["decoder", reconstruction.decoder],
+      ["characters", reconstruction.characters],
+      ["AI / accelerator", reconstruction.accelerator_required ? "required" : "not used"],
     );
   }
   metrics.replaceChildren();
@@ -107,9 +116,16 @@ socket.on("receiver_error", (data) => {
 
 socket.on("receiver_result", (data) => {
   if (mediaUrl) URL.revokeObjectURL(mediaUrl);
+  textResult.hidden = true;
   imageResult.hidden = true;
   audioResult.hidden = true;
-  if (data.media_type === "image") {
+  if (data.media_type === "text") {
+    textContent.textContent = data.text_content;
+    mediaUrl = URL.createObjectURL(new Blob([data.text_content], { type: "text/plain;charset=us-ascii" }));
+    textDownload.href = mediaUrl;
+    textResult.hidden = false;
+    resultTitle.textContent = "Received text";
+  } else if (data.media_type === "image") {
     mediaUrl = makeMediaUrl(data.png_base64, "image/png");
     image.src = mediaUrl;
     imageDownload.href = mediaUrl;

@@ -37,6 +37,7 @@ from .raw import (
     parse_raw_image_preset,
 )
 from .service import roundtrip_image
+from .text import MAX_TEXT_BYTES, TEXT_PRESET_CODE, encode_text
 from .transport import RawByteSink
 from .uno_q_transport import (
     UnoQAdbSink,
@@ -58,9 +59,7 @@ def _package_version(package: str) -> str | None:
 def _png_data_url(path: Path, *, correct_orientation: bool = False) -> str:
     with Image.open(path) as source:
         image = (
-            ImageOps.exif_transpose(source)
-            if correct_orientation
-            else source.copy()
+            ImageOps.exif_transpose(source) if correct_orientation else source.copy()
         )
         image = image.convert("RGB")
     stream = io.BytesIO()
@@ -130,9 +129,7 @@ def _runtime_status() -> dict[str, object]:
 UnoQSinkFactory = Callable[..., RawByteSink]
 
 
-def create_app(
-    *, uno_q_sink_factory: UnoQSinkFactory = UnoQAdbSink
-) -> FastAPI:
+def create_app(*, uno_q_sink_factory: UnoQSinkFactory = UnoQAdbSink) -> FastAPI:
     app = FastAPI(
         title="LightWeave",
         docs_url=None,
@@ -289,10 +286,30 @@ def create_app(
         except (FileNotFoundError, RuntimeError) as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    @app.post("/api/transmit/text")
+    def transmit_text(
+        text: Annotated[str, Form()],
+    ) -> dict[str, object]:
+        try:
+            payload = encode_text(text)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raw_bytes = len(payload)
+        return {
+            "preset_code": TEXT_PRESET_CODE,
+            "payload_base64": base64.b64encode(payload).decode("ascii"),
+            "raw_bytes": raw_bytes,
+            "maximum_bytes": MAX_TEXT_BYTES,
+            "characters": len(text),
+            "text": text,
+            **transfer_estimates(raw_bytes),
+            "warning": "Text uses printable ASCII bytes directly; no AI model runs.",
+        }
+
     @app.post("/api/adapters/uno-q/transmit")
     def transmit_to_uno_q(
         file: Annotated[UploadFile, File()],
-        media_type: Annotated[Literal["image", "audio"], Form()],
+        media_type: Annotated[Literal["text", "image", "audio"], Form()],
         preset_code: Annotated[str, Form()],
     ) -> dict[str, object]:
         payload = file.file.read(MAX_UPLOAD_BYTES + 1)
@@ -301,9 +318,7 @@ def create_app(
         except UnoQTransportError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         try:
-            sink = uno_q_sink_factory(
-                media_type=media_type, preset_code=preset_code
-            )
+            sink = uno_q_sink_factory(media_type=media_type, preset_code=preset_code)
             receipt = sink.send(payload)
             evidence = dict(receipt.evidence or {})
             return {
@@ -438,9 +453,7 @@ def create_app(
                 )
                 return {
                     "result": result,
-                    "input_image": _png_data_url(
-                        input_path, correct_orientation=True
-                    ),
+                    "input_image": _png_data_url(input_path, correct_orientation=True),
                     "reconstructed_image": _png_data_url(output_path),
                 }
         except (UnidentifiedImageError, OSError) as exc:

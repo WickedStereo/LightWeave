@@ -66,6 +66,8 @@ The implemented milestone assumes a reliable ordered byte pipe and includes:
   variable byte count on the STM32 and launches the existing laser waveform.
 - A 12-byte `LWF1` optical wrapper that carries version, media/profile, payload
   length, exact audio sample count, and CRC-16 without changing `payload.bin`.
+- Plain printable-ASCII text as `T1-ASCII-B100`: no AI model, at most 100 raw
+  bytes, automatically routed through the same `LWF1` Send/Listen workflow.
 - A separate `lightweave_byte_receiver` diagnostic that accepts an out-of-band
   expected length, captures the matching raw optical bytes, and reports binary,
   SHA-256, length, and stop-bit evidence without invoking media reconstruction.
@@ -244,8 +246,10 @@ or receiver reconstruction.
 The first receiver-connection attempt exposed only the transmitter, but a
 subsequent cable/port reconnect resolved enumeration. Two boards are now mapped
 without stopping either app: transmitter `123900964`/`UNOQ-1`/COM3 and receiver
-`371371094`/`unoq2`/COM4. The transmitter runs `lightweave_transmitter`; the
-receiver is left running `lightweave_optical_receiver` after validation.
+`371371094`/`unoq2`/COM4. The transmitter now runs
+`lightweave_transmitter`/**LightWeave Transmitter**; the receiver now runs
+`lightweave_receiver`/**LightWeave Receiver**. The former
+`lightweave_optical_receiver` is stopped and retained as rollback.
 
 Read-only inspection found that `image_receiver` is the closest optical
 receiver base. Its STM32 sketch already matches the transmitter's 25 ms/bit,
@@ -257,6 +261,41 @@ existing accelerated decoder. `laser_receiver_ui` is not a suitable base
 because it uses 100 ms/bit, per-character leading bits, and ASCII strings. All
 inspected receiver source remained unchanged; important `image_receiver`
 source hashes were recorded before any future clone.
+
+### Legacy App Lab text-pair discovery
+
+Read-only inspection on 2026-08-06 found stopped `laser_transmitter_ui` and
+`laser_receiver_ui` projects. Neither was started, flashed, or modified. The
+prototype accepts 1-100 printable ASCII characters. The transmitter drives pin
+9 at 100 ms per bit, emits one initial low interval, then for each character one
+high leading bit followed by eight MSB-first ASCII bits. It leaves the laser low
+after the final character. The receiver uses digital pin 2 with `INPUT_PULLUP`,
+detects the first low-to-high transition, takes three majority-vote samples
+around each bit center, and treats a low next-leading-bit sample as end of text.
+
+The logic proves the no-model text use case, but the pair is not a production
+protocol: it has no magic, length, CRC, or version; the backend and browser use
+different duration formulas; the browser downloads Socket.IO from a CDN; the
+README/App metadata still describe an LED example; and received text is only
+kept in memory. Production integration therefore retains this exact framing as
+a documented compatibility reference while using `T1-ASCII-B100` (`0x20`) in
+the common offline `LWF1` frame. The saved payload is the exact ASCII bytes.
+The current A0/25-ms production hardware path stays unchanged. The complete
+production integration was installed and exercised on 2026-08-06. A 16-byte
+`Hello LightWeave` message arrived byte-for-byte in 5.65 seconds inside a
+28-byte LWF1 frame. Both ends reported header
+`4c570120100000000000`, CRC `0xa62b` (wire `2ba6`), profile ID `0x20`,
+valid stop bit, and matching payload SHA-256. The receiver stored the result as
+`.bin`, `.txt`, and `.json`; its evidence explicitly reports printable ASCII
+with `accelerator_required: false`.
+
+Final App Lab identities are deliberately paired:
+
+- `lightweave_transmitter`, displayed as **LightWeave Transmitter**.
+- `lightweave_receiver`, displayed as **LightWeave Receiver**.
+
+The existing `lightweave_optical_receiver` remains stopped as rollback during
+migration, and both original `laser_*` apps remain untouched.
 
 ### Basic optical byte receiver
 
@@ -282,18 +321,20 @@ and a valid stop bit. This proves byte correctness for that diagnostic pattern,
 not general reliability under adverse optical conditions. The same diagnostic
 passed a second time before production integration began.
 
-### Production optical image/audio receiver
+### Production optical text/image/audio receiver
 
 The repository tracks `uno_q/optical_receiver_app/`, installed on receiver
-`371371094` as `lightweave_optical_receiver`. It remains separate from the byte
-diagnostic and all original apps. Its installer clones the installed
+`371371094` as `lightweave_receiver` and displayed as **LightWeave Receiver**.
+It remains separate from the byte diagnostic and all original apps. The former
+`lightweave_optical_receiver` is preserved stopped as rollback. Its installer
+clones the installed
 `lightweave-uno` runtime/models, verifies decoder source, reuses the board-local
 WebUI/Vulkan files, and deploys the A0/threshold-800, MSB-first framing sketch.
-The expensive native runtime preparation is not repeated. The final sketch uses
-92,732 bytes of flash and 35,054 bytes of global RAM with Arduino Zephyr 0.90.0
-and RouterBridge 0.4.3.
+The expensive native runtime preparation is not repeated. The text-integrated
+receiver sketch uses 93,044 bytes of flash and 35,146 bytes of global RAM with
+Arduino Zephyr 0.90.0 and RouterBridge 0.4.3.
 
-The production receiver accepts a self-describing image/audio frame. The
+The production receiver accepts a self-describing text/image/audio frame. The
 downloaded/generated `payload.bin` remains the unchanged raw codec output; only
 the laser wire wraps it:
 
@@ -309,6 +350,7 @@ CRC-16/CCITT-FALSE      2 bytes, little-endian
 stop bit
 ```
 
+Text uses `0x20`, a zero media parameter, and 1-100 printable ASCII bytes.
 Images use profile IDs `0x01` through `0x03` and a zero media parameter. Audio
 uses `0x10` and places the exact 24 kHz sample count in the media parameter. The
 CRC covers the ten-byte header plus raw payload. The common wrapper adds 12
@@ -325,6 +367,10 @@ disabled. One 188-byte `A1-E15-S24000` frame produced an exact 24,000-sample,
 Adreno suffix; the conditioned boundary jump was zero. The five-second optical
 case was deliberately not run after the owner chose to skip further long
 transfers; five-second codec/board reconstruction remains validated separately.
+The 16-byte text fixture also passed exact optical reception, CRC, stop-bit,
+automatic profile routing, atomic TXT persistence, and no-AI evidence. The
+Windows text panel and board receiver page were browser-tested with local-only
+assets and zero console errors.
 
 An initial 216-byte frame consistently slipped one bit around optical bit 1,389
 because the two STM32 free-running clocks accumulated phase error. A receiver
@@ -377,6 +423,9 @@ model negotiation.
   then uses the established truthful CPU/QNN hybrid and trims to `n`.
   The UNO Q consumes the same bytes/code but limits clips to five seconds and
   uses the separately evidenced CPU/Adreno split described above.
+- Text preset `T1-ASCII-B100` is the exact 1-100 printable-ASCII byte string.
+  It uses no compression, model, entropy coder, or accelerator. LWF1 profile
+  `0x20` provides media type, length, and CRC only on the optical wire.
 
 ### Image path
 
@@ -621,6 +670,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | UNO Q optical byte diagnostic | Complete and published | Commit `80ba103`; exact `00 FF AA 55` received twice with matching SHA-256 and valid stop bit |
 | UNO Q optical image receiver | Complete and published | Commit `506eee9`; two 80-byte physical image transfers passed exact-byte, stop-bit, 64-by-64 PNG, 16-layer Adreno, strict-no-fallback, App Lab UI, and zero-console-error gates |
 | Self-describing optical image/audio framing | Complete and published | Commit `c8600c7`; `LWF1` carries profile, length, audio sample count, and CRC; all image routes plus one-second audio passed physical reconstruction |
+| Integrated text transport | Complete locally; publication pending | Exact 16-byte optical transfer passed profile `0x20`, CRC/stop-bit, TXT persistence, no-AI evidence, paired App Lab names, local browser UI, and protected legacy-source hashes |
 | Offline runtime | Complete locally | Process guard and dual-media smoke script implemented |
 | QUAD local workflow | Complete | Detect and doctor exercised |
 | GitHub Actions unit CI | Complete | Windows run `31140365004` passed on publication head `db6cf62`; accelerator/hardware gates stay local |
@@ -663,6 +713,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Fixed analog threshold and open-loop timing may be environment-sensitive | CRC caught a repeatable long-frame bit slip; a 24,991-us receiver interval passes this board pair while the transmitter stays at 25 ms, but true clock recovery and broader alignment/light testing remain necessary |
 | `LWF1` is not cryptographically self-describing | It supplies routing, bounds, sample count, and CRC but no model hash; pinned artifacts remain required and `.lwv` is used where model negotiation/SHA-256 matter |
 | Five-second optical audio is slow | Codec/board decode is validated to five seconds, but the owner elected not to spend 190.45 seconds on the optical stress transfer; one-second optical audio is the physical acceptance evidence |
+| Legacy and production text waveforms differ | The stopped `laser_*` apps remain unchanged and their 100-ms character framing is documented. Production uses `T1-ASCII-B100` in the common 25-ms LWF1 frame; do not present the two as wire-compatible. |
 | Mobile access to the App Lab WebUI is intermittent | Direct board IPv4 port 7000 currently returns HTTP 200 and Wi-Fi signal is strong, while `.local` discovery did not resolve from Windows. Use the current DHCP IPv4 address on the same trusted subnet; avoid `localhost`, HTTPS, VPN/cellular fallback, and client-isolated Wi-Fi. Reserve the address or use a dedicated demo router/hotspot for stability. |
 
 ## Open questions
@@ -746,6 +797,8 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | D-045 | 2026-08-06 | Use the common 12-byte `LWF1` image/audio wrapper and keep `payload.bin` unchanged. | Carries profile, payload length, exact audio sample count, and CRC-16 while preserving raw codec compatibility. |
 | D-046 | 2026-08-06 | Calibrate this receiver to a 24,991-us sample interval while retaining 25-ms transmitter bits. | Removed a measured long-frame phase slip; this is board-pair evidence, not general clock recovery. |
 | D-047 | 2026-08-06 | Stop additional long optical acceptance transfers. | Owner accepted existing evidence; the five-second audio wire test is intentionally skipped while the supported decoder limit remains five seconds. |
+| D-048 | 2026-08-06 | Integrate text as `T1-ASCII-B100` / profile `0x20` in `LWF1`, with no AI stage. | Reuses automatic routing, length, CRC, storage, and one-shot reception while preserving exact printable-ASCII payload bytes. |
+| D-049 | 2026-08-06 | Name the production App Lab pair `lightweave_transmitter` / **LightWeave Transmitter** and `lightweave_receiver` / **LightWeave Receiver**. | Clear matched identities; original `laser_*` and stopped `lightweave_optical_receiver` remain rollback/reference apps. |
 
 ## Public references
 
@@ -809,3 +862,5 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-06 | Published the dynamic `LWF1` image/audio transmitter/receiver implementation, App Lab sources, installers, tests, setup guidance, SBOM/notices, and physical evidence as commit `c8600c7` on `origin/main`. |
 | 2026-08-06 | Recorded publication in commit `db6cf62`; GitHub Actions run `31140365004` passed the Windows lint/unit gate on that head. |
 | 2026-08-06 | Diagnosed intermittent phone access: the receiver app and `0.0.0.0:7000` listener were healthy and direct IPv4 returned HTTP 200, isolating the remaining instability to DHCP/name discovery, phone routing, or Wi-Fi client policy. |
+| 2026-08-06 | Inspected the stopped legacy text pair, documented its 100-ms printable-ASCII leading-bit protocol and prototype gaps, selected `T1-ASCII-B100` in `LWF1`, and chose matched production transmitter/receiver App Lab names. |
+| 2026-08-06 | Integrated no-AI text into the Windows dashboard and production App Lab pair, installed **LightWeave Transmitter**/**LightWeave Receiver**, preserved all legacy/rollback source hashes, and physically received `Hello LightWeave` exactly with valid LWF1 CRC/stop bit and atomic TXT output. |

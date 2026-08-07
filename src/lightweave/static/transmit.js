@@ -1,4 +1,5 @@
 const state = {
+  text: null,
   image: null,
   audio: null,
   arduino: { ready: false, busy: false, confirming: null, confirmUntil: 0 },
@@ -50,6 +51,8 @@ async function loadStatus() {
 }
 
 function setArduinoButtons() {
+  document.querySelector("#text-arduino").disabled =
+    !state.text || !state.arduino.ready || state.arduino.busy;
   document.querySelector("#image-arduino").disabled =
     !state.image || !state.arduino.ready || state.arduino.busy;
   document.querySelector("#audio-arduino").disabled =
@@ -59,9 +62,53 @@ function setArduinoButtons() {
 function clearArduinoConfirmation() {
   state.arduino.confirming = null;
   state.arduino.confirmUntil = 0;
+  document.querySelector("#text-arduino").textContent = "send to Arduino";
   document.querySelector("#image-arduino").textContent = "send to Arduino";
   document.querySelector("#audio-arduino").textContent = "send to Arduino";
 }
+
+document.querySelector("#text-input").addEventListener("input", (event) => {
+  document.querySelector("#text-count").textContent = new TextEncoder().encode(event.target.value).length;
+});
+
+document.querySelector("#text-transmit-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const activity = document.querySelector("#text-activity");
+  const error = document.querySelector("#text-error");
+  const result = document.querySelector("#text-result");
+  activity.hidden = false;
+  error.hidden = true;
+  result.hidden = true;
+  form.querySelector("button[type=submit]").disabled = true;
+  try {
+    const body = await responseBody(await fetch("/api/transmit/text", {
+      method: "POST", body: new FormData(form),
+    }));
+    if (state.text?.payloadUrl) URL.revokeObjectURL(state.text.payloadUrl);
+    const payload = decodeBase64(body.payload_base64);
+    const payloadUrl = URL.createObjectURL(new Blob([payload], { type: "application/octet-stream" }));
+    state.text = { ...body, payload, payloadUrl };
+    document.querySelector("#text-download").href = payloadUrl;
+    document.querySelector("#text-code").textContent = body.preset_code;
+    document.querySelector("#text-preview").textContent = body.text;
+    renderMetrics(document.querySelector("#text-metrics"), [
+      ["Raw payload", `${body.raw_bytes} / ${body.maximum_bytes} bytes`],
+      ["Characters", String(body.characters)],
+      ["Encoding", "printable ASCII / no AI"],
+      ["Transfer / 1 kbps", formatSeconds(body.at_1_kbps_seconds)],
+      ["Transfer / 2 kbps", formatSeconds(body.at_2_kbps_seconds)],
+    ]);
+    result.hidden = false;
+    setArduinoButtons();
+  } catch (caught) {
+    error.textContent = caught.message;
+    error.hidden = false;
+  } finally {
+    activity.hidden = true;
+    form.querySelector("button[type=submit]").disabled = false;
+  }
+});
 
 async function loadArduinoStatus() {
   const box = document.querySelector("#arduino-status");
@@ -268,6 +315,8 @@ document.querySelector("#audio-transmit-form").addEventListener("submit", async 
 });
 
 document.querySelector("#audio-copy").addEventListener("click", () => navigator.clipboard.writeText(state.audio.preset_code));
+document.querySelector("#text-copy").addEventListener("click", () => navigator.clipboard.writeText(state.text.preset_code));
+document.querySelector("#text-arduino").addEventListener("click", () => sendToArduino("text"));
 document.querySelector("#image-arduino").addEventListener("click", () => sendToArduino("image"));
 document.querySelector("#audio-arduino").addEventListener("click", () => sendToArduino("audio"));
 document.querySelector("#audio-verify").addEventListener("click", async (event) => {
@@ -332,3 +381,4 @@ for (const button of document.querySelectorAll("[data-sample]")) {
 }
 loadStatus();
 loadArduinoStatus();
+  document.querySelector("#text-arduino").textContent = "send to Arduino";

@@ -31,12 +31,20 @@ settings code is communicated out of band for standalone files and is not part
 of `payload.bin`; `LWF1` carries the equivalent profile/sample metadata on the
 laser wire.
 
+Raw text uses `T1-ASCII-B100`: 1-100 printable ASCII bytes, sent unchanged and
+decoded without an AI model. Production LWF1 profile ID `0x20` supplies its
+type, dynamic length, and CRC on the laser wire. The original stopped
+`laser_transmitter_ui` and `laser_receiver_ui` protocol is preserved as an
+observed compatibility reference in
+[`LEGACY_TEXT_PROTOCOL.md`](LEGACY_TEXT_PROTOCOL.md).
+
 ## Transmitter companion
 
 The separately tracked [`transmitter_app`](transmitter_app) project connects
 the Windows dashboard to the transmitting UNO Q over USB/ADB. It is installed
 as `lightweave_transmitter`, cloned from but independent of the board's
-`image_transmitter_bkp` app. Its atomic inbox accepts image or audio raw bytes,
+`image_transmitter_bkp` app. Its App Lab display name is **LightWeave
+Transmitter**. Its atomic inbox accepts text, image, or audio raw bytes,
 loads the exact variable length into the STM32, and retains the existing pin-9,
 25-ms, MSB-first laser waveform. The STM32 adds `LWF1` only while transmitting;
 the saved raw payload is never rewritten or padded.
@@ -74,12 +82,13 @@ This diagnostic does not invoke CompressAI, EnCodec, ncnn, or the accelerated
 receiver. Length remains trusted out-of-band data. It is kept as a focused
 transport troubleshooting tool.
 
-## Production optical image/audio receiver
+## Production text/image/audio receiver
 
-[`optical_receiver_app`](optical_receiver_app) joins optical sampling with the
-installed native image and audio decoders. The tracked app is installed as
-`lightweave_optical_receiver`; the diagnostic and original `image_receiver`
-projects are not modified.
+[`optical_receiver_app`](optical_receiver_app) joins optical sampling with
+no-AI text handling and the installed native image/audio decoders. The tracked
+app is installed as `lightweave_receiver` and displayed as **LightWeave
+Receiver**. The former `lightweave_optical_receiver`, diagnostic, and original
+`image_receiver`/`laser_receiver_ui` projects are not modified.
 
 Install the base decoder once with `install_uno_q.ps1`, then deploy only the
 small optical integration layer:
@@ -97,9 +106,10 @@ rebuilds ncnn or regenerates models.
 
 In App Lab, press **Listen for transfer**, then send from the Windows dashboard.
 The receiver reads the `LWF1` profile, length, and audio sample count, validates
-CRC/stop bit, and routes the raw bytes automatically. It displays/downloads the
-PNG or playable WAV and reports frame, CPU, Adreno, model, and strict-assignment
-evidence. **Cancel** returns an armed receiver to idle without auto-rearming.
+CRC/stop bit, and routes the raw bytes automatically. It displays/downloads
+text, PNG, or playable WAV output and reports frame plus applicable CPU,
+Adreno, model, and strict-assignment evidence. **Cancel** returns an armed
+receiver to idle without auto-rearming.
 
 Automated two-board acceptance:
 

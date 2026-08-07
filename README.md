@@ -99,8 +99,9 @@ lightweave dashboard
 ```
 
 The dashboard binds only to `127.0.0.1` and loads no remote assets. `/transmit`
-generates and downloads the exact raw `payload.bin`, `/receive` reconstructs an
-uploaded payload using its out-of-band settings code, and `/loopback` preserves
+generates no-AI text, image, and audio payloads and downloads the exact raw
+`payload.bin`; `/receive` reconstructs uploaded image/audio payloads using
+their out-of-band settings codes, and `/loopback` preserves
 the `.lwv` development workbench. The monochrome text-first UI defaults to the
 balanced 128 x 128 profile, includes tiny and quality alternatives plus three
 local test patterns, and shows transfer estimates, quality/latency metrics,
@@ -115,8 +116,9 @@ model-fingerprint protections are required.
 
 The repository includes the complete App Lab transmitter source in
 [`uno_q/transmitter_app`](uno_q/transmitter_app). It is deployed as a new app
-named `lightweave_transmitter`; the owner's `image_transmitter_bkp` project is
-hashed before and after installation and is never edited or started.
+named `lightweave_transmitter` and displayed as **LightWeave Transmitter**. The
+owner's `image_transmitter_bkp` and `laser_transmitter_ui` projects are hashed
+before and after installation and are never edited or started.
 
 Connect one transmitting UNO Q by USB, then run:
 
@@ -135,7 +137,7 @@ Connect one transmitting UNO Q by USB, then run:
 lightweave dashboard
 ```
 
-After generating an image or audio `payload.bin`, use **Send to Arduino**. The
+After generating text, image, or audio `payload.bin`, use **Send to Arduino**. The
 dashboard pushes the exact bytes through an atomic ADB inbox; no Wi-Fi or
 remote service is involved. If ADB is installed elsewhere, set
 `LIGHTWEAVE_ADB_PATH`. With two UNO Q boards attached, LightWeave selects the
@@ -178,13 +180,14 @@ and `stop_bit_valid: true`. The expected byte count travels only through the
 local ADB control plane. This test explicitly selects legacy `raw-v0`; normal
 dashboard sends use `LWF1`. The original receiver projects are not edited.
 
-### Reconstruct optically received images and audio
+### Receive optical text, images, and audio
 
 The production [`uno_q/optical_receiver_app`](uno_q/optical_receiver_app)
 combines the A0 receiver with the installed native LightWeave decoders. It
-parses `LWF1`, automatically identifies media and settings, and reconstructs
-all three image profiles or up to five seconds of EnCodec audio. Image graphs
-run completely on Adreno 702; audio is accurately labeled CPU/Adreno hybrid.
+parses `LWF1` and automatically identifies media and settings. Text is exact
+printable ASCII and uses no AI. The same app reconstructs all three image
+profiles or up to five seconds of EnCodec audio. Image graphs run completely
+on Adreno 702; audio is accurately labeled CPU/Adreno hybrid.
 
 Install the accelerated base once, then deploy the lightweight optical app:
 
@@ -194,7 +197,7 @@ $env:LIGHTWEAVE_UNO_Q_RECEIVER_SERIAL = "371371094"
 .\scripts\install_uno_q_optical_receiver.ps1 -DeviceSerial 371371094 -StopRunningApp
 ```
 
-Open **LightWeave Optical Receiver** in App Lab and press **Listen for
+Open **LightWeave Receiver** in App Lab and press **Listen for
 transfer**, then press **Send to Arduino** in the Windows dashboard. No receiver
 preset or byte count is entered. For automated physical acceptance with a
 prepared image payload:
@@ -207,6 +210,21 @@ prepared image payload:
   --transmitter-serial 123900964 `
   --receiver-serial 371371094
 ```
+
+For a short no-AI text transfer:
+
+```powershell
+.\.venv-x64\Scripts\python.exe scripts\verify_uno_q_optical_text.py `
+  --text "Hello LightWeave" `
+  --output artifacts\generated\uno_q\received.txt `
+  --transmitter-serial 123900964 `
+  --receiver-serial 371371094
+```
+
+The historical 100-ms `laser_transmitter_ui`/`laser_receiver_ui` waveform is
+documented in [`uno_q/LEGACY_TEXT_PROTOCOL.md`](uno_q/LEGACY_TEXT_PROTOCOL.md).
+It remains a compatibility reference; production text uses the shared 25-ms
+LWF1 link with profile `T1-ASCII-B100`, dynamic length, and CRC.
 
 For a short one-second audio fixture, use the companion command:
 

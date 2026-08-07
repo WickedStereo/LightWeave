@@ -38,12 +38,13 @@ PROFILES = (
     Profile(0x02, "I128-Q1-B768", "image", 768),
     Profile(0x03, "I256-Q1-B2048", "image", 2_048),
     Profile(0x10, "A1-E15-S<n>", "audio", MAX_AUDIO_BYTES),
+    Profile(0x20, "T1-ASCII-B100", "text", 100),
 )
 PROFILE_BY_ID = {profile.profile_id: profile for profile in PROFILES}
 PROFILE_BY_PRESET = {
     profile.preset_code: profile
     for profile in PROFILES
-    if profile.media_type == "image"
+    if profile.media_type != "audio"
 }
 
 
@@ -68,9 +69,7 @@ def crc16_ccitt_false(data: bytes) -> int:
         crc ^= value << 8
         for _ in range(8):
             crc = (
-                ((crc << 1) ^ 0x1021) & 0xFFFF
-                if crc & 0x8000
-                else (crc << 1) & 0xFFFF
+                ((crc << 1) ^ 0x1021) & 0xFFFF if crc & 0x8000 else (crc << 1) & 0xFFFF
             )
     return crc
 
@@ -101,9 +100,17 @@ def validate_contract(
         )
     if payload is not None and len(payload) != payload_bytes:
         raise FrameError("Declared payload length does not match the payload.")
-    if profile.media_type == "image":
+    if profile.media_type in {"image", "text"}:
         if media_parameter != 0:
-            raise FrameError("Image media parameter must be zero.")
+            raise FrameError(
+                f"{profile.media_type.capitalize()} media parameter must be zero."
+            )
+        if (
+            profile.media_type == "text"
+            and payload is not None
+            and any(value < 32 or value > 126 for value in payload)
+        ):
+            raise FrameError("Text payload contains non-printable ASCII bytes.")
         return
     if payload_bytes % AUDIO_CHUNK_BYTES:
         raise FrameError("Audio payload length must be divisible by 188 bytes.")

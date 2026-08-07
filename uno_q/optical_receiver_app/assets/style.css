@@ -98,6 +98,15 @@ audio {
   margin: 14px 0;
 }
 
+#text-content {
+  min-height: 120px;
+  margin: 14px 0;
+  padding: 16px;
+  border: 1px solid #555;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 dl {
   display: grid;
   grid-template-columns: minmax(160px, 1fr) 2fr;

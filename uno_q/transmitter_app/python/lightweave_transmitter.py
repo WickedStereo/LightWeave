@@ -43,6 +43,8 @@ IMAGE_PRESETS = {
     "I128-Q1-B768": 768,
     "I256-Q1-B2048": 2_048,
 }
+TEXT_PRESET = "T1-ASCII-B100"
+MAX_TEXT_BYTES = 100
 AUDIO_PRESET = re.compile(r"A1-E15-S([1-9][0-9]*)")
 REQUEST_ID = re.compile(
     r"[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-"
@@ -100,6 +102,15 @@ def _validate_audio(payload: bytes, preset_code: str) -> None:
             raise TransmitterError("Raw audio chunk has non-zero padding bits.")
 
 
+def _validate_text(payload: bytes, preset_code: str) -> None:
+    if preset_code != TEXT_PRESET:
+        raise TransmitterError("Unsupported raw text preset code.")
+    if len(payload) > MAX_TEXT_BYTES:
+        raise TransmitterError("Text payload exceeds the 100-byte limit.")
+    if any(value < 32 or value > 126 for value in payload):
+        raise TransmitterError("Text payload must contain printable ASCII only.")
+
+
 def validate_request(metadata: dict[str, Any], payload: bytes) -> Request:
     if metadata.get("schema_version") != REQUEST_SCHEMA_VERSION:
         raise TransmitterError("Unsupported request schema version.")
@@ -151,8 +162,10 @@ def validate_request(metadata: dict[str, Any], payload: bytes) -> Request:
             raise TransmitterError("Raw image exceeds its selected preset budget.")
     elif request.media_type == "audio":
         _validate_audio(payload, request.preset_code)
+    elif request.media_type == "text":
+        _validate_text(payload, request.preset_code)
     else:
-        raise TransmitterError("Media type must be image or audio.")
+        raise TransmitterError("Media type must be text, image, or audio.")
     return request
 
 
@@ -265,7 +278,7 @@ class InboxWorker:
             duration = transmission_seconds(len(payload), request.wire_mode)
             launch_time = current if now is not None else time.time()
             busy_until = launch_time + duration
-            self.bridge.notify("transmit_image")
+            self.bridge.notify("transmit_payload")
             result = {
                 "accepted": True,
                 "status": "accepted",
@@ -315,9 +328,7 @@ class InboxWorker:
             TransmitterError,
         ) as exc:
             safe_id = (
-                request_id
-                if REQUEST_ID.fullmatch(request_id)
-                else str(uuid.uuid4())
+                request_id if REQUEST_ID.fullmatch(request_id) else str(uuid.uuid4())
             )
             self._write_result(
                 safe_id,

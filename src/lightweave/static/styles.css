@@ -46,9 +46,10 @@ label { display: grid; gap: 7px; color: #ccc; font-size: .8rem; }
 .drop-zone:hover { border-color: #fff; }
 .drop-zone strong { color: #fff; font-size: .9rem; }
 .drop-zone span, .field-note { color: #888; line-height: 1.45; }
-input, select, button { font: inherit; }
+input, select, textarea, button { font: inherit; }
 input[type="file"] { width: 100%; color: #aaa; }
-input:not([type="file"]), select { width: 100%; min-height: 42px; padding: 8px 10px; border: 1px solid #666; border-radius: 0; color: #fff; background: #0d0d0d; }
+input:not([type="file"]), select, textarea { width: 100%; min-height: 42px; padding: 8px 10px; border: 1px solid #666; border-radius: 0; color: #fff; background: #0d0d0d; }
+textarea { resize: vertical; line-height: 1.5; }
 button, .download-button { min-height: 42px; padding: 10px 16px; border: 1px solid #fff; border-radius: 0; color: #080808; background: #f2f2ee; font-family: inherit; font-size: .82rem; font-weight: 700; cursor: pointer; text-decoration: none; }
 button:hover, .download-button:hover { color: #fff; background: #080808; }
 button:disabled { opacity: .45; cursor: wait; }
@@ -83,6 +84,7 @@ figcaption { margin-top: 8px; color: #888; font-size: .72rem; text-align: center
 details { margin-top: 18px; padding-top: 14px; border-top: 1px solid #444; color: #aaa; }
 summary { cursor: pointer; font-size: .8rem; }
 pre { max-height: 360px; overflow: auto; padding: 14px; border: 1px solid #444; color: #ddd; background: #000; font-size: .72rem; }
+.text-preview { min-height: 84px; margin: 18px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .85rem; }
 
 .control-panel, .results, .audio-panel { padding: 24px; border: 1px solid #555; }
 .results, .audio-panel { margin-top: 24px; }

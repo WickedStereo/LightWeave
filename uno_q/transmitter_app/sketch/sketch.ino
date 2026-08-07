@@ -168,9 +168,10 @@ void setup() {
   Bridge.provide("prepare_transmission", prepareTransmission);
   Bridge.provide("store_image_byte", storeImageByte);
   Bridge.provide("is_image_buffer_complete", isImageBufferComplete);
+  Bridge.provide("transmit_payload", transmitImage);
   Bridge.provide("transmit_image", transmitImage);
   Bridge.provide("get_loaded_byte_count", getLoadedByteCount);
-  Serial.println("LightWeave LWF1/raw-v0 laser transmitter ready");
+  Serial.println("LightWeave text/image/audio LWF1 transmitter ready");
 }
 
 void loop() {

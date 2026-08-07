@@ -131,6 +131,14 @@ bool audioPaddingValid() {
   return true;
 }
 
+bool textPayloadValid() {
+  if (activeProfileId != 0x20) return true;
+  for (int index = 0; index < activePayloadBytes; ++index) {
+    if (receivedPayload[index] < 32 || receivedPayload[index] > 126) return false;
+  }
+  return true;
+}
+
 int getReceivedByteCount() {
   return receivedByteCount;
 }
@@ -249,6 +257,10 @@ void handleWaitingForStop() {
   }
   if (!audioPaddingValid()) {
     rejectFrame("audio-padding");
+    return;
+  }
+  if (!textPayloadValid()) {
+    rejectFrame("invalid-text-payload");
     return;
   }
   if (!stopBitValid) {

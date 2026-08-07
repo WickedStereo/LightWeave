@@ -22,7 +22,7 @@
         <div>
           <p class="eyebrow">TX / LWF1 OPTICAL LINK</p>
           <h1>Transmit</h1>
-          <p class="lede">Turn an image or WAV into the exact bytes sent by the future optical adapter. Keep the printed settings code with the payload.</p>
+          <p class="lede">Turn text, an image, or a WAV into the exact bytes sent by the optical adapter. Keep the printed settings code with the payload.</p>
         </div>
         <div class="status" id="runtime-status">checking local runtime...</div>
       </header>
@@ -38,6 +38,36 @@
       </div>
 
       <div class="workflow-grid">
+        <section class="workflow-card">
+          <div class="card-heading">
+            <span class="media-tag">TEXT / T1-ASCII-B100 / NO AI</span>
+            <h2>Text payload</h2>
+            <p>Printable ASCII is sent directly. No model, compression, or reconstruction step is involved.</p>
+          </div>
+          <form id="text-transmit-form" class="stack-form">
+            <label for="text-input">Message
+              <textarea id="text-input" name="text" maxlength="100" rows="6" placeholder="Type up to 100 printable ASCII characters" required></textarea>
+              <span class="field-note"><span id="text-count">0</span> / 100 bytes</span>
+            </label>
+            <button type="submit">generate text payload</button>
+          </form>
+          <div class="activity" id="text-activity" hidden><span></span>validating text...</div>
+          <div class="error" id="text-error" hidden></div>
+          <div id="text-result" hidden>
+            <div class="code-row">
+              <div><small>settings code</small><code id="text-code"></code></div>
+              <button class="secondary" id="text-copy" type="button">copy</button>
+            </div>
+            <div class="metrics compact" id="text-metrics"></div>
+            <pre class="text-preview" id="text-preview"></pre>
+            <div class="action-row">
+              <a class="download-button" id="text-download" download="payload.bin">download payload.bin</a>
+              <button class="secondary" id="text-arduino" type="button" disabled>send to Arduino</button>
+            </div>
+            <div class="adapter-result" id="text-arduino-result" hidden></div>
+          </div>
+        </section>
+
         <section class="workflow-card">
           <div class="card-heading">
             <span class="media-tag">IMAGE / COMPRESSAI Q1</span>

@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>LightWeave / optical receiver</title>
+  <title>LightWeave / receiver</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
   <main>
     <header>
       <p class="eyebrow">LIGHTWEAVE / UNO Q</p>
-      <h1>Optical receiver</h1>
-      <p>Receive a self-describing LWF1 image or audio frame, then reconstruct it on this board.</p>
+      <h1>Receiver</h1>
+      <p>Receive a self-describing LWF1 text, image, or audio frame and restore it on this board.</p>
     </header>
 
     <section class="status" aria-live="polite">
@@ -34,7 +34,11 @@
     </p>
 
     <section id="result" hidden>
-      <h2 id="result-title">Reconstruction</h2>
+      <h2 id="result-title">Received result</h2>
+      <div id="text-result" hidden>
+        <pre id="text-content"></pre>
+        <a id="text-download" download="lightweave-received-text.txt">Download TXT</a>
+      </div>
       <div id="image-result" hidden>
         <div class="image-frame"><img id="image" alt="Reconstructed LightWeave image"></div>
         <a id="image-download" download="lightweave-optical-reconstruction.png">Download PNG</a>

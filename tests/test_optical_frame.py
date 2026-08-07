@@ -27,6 +27,18 @@ def test_canonical_audio_vector() -> None:
     assert crc == 0x6321
 
 
+def test_text_frame_preserves_exact_ascii_without_ai_metadata() -> None:
+    payload = b"Hello LightWeave"
+    wire = frame.build_frame(payload, "T1-ASCII-B100")
+    assert wire[3] == 0x20
+    assert wire[4:6] == len(payload).to_bytes(2, "little")
+    assert wire[6:10] == bytes(4)
+    parsed, restored, _ = frame.parse_frame(wire)
+    assert parsed.preset_code == "T1-ASCII-B100"
+    assert parsed.profile.media_type == "text"
+    assert restored == payload
+
+
 @pytest.mark.parametrize(
     ("preset", "payload_bytes", "profile_id"),
     [
@@ -35,6 +47,7 @@ def test_canonical_audio_vector() -> None:
         ("I256-Q1-B2048", 2048, 0x03),
         ("A1-E15-S1", 188, 0x10),
         ("A1-E15-S120000", 940, 0x10),
+        ("T1-ASCII-B100", 100, 0x20),
     ],
 )
 def test_profiles_and_endianness(
@@ -56,6 +69,8 @@ def test_frame_rejects_corruption_and_invalid_contracts() -> None:
         frame.build_header("A1-E15-S24000", 189)
     with pytest.raises(frame.FrameError, match="padding"):
         frame.build_frame(bytes(187) + b"\xf0", "A1-E15-S24000")
+    with pytest.raises(frame.FrameError, match="printable"):
+        frame.build_frame(b"line\nbreak", "T1-ASCII-B100")
 
 
 def test_duration_includes_wire_only_overhead() -> None:

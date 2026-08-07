@@ -102,7 +102,7 @@ def test_inbox_preserves_every_binary_value(tmp_path: Path) -> None:
     assert result["payload_bytes"] == 256
     assert result["buffered_bytes"] == 256
     assert bytes(bridge.values) == payload
-    assert bridge.notifications == ["transmit_image"]
+    assert bridge.notifications == ["transmit_payload"]
     assert not list((tmp_path / "data" / "inbox").iterdir())
 
 
@@ -168,6 +168,24 @@ def test_inbox_preserves_explicit_raw_v0_diagnostic(tmp_path: Path) -> None:
     assert bytes(bridge.values) == payload
 
 
+def test_inbox_accepts_exact_printable_ascii_text(tmp_path: Path) -> None:
+    bridge = FakeBridge()
+    worker = tx.InboxWorker(tmp_path, bridge)
+    payload = b"Hello LightWeave"
+    request_id = _publish(
+        tmp_path,
+        payload,
+        media_type="text",
+        preset_code="T1-ASCII-B100",
+    )
+    assert worker.process_once(now=1_000.0)
+    result = json.loads((worker.results / f"{request_id}.json").read_text())
+    assert result["accepted"] is True
+    assert result["profile_id"] == 0x20
+    assert bytes(bridge.values) == payload
+    assert bridge.notifications == ["transmit_payload"]
+
+
 @pytest.mark.parametrize(
     "payload,media,preset,message",
     [
@@ -176,6 +194,8 @@ def test_inbox_preserves_explicit_raw_v0_diagnostic(tmp_path: Path) -> None:
         (bytes(187), "audio", "A1-E15-S24000", "divisible"),
         (bytes(188), "audio", "A1-E15-S24001", "impossible"),
         (bytes(941), "audio", "A1-E15-S120000", "940-byte"),
+        (b"line\nbreak", "text", "T1-ASCII-B100", "printable"),
+        (b"hello", "text", "I64-Q1-B128", "text preset"),
     ],
 )
 def test_host_contract_rejects_invalid_payloads(
@@ -213,7 +233,7 @@ class FakeAdb:
             "app",
             "list",
         ]:
-            value = {"apps": [{"name": "lightweave_transmitter", "status": "running"}]}
+            value = {"apps": [{"name": "LightWeave Transmitter", "status": "running"}]}
             return subprocess.CompletedProcess(command, 0, json.dumps(value), "")
         if "test" in command and "transmitter.manifest.json" in command[-1]:
             return subprocess.CompletedProcess(command, 0, "", "")

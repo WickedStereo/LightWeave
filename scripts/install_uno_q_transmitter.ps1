@@ -22,7 +22,9 @@ $sourceRoot = (Resolve-Path (Join-Path $projectRoot "uno_q\transmitter_app")).Pa
 $framePython = (Resolve-Path (Join-Path $projectRoot "src\lightweave\optical_frame.py")).Path
 $frameHeader = (Resolve-Path (Join-Path $projectRoot "uno_q\common\lightweave_optical_frame.h")).Path
 $sourceApp = "/home/arduino/ArduinoApps/image_transmitter_bkp"
+$legacyTextApp = "/home/arduino/ArduinoApps/laser_transmitter_ui"
 $targetApp = "/home/arduino/ArduinoApps/lightweave_transmitter"
+$targetDisplayName = "LightWeave Transmitter"
 $requiredFiles = @(
     "app.yaml",
     "README.md",
@@ -88,10 +90,10 @@ if (-not $freeMatch.Success -or [int64]$freeMatch.Groups[1].Value -lt 65536) {
     throw "UNO Q has less than 64 MiB free disk space."
 }
 
-$backupHashCommand = "cd '$sourceApp' && sha256sum app.yaml python/main.py sketch/sketch.ino"
+$backupHashCommand = "sha256sum '$sourceApp/app.yaml' '$sourceApp/python/main.py' '$sourceApp/sketch/sketch.ino' '$legacyTextApp/app.yaml' '$legacyTextApp/python/main.py' '$legacyTextApp/sketch/sketch.ino'"
 $backupBefore = (& $AdbPath -s $DeviceSerial shell $backupHashCommand) -join "`n"
-if ($LASTEXITCODE -ne 0 -or ($backupBefore -split "`n").Count -ne 3) {
-    throw "Could not hash the image_transmitter_bkp source."
+if ($LASTEXITCODE -ne 0 -or ($backupBefore -split "`n").Count -ne 6) {
+    throw "Could not hash the image or legacy-text transmitter sources."
 }
 
 $targetProbe = & $AdbPath -s $DeviceSerial shell "test -d '$targetApp'"
@@ -104,9 +106,10 @@ if ($targetExists) {
 }
 
 Write-Host "Source app: image_transmitter_bkp (read-only)"
-Write-Host "Target app: lightweave_transmitter"
+Write-Host "Legacy text app: laser_transmitter_ui (read-only)"
+Write-Host "Target app: lightweave_transmitter / $targetDisplayName"
 Write-Host "Tracked source: $sourceRoot"
-Write-Host "Backup source hashes recorded: 3"
+Write-Host "Protected source hashes recorded: 6"
 if ($DryRun) {
     Write-Host "Dry run passed; the board was not modified."
     exit 0
@@ -161,7 +164,7 @@ $targetList = $targetListJson | ConvertFrom-Json
 $targetRunning = @(
     $targetList.apps |
         Where-Object {
-            $_.name -eq "lightweave_transmitter" -and $_.status -eq "running"
+            $_.name -eq $targetDisplayName -and $_.status -eq "running"
         }
 ).Count -gt 0
 if ($targetRunning) {
@@ -174,7 +177,7 @@ if ($LASTEXITCODE -ne 0) { throw "Could not clear the cloned app cache." }
 
 $backupAfter = (& $AdbPath -s $DeviceSerial shell $backupHashCommand) -join "`n"
 if ($LASTEXITCODE -ne 0 -or $backupAfter -ne $backupBefore) {
-    throw "image_transmitter_bkp changed during installation. Stop and inspect the board."
+    throw "A protected transmitter source changed during installation. Stop and inspect the board."
 }
 
 if (-not $NoStart) {
@@ -184,7 +187,7 @@ if (-not $NoStart) {
     $runningApps = @(
         $appList.apps |
             Where-Object {
-                $_.status -eq "running" -and $_.name -ne "lightweave_transmitter"
+                $_.status -eq "running" -and $_.name -ne $targetDisplayName
             }
     )
     if ($runningApps.Count -gt 0 -and -not $StopRunningApp) {
@@ -204,5 +207,5 @@ if (-not $NoStart) {
     if ($LASTEXITCODE -ne 0) { throw "App Lab could not start lightweave_transmitter." }
 }
 
-Write-Host "Backup hashes unchanged."
+Write-Host "Image-backup and legacy-text source hashes unchanged."
 Write-Host "LightWeave transmitter installation completed."

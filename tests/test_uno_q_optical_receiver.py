@@ -97,6 +97,14 @@ def test_collect_accepts_canonical_audio_frame() -> None:
     assert received.received_crc == 0x6321
 
 
+def test_collect_accepts_exact_printable_ascii_text_frame() -> None:
+    payload = b"Hello LightWeave"
+    received = optical.collect_received_frame(FakeBridge(payload, "T1-ASCII-B100"))
+    assert received.header.profile.media_type == "text"
+    assert received.header.profile.profile_id == 0x20
+    assert received.payload == payload
+
+
 @pytest.mark.parametrize(
     ("bridge", "message"),
     [
@@ -118,6 +126,7 @@ def test_collect_rejects_invalid_stm32_evidence(
     [
         ("I64-Q1-B128", "png", "image"),
         ("A1-E15-S24000", "wav", "audio"),
+        ("T1-ASCII-B100", "txt", "text"),
     ],
 )
 def test_store_claims_listen_and_records_media_atomically(
@@ -135,7 +144,12 @@ def test_store_claims_listen_and_records_media_atomically(
     )
     request = store.claim_next()
     assert request == optical.ReceiveRequest(request_id, "adb")
-    payload = bytes(188) if media_type == "audio" else b"\x00\xff\xaa\x55"
+    if media_type == "audio":
+        payload = bytes(188)
+    elif media_type == "text":
+        payload = b"Hello LightWeave"
+    else:
+        payload = b"\x00\xff\xaa\x55"
     bridge = FakeBridge(payload, preset)
     frame = optical.collect_received_frame(bridge)
     media = b"media-fixture"
@@ -177,6 +191,10 @@ def test_tracked_app_preserves_hardware_and_accelerator_contracts() -> None:
     assert "from lightweave_uno import decode_audio_payload, decode_payload" in main
     assert "decode_payload(frame.payload, frame.header.preset_code)" in main
     assert "decode_audio_payload(frame.payload, frame.header.preset_code)" in main
+    assert 'frame.payload.decode("ascii")' in main
+    assert 'accelerator_required": False' in main
+    assert 'id="text-content"' in page
+    assert "Download TXT" in page
     assert "Listen for transfer" in page
     assert "http://" not in page
     assert "https://" not in page

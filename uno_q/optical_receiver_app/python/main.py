@@ -86,10 +86,23 @@ def process_completed_request(request: ReceiveRequest) -> None:
         media, metrics = decode_payload(frame.payload, frame.header.preset_code)
         extension = "png"
         base64_field = "png_base64"
-    else:
+        text_content = None
+    elif frame.header.profile.media_type == "audio":
         media, metrics = decode_audio_payload(frame.payload, frame.header.preset_code)
         extension = "wav"
         base64_field = "wav_base64"
+        text_content = None
+    else:
+        text_content = frame.payload.decode("ascii")
+        media = frame.payload
+        metrics = {
+            "backend": "printable-ascii",
+            "decoder": "strict ASCII bytes",
+            "accelerator_required": False,
+            "characters": len(text_content),
+        }
+        extension = "txt"
+        base64_field = None
     result = store.write_result(
         request,
         frame,
@@ -97,10 +110,12 @@ def process_completed_request(request: ReceiveRequest) -> None:
         output_extension=extension,
         metrics=metrics,
     )
-    ui.send_message(
-        "receiver_result",
-        {**result, base64_field: base64.b64encode(media).decode("ascii")},
-    )
+    response = dict(result)
+    if base64_field is not None:
+        response[base64_field] = base64.b64encode(media).decode("ascii")
+    else:
+        response["text_content"] = text_content
+    ui.send_message("receiver_result", response)
 
 
 def clear_pending() -> None:

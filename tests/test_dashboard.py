@@ -60,6 +60,8 @@ def test_dashboard_serves_only_local_assets() -> None:
         assert 'href="/static/styles.css"' in page.text
         assert 'src="/static/transmit.js"' in page.text
         assert "I128-Q1-B768" in page.text
+        assert "T1-ASCII-B100" in page.text
+        assert "NO AI" in page.text
         assert "send to Arduino" in page.text
         assert "https://" not in page.text
         transmitter_script = client.get("/static/transmit.js")
@@ -88,6 +90,33 @@ def test_dashboard_exposes_uno_q_status_and_transmit_contract() -> None:
         assert response.status_code == 200
         assert response.json()["buffered_bytes"] == 80
         assert response.json()["optical_bits"] == 738
+
+        text = client.post(
+            "/api/adapters/uno-q/transmit",
+            data={"media_type": "text", "preset_code": "T1-ASCII-B100"},
+            files={"file": ("payload.bin", b"Hello LightWeave")},
+        )
+        assert text.status_code == 200
+        assert text.json()["buffered_bytes"] == 16
+
+
+def test_dashboard_generates_exact_no_ai_text_payload() -> None:
+    with TestClient(create_app()) as client:
+        response = client.post("/api/transmit/text", data={"text": "Hello!"})
+        assert response.status_code == 200
+        assert response.json() == {
+            "preset_code": "T1-ASCII-B100",
+            "payload_base64": "SGVsbG8h",
+            "raw_bytes": 6,
+            "maximum_bytes": 100,
+            "characters": 6,
+            "text": "Hello!",
+            "at_1_kbps_seconds": 0.048,
+            "at_2_kbps_seconds": 0.024,
+            "warning": "Text uses printable ASCII bytes directly; no AI model runs.",
+        }
+        invalid = client.post("/api/transmit/text", data={"text": "line\nbreak"})
+        assert invalid.status_code == 422
 
 
 def test_dashboard_serves_small_local_test_patterns() -> None:

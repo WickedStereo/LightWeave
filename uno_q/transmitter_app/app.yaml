@@ -1,5 +1,5 @@
-name: lightweave_transmitter
-description: Send LightWeave LWF1 image/audio frames or legacy raw diagnostics.
+name: LightWeave Transmitter
+description: Send LightWeave LWF1 text, image, and audio frames.
 ports: []
 bricks: []
 icon: "💡"

@@ -26,9 +26,11 @@ from .raw import (
     parse_raw_audio_preset,
     parse_raw_image_preset,
 )
+from .text import TEXT_PRESET_CODE, decode_text
 from .transport import SendReceipt
 
 TRANSMITTER_PATH = "/home/arduino/ArduinoApps/lightweave_transmitter"
+TRANSMITTER_DISPLAY_NAME = "LightWeave Transmitter"
 MAX_PAYLOAD_BYTES = 2_048
 MAX_AUDIO_BYTES = 940
 SAMPLES_PER_AUDIO_CHUNK = 24_000
@@ -80,8 +82,7 @@ def resolve_adb_path(explicit: str | Path | None = None) -> Path:
         if path.is_file():
             return path.resolve()
     raise UnoQTransportError(
-        "ADB was not found. Install Android platform-tools or set "
-        "LIGHTWEAVE_ADB_PATH."
+        "ADB was not found. Install Android platform-tools or set LIGHTWEAVE_ADB_PATH."
     )
 
 
@@ -100,8 +101,16 @@ def validate_uno_q_payload(payload: bytes, media_type: str, preset_code: str) ->
                 f"Raw image exceeds the {preset.maximum_bytes}-byte preset budget."
             )
         return
+    if media_type == "text":
+        if preset_code != TEXT_PRESET_CODE:
+            raise UnoQTransportError("Unsupported raw text preset code.")
+        try:
+            decode_text(payload)
+        except ValueError as exc:
+            raise UnoQTransportError(str(exc)) from exc
+        return
     if media_type != "audio":
-        raise UnoQTransportError("Media type must be image or audio.")
+        raise UnoQTransportError("Media type must be text, image, or audio.")
     try:
         samples = parse_raw_audio_preset(preset_code)
     except ValueError as exc:
@@ -141,9 +150,7 @@ class UnoQAdbSink:
         self.media_type = media_type
         self.preset_code = preset_code
         self.adb_path = resolve_adb_path(adb_path)
-        self.device_serial = device_serial or os.environ.get(
-            "LIGHTWEAVE_UNO_Q_SERIAL"
-        )
+        self.device_serial = device_serial or os.environ.get("LIGHTWEAVE_UNO_Q_SERIAL")
         self.runner = runner
         self.sleep = sleep
         self.clock = clock
@@ -253,14 +260,14 @@ class UnoQAdbSink:
             except (json.JSONDecodeError, KeyError, TypeError):
                 continue
             if any(
-                entry.get("name") == "lightweave_transmitter"
+                entry.get("name") == TRANSMITTER_DISPLAY_NAME
                 and entry.get("status") == "running"
                 for entry in applications
             ):
                 transmitter_devices.append(serial)
         if len(transmitter_devices) != 1:
             raise UnoQTransportError(
-                "Could not uniquely identify a running lightweave_transmitter; "
+                "Could not uniquely identify the running LightWeave Transmitter; "
                 "configure LIGHTWEAVE_UNO_Q_SERIAL to resolve the ambiguity."
             )
         return transmitter_devices[0]
@@ -291,7 +298,7 @@ class UnoQAdbSink:
             (
                 entry
                 for entry in applications
-                if entry.get("name") == "lightweave_transmitter"
+                if entry.get("name") == TRANSMITTER_DISPLAY_NAME
             ),
             None,
         )
@@ -375,7 +382,7 @@ class UnoQAdbSink:
         status = self.status()
         if not status["ready"]:
             raise UnoQTransportError(
-                "lightweave_transmitter is not installed and running; run the "
+                "LightWeave Transmitter is not installed and running; run the "
                 "UNO Q transmitter installer first."
             )
 

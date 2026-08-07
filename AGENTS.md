@@ -29,6 +29,8 @@
 - A successful QNN assignment is not enough by itself. Preserve CPU/ONNX/NPU numerical parity gates and profile evidence for every generated graph.
 - Raw `payload.bin` must remain the unchanged header-free codec output. Production optical sends may wrap it in `LWF1` with version, profile, length, media parameter, and CRC-16; those 12 wire bytes are never written into `payload.bin`. Explicit `raw-v0` remains only for the byte diagnostic. Neither raw files nor `LWF1` contain model negotiation or a cryptographic payload hash.
 - Do not spend time on additional long physical transfers unless the owner asks. The five-second/940-byte audio contract remains supported, but current optical acceptance stops at the passing one-second fixture.
+- The owner authorized integration of the stopped `laser_transmitter_ui` / `laser_receiver_ui` text prototype on 2026-08-06. Preserve those apps unchanged. Production text is printable ASCII, maximum 100 bytes, uses no AI, and travels as profile `T1-ASCII-B100` inside the shared `LWF1` frame. Legacy 100-ms per-character framing is compatibility reference only.
+- Final production App Lab identities are `lightweave_transmitter` / **LightWeave Transmitter** and `lightweave_receiver` / **LightWeave Receiver**. Preserve `lightweave_optical_receiver` as a stopped rollback app during migration.
 
 ## Repository hygiene
 

@@ -28,6 +28,7 @@ inline bool validateFields(uint8_t profileId, uint16_t payloadBytes,
   if (profileId == 0x01) return payloadBytes <= 128 && mediaParameter == 0;
   if (profileId == 0x02) return payloadBytes <= 768 && mediaParameter == 0;
   if (profileId == 0x03) return payloadBytes <= 2048 && mediaParameter == 0;
+  if (profileId == 0x20) return payloadBytes <= 100 && mediaParameter == 0;
   if (profileId != 0x10 || payloadBytes > 940 || payloadBytes % 188 != 0) {
     return false;
   }

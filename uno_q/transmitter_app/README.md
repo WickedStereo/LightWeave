@@ -1,8 +1,10 @@
 # LightWeave UNO Q transmitter
 
 This App Lab project is derived from the owner's `image_transmitter_bkp`
-application. The installer hashes that backup before and after deployment and
-updates only the tracked `lightweave_transmitter` clone.
+application. The installer hashes that backup and the original
+`laser_transmitter_ui` text prototype before and after deployment, and updates
+only the tracked `lightweave_transmitter` clone. Its App Lab display name is
+**LightWeave Transmitter**.
 
 The Windows dashboard places the unchanged `payload.bin` in an atomic ADB
 inbox. The Linux worker validates request schema 2, SHA-256, profile, media
@@ -14,6 +16,10 @@ through RouterBridge. By default the STM32 emits an `LWF1` optical frame:
 3. the raw payload, unchanged and MSB first;
 4. CRC-16/CCITT-FALSE as two little-endian bytes;
 5. one low stop bit.
+
+Text profile `T1-ASCII-B100` sends 1-100 printable ASCII bytes directly. It
+does not run an AI model, compressor, or decoder. The raw file is those exact
+ASCII bytes; only the optical wire adds LWF1 framing.
 
 Pin 9 and 25 milliseconds per bit are unchanged. `raw-v0` is retained only for
 the explicit byte-receiver diagnostic. It emits the old start/payload/stop

@@ -20,7 +20,7 @@ if str(SRC) not in sys.path:
 
 from lightweave.uno_q_transport import UnoQAdbSink, resolve_adb_path  # noqa: E402
 
-RECEIVER_PATH = "/home/arduino/ArduinoApps/lightweave_optical_receiver"
+RECEIVER_PATH = "/home/arduino/ArduinoApps/lightweave_receiver"
 PRESETS = {
     "I64-Q1-B128": (128, 64),
     "I128-Q1-B768": (768, 128),

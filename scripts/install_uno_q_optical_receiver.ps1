@@ -25,8 +25,9 @@ $noticePath = (Resolve-Path (Join-Path $projectRoot "uno_q\native\THIRD_PARTY_NO
 $decoderSource = "/home/arduino/ArduinoApps/lightweave-uno"
 $receiverSource = "/home/arduino/ArduinoApps/image_receiver"
 $uiSource = "/home/arduino/ArduinoApps/laser_receiver_ui"
-$targetApp = "/home/arduino/ArduinoApps/lightweave_optical_receiver"
-$targetDisplayName = "LightWeave Optical Receiver"
+$rollbackSource = "/home/arduino/ArduinoApps/lightweave_optical_receiver"
+$targetApp = "/home/arduino/ArduinoApps/lightweave_receiver"
+$targetDisplayName = "LightWeave Receiver"
 $requiredFiles = @(
     "app.yaml",
     "README.md",
@@ -118,6 +119,9 @@ $requiredBoardFiles = @(
     "$decoderSource/runtime/audio-tail.ncnn.param",
     "$decoderSource/runtime/audio-tail.ncnn.bin",
     "$receiverSource/sketch/sketch.ino",
+    "$uiSource/app.yaml",
+    "$uiSource/python/main.py",
+    "$uiSource/sketch/sketch.ino",
     "$uiSource/assets/libs/socket.io.min.js"
 )
 foreach ($remote in $requiredBoardFiles) {
@@ -131,7 +135,13 @@ if ($LASTEXITCODE -ne 0 -or $boardDecoderHash -ne $trackedDecoderHash) {
     throw "The installed LightWeave decoder source does not match this repository. Reinstall the base UNO Q bundle first."
 }
 
-$sourceHashCommand = "sha256sum '$decoderSource/app.yaml' '$decoderSource/python/lightweave_uno.py' '$decoderSource/uno_q.manifest.json' '$decoderSource/runtime/lightweave-uno-runner' '$decoderSource/runtime/entropy_tables.bin' '$decoderSource/runtime/tiny.ncnn.param' '$decoderSource/runtime/tiny.ncnn.bin' '$decoderSource/runtime/balanced.ncnn.param' '$decoderSource/runtime/balanced.ncnn.bin' '$decoderSource/runtime/quality.ncnn.param' '$decoderSource/runtime/quality.ncnn.bin' '$receiverSource/app.yaml' '$receiverSource/python/main.py' '$receiverSource/sketch/sketch.ino' '$uiSource/assets/libs/socket.io.min.js'"
+$rollbackHashSuffix = ""
+& $AdbPath -s $DeviceSerial shell "test -d '$rollbackSource'"
+$rollbackExists = $LASTEXITCODE -eq 0
+if ($rollbackExists) {
+    $rollbackHashSuffix = " '$rollbackSource/app.yaml' '$rollbackSource/python/lightweave_optical_receiver.py' '$rollbackSource/sketch/sketch.ino'"
+}
+$sourceHashCommand = "sha256sum '$decoderSource/app.yaml' '$decoderSource/python/lightweave_uno.py' '$decoderSource/uno_q.manifest.json' '$decoderSource/runtime/lightweave-uno-runner' '$decoderSource/runtime/entropy_tables.bin' '$decoderSource/runtime/tiny.ncnn.param' '$decoderSource/runtime/tiny.ncnn.bin' '$decoderSource/runtime/balanced.ncnn.param' '$decoderSource/runtime/balanced.ncnn.bin' '$decoderSource/runtime/quality.ncnn.param' '$decoderSource/runtime/quality.ncnn.bin' '$receiverSource/app.yaml' '$receiverSource/python/main.py' '$receiverSource/sketch/sketch.ino' '$uiSource/app.yaml' '$uiSource/python/main.py' '$uiSource/sketch/sketch.ino' '$uiSource/assets/libs/socket.io.min.js'$rollbackHashSuffix"
 $sourceBefore = (& $AdbPath -s $DeviceSerial shell $sourceHashCommand) -join "`n"
 if ($LASTEXITCODE -ne 0 -or -not $sourceBefore) {
     throw "Could not hash the reusable receiver components."
@@ -142,7 +152,7 @@ $targetExists = $LASTEXITCODE -eq 0
 if ($targetExists) {
     & $AdbPath -s $DeviceSerial shell "test -f '$targetApp/optical_receiver.manifest.json'"
     if ($LASTEXITCODE -ne 0) {
-        throw "Refusing to overwrite an unrelated lightweave_optical_receiver app."
+        throw "Refusing to overwrite an unrelated lightweave_receiver app."
     }
 }
 
@@ -150,7 +160,9 @@ Write-Host "Receiver device: $DeviceSerial"
 Write-Host "Receiver host: $(([regex]::Match($doctorText, 'HOST=([^\r\n]+)')).Groups[1].Value)"
 Write-Host "Decoder source: lightweave-uno (read-only)"
 Write-Host "Optical source: image_receiver (read-only)"
-Write-Host "Target app: lightweave_optical_receiver"
+Write-Host "Legacy text source: laser_receiver_ui (read-only)"
+Write-Host "Rollback receiver: lightweave_optical_receiver ($(if ($rollbackExists) { 'read-only' } else { 'not installed' }))"
+Write-Host "Target app: lightweave_receiver / $targetDisplayName"
 Write-Host "Tracked source: $trackedRoot"
 if ($DryRun) {
     Write-Host "Dry run passed; the receiver board was not modified."
@@ -158,7 +170,7 @@ if ($DryRun) {
 }
 
 if (-not $targetExists) {
-    & $AdbPath -s $DeviceSerial shell "arduino-app-cli app new lightweave_optical_receiver --from-app '$decoderSource'"
+    & $AdbPath -s $DeviceSerial shell "arduino-app-cli app new lightweave_receiver --from-app '$decoderSource'"
     if ($LASTEXITCODE -ne 0) { throw "Could not clone the installed LightWeave receiver." }
 }
 
@@ -250,8 +262,8 @@ if (-not $NoStart) {
         Write-Host "Stopped App Lab app: $($runningApp.name)"
     }
     & $AdbPath -s $DeviceSerial shell "arduino-app-cli app restart '$targetApp'"
-    if ($LASTEXITCODE -ne 0) { throw "App Lab could not start lightweave_optical_receiver." }
+    if ($LASTEXITCODE -ne 0) { throw "App Lab could not start lightweave_receiver." }
 }
 
 Write-Host "Reusable source hashes are unchanged."
-Write-Host "LightWeave optical receiver installation completed."
+Write-Host "LightWeave receiver installation completed."
