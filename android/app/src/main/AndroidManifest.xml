@@ -12,7 +12,7 @@
         android:icon="@drawable/ic_lightweave"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.LightWeave">
+        android:theme="@style/Theme.LightWeave.Light">
         <activity
             android:name=".MainActivity"
             android:exported="true">

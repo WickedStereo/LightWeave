@@ -1,4 +1,4 @@
-usb-serial-for-android 3.10.0
+LightWeave Mobile uses usb-serial-for-android 3.10.0
 https://github.com/mik3y/usb-serial-for-android
 
 MIT License

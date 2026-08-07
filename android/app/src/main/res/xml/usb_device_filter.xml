@@ -1,7 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Arduino UNO Q: VID 0x2341 / PID 0x0078. -->
-    <usb-device
-        vendor-id="9025"
-        product-id="120" />
+    <usb-device vendor-id="9025" product-id="120" />
 </resources>

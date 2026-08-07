@@ -6,9 +6,9 @@
 | Field | Current value |
 | --- | --- |
 | Project | LightWeave |
-| Phase | Unified text/image/audio optical demo complete; submission hardening in progress |
-| Primary milestone | Present measured Windows, UNO Q, STM32, QNN, and Adreno execution evidence clearly |
-| Secondary milestone | Galaxy S25 receiver UI and hardware validation |
+| Phase | Standalone UNO Q + Galaxy receiver software complete; final phone hardware validation pending |
+| Primary milestone | Validate the final no-laptop Galaxy S25 Ultra + receiver UNO Q display path |
+| Secondary milestone | Submission hardening and presentation evidence |
 | Last updated | 2026-08-06 |
 | Approval gate | Application implementation explicitly approved on 2026-08-05 |
 
@@ -56,8 +56,9 @@ The implemented milestone assumes a reliable ordered byte pipe and includes:
   an out-of-band exact sample count.
 - Separate `/transmit`, `/receive`, and `/loopback` dashboard pages plus
   `RawByteSink`/`RawByteSource` adapter contracts for future hardware.
-- A native Android receiver prototype for direct UNO Q USB text/image display,
-  with hardware-free framed demos and no Internet permission.
+- A fresh native **LightWeave Mobile** Android receiver for direct UNO Q USB
+  control plus decoded text, PNG, WAV, and hardware-evidence display, with no
+  Internet permission and no laptop required at runtime.
 - A native UNO Q receiver for all three raw image presets plus up to five
   seconds of header-free EnCodec audio. Images run fully on Adreno; audio uses
   a measured CPU/Adreno split with no fallback inside its Vulkan suffix.
@@ -87,8 +88,8 @@ The following remain out of scope:
 
 - Analog/photodiode redesign, clock recovery, serial framing, retransmission,
   faster modulation, and changes to the existing laser waveform/timing.
-- Galaxy S25 hardware validation, Android audio playback, WebSockets, and Cloud
-  AI in the runtime path.
+- Direct Galaxy S25 cable/power validation, WebSockets, and Cloud AI in the
+  runtime path.
 - UNO Q media encoding and MCU performance optimization beyond the approved
   variable-length framed receive/transmit loop.
 - Medical, regulatory, safety, or absolute-security claims.
@@ -96,27 +97,39 @@ The following remain out of scope:
 
 ### UNO Q-to-Android receiver extension
 
-The owner selected a direct USB-C-to-USB-C receiver path: Galaxy S25 Ultra as
-USB host, UNO Q as USB device, and a native Android application displaying
-results already reconstructed by the UNO Q. Text and images are the current
-app scope; audio is deferred. The phone application is presentation and USB
-transport only, not an AI decoder.
+The owner selected a final receiver/display topology with no laptop: Galaxy
+S25 Ultra as USB host and presentation/control surface, plus receiver UNO Q as
+USB device, optical endpoint, validator, and reconstruction host. The phone
+does not run an AI model. It sends Listen/Cancel/Status controls and displays
+decoded text, exact PNG, playable WAV, and the same frame/hardware evidence as
+the receiver WebUI.
 
-The `android/` Android Studio project implements the hardware-independent side
-of that contract. It matches observed UNO Q USB identity `2341:0078`, requests
-USB-host permission, uses `usb-serial-for-android` 3.10.0 for CDC/ACM reads,
-and parses incremental `LWRX` v1 frames. A 16-byte little-endian header carries
-magic, version, media type, flags, payload length, and CRC32. Type 1 is UTF-8
-text; type 2 is PNG/JPEG. USB framing is downstream of the optical link and
-does not count against the raw optical payload budget.
+The old Android prototype was explicitly retired and replaced from scratch by
+the `com.lightweave.mobile` **LightWeave Mobile** project. It matches observed
+UNO Q USB identity `2341:0078`, requests USB-host permission, uses
+`usb-serial-for-android` 3.10.0 for bidirectional CDC/ACM, and has no Internet
+or broad-storage permission. Phone-to-board `LWCT/1` uses fixed 12-byte
+CRC32-protected Listen, Cancel, and Status commands. Board-to-phone `LWRX/2`
+uses a 20-byte header, canonical JSON evidence, decoded TXT/PNG/WAV or status,
+and CRC32 over the prefix plus metadata and media. This downstream framing
+never travels over the laser and does not alter `payload.bin` or `LWF1`.
+
+The receiver App Lab service receives controls and persists every decoded
+result in `data/phone-outbox` until USB delivery succeeds. A narrow Compose
+override grants only that service access to `/dev/ttyGS0`; the base OS,
+receiver decode path, STM32 sketch, and transmitter are unchanged. The
+installer reapplies and checks that override after App Lab deployment.
 
 The UNO Q reconstruction boundary is now verified independently of the phone.
 Its native ARM64 rANS decoder produces the same latent tensor as CompressAI for
 all three raw image presets, and the complete `g_s` graph runs through ncnn
 Vulkan on the Adreno 702 with unsupported layers and CPU fallback rejected.
-The board-local CLI and App Lab WebUI both reconstruct real payloads. The
-remaining Android uncertainty is the USB transport, phone power, and display
-path—not whether the UNO Q can reconstruct the image.
+The board-local CLI and App Lab WebUI both reconstruct real payloads. Direct
+board evidence now also proves exact host-to-board `LWCT/1` Status and
+Listen/Cancel, an `LWRX/2` status response, and delivery of an existing strict-
+Adreno reconstructed 4,469-byte PNG with its 1,909-byte evidence metadata and
+correct PNG signature. The remaining uncertainty is S25 enumeration, power,
+and on-device UI behavior, not the UNO Q USB gadget or reconstruction path.
 
 Documentation claims: Arduino specifies that UNO Q has a Qualcomm Dragonwing
 QRB2210 MPU running Debian, an STM32U585 MCU, Bridge/RPC, Wi-Fi, Bluetooth, and
@@ -172,12 +185,12 @@ download/verification scripts are tracked.
 
 ### Deferred next milestones
 
-The direct Windows-to-UNO-Q optical image and audio workflows are implemented
-and physically validated with automatic `LWF1` metadata. The next selected
-milestone is finishing and hardware-validating the Android receiver UI for
-presentation of text and reconstructed media from UNO Q. Faster modulation,
-transition-based clock recovery, retries, and sustained adverse-light testing
-remain later transport work.
+The direct Windows-to-UNO-Q optical workflow and standalone Android receiver
+software are implemented. The next gate is installing the APK on the S25 and
+physically validating USB enumeration/power, Listen/Cancel, text/image/audio
+presentation, reconnect, and an end-to-end optical transfer with no receiver-
+side laptop. Faster modulation, transition-based clock recovery, retries, and
+sustained adverse-light testing remain later transport work.
 
 ### Existing App Lab transmitter discovery
 
@@ -604,16 +617,17 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Check | Result |
 | --- | --- |
 | Toolchain | Java 17, Android SDK/target 36, AGP 9.0.0, Gradle 9.1.0 |
-| Debug APK | Builds successfully; package `com.lightweave.receiver` |
-| Unit tests | 9 passing tests for identity, framing, fragmentation, CRC/resync, UTF-8, and counters |
-| Android lint | 0 errors; Gradle-version notice only |
-| Offline rebuild after dependency setup | Pass |
+| Fresh debug APK | Builds successfully; package `com.lightweave.mobile`, version `1.0.0` |
+| Unit tests | 7 passing tests for exact control vectors, Python/Android canonical parity, all four result types, single-byte fragmentation, CRC/resync, invalid headers, and USB identity |
+| Android lint | Pass, 0 errors |
 | USB host declaration | Present; exact UNO Q filter `2341:0078` |
 | App network permission | None |
-| Supported result types | UTF-8 text and PNG/JPEG image |
-| Hardware-free demos | Text and generated PNG traverse the production frame parser |
-| S25/UNO Q cable and power | Not exercised |
-| UNO Q decoder deployment | Verified separately on board; UNO Q-to-phone delivery remains unexercised |
+| Supported result types | Status, UTF-8 text, PNG image, and playable PCM WAV audio |
+| Controls | Bidirectional Listen, Cancel, and Status through `LWCT/1` |
+| UNO Q USB service | `/dev/ttyGS0` exposed only to receiver service; read/write preflight passed |
+| Physical USB protocol | Status round trip passed; Listen changed board state to `phone-usb`/`listening`; Cancel returned it to idle |
+| Real decoded result delivery | Existing strict-Adreno 64 by 64 PNG delivered as a valid 6,398-byte `LWRX/2` frame; 4,469 PNG bytes and 1,909 metadata bytes |
+| S25/UNO Q cable, power, and screen | Not yet exercised; final hardware gate |
 
 ### Product surface and packaging
 
@@ -628,7 +642,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Monochrome dashboard refresh | Pass; text-first square layout, no gradients/shadows, responsive at 390 px without horizontal overflow |
 | Multi-size browser workflow | Pass; balanced sample transmit/verify and separate receiver upload both reconstructed 128 by 128 with 0 CPU profile nodes |
 | Raw disconnected-runtime smoke | Pass for balanced strict image QNN and audio hybrid; 216/376 raw bytes and exact outputs |
-| Android text/image receiver | Debug APK, framed demos, unit tests, and lint pass; real UNO Q/S25 path pending |
+| Android standalone receiver | Fresh APK, text/image/audio/status, Listen/Cancel, save/playback, evidence UI, unit tests, and lint pass; direct S25 hardware pending |
 | UNO Q native receiver | All image profiles reconstruct on Adreno Vulkan with strict no-fallback and at least 36.34 dB accelerator/CPU parity |
 | UNO Q App Lab WebUI | Rendered browser upload/reconstruction/download and oversize error pass; balanced accelerator time about 524 ms; no console errors |
 | UNO Q audio receiver | One- and five-second raw payloads reconstruct through CPU plus a strict 39-layer Adreno suffix at 52.07 dB or better PyTorch parity |
@@ -667,12 +681,12 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Raw 128 by 128 strict QNN decoder | Complete locally | QUInt16 QDQ, 66.74 dB minimum CPU parity, no fallback, 0 CPU nodes, 51.29 dB minimum NPU/CPU parity |
 | Raw milestone publication | Complete | Commit `140f9ae`; GitHub Actions run `31047777514` passed |
 | Multi-size dashboard publication | Complete | Commit `9aee230`; GitHub Actions run `31057418505` passed |
-| Android text/image receiver | Complete locally; hardware pending | APK builds; 9 unit tests and lint pass; validate UNO Q CDC, S25 power, and decoded output next |
+| Android standalone receiver | Software and UNO Q USB side complete; S25 pending | Fresh APK builds; 7 unit tests/lint pass; duplex controls/status and real reconstructed-PNG USB delivery pass on UNO Q gadget |
 | UNO Q accelerator feasibility | Complete | ncnn Vulkan executes all three complete graphs on Adreno 702; QNN/FastRPC is absent on the exercised image |
 | UNO Q native receiver | Complete locally | Native rANS, strict runner, CLI, rendered API/WebUI, manifest, SPDX SBOM, offline bundle, dry-run/idempotent installer, and 60-test repository suite pass |
 | UNO Q receiver publication | Complete | Source/evidence commit `8074645` and Android-preservation commit `fa19c64` published to `origin/main` |
 | UNO Q audio receiver | Complete and published | Commit `03b0bd7`; native unpack/codebook parity, earliest valid split 5, strict 39-layer Adreno suffix, 1/5-second parity, CLI/API/WebUI, offline bundle, installer, and offline smoke pass |
-| Android receiver UI and hardware path | Next milestone; deferred for now | Refine the existing prototype, then validate S25/UNO Q enumeration, power, text/image rendering, reconnects, throughput, and later WAV playback |
+| Android receiver UI and hardware path | Active final gate | No-laptop phone/UNO topology and text/image/audio app are implemented; validate direct S25 enumeration, power, rendering/playback, reconnect, and end-to-end optical transfer |
 | Windows-to-UNO Q transmitter flow | Complete and published | Commit `028f9d9`; dashboard image/audio Send actions, USB/ADB sink, atomic App Lab inbox, variable-length STM32 loop, tracked clone source, installer, and real 104/124/188-byte board acceptance pass |
 | UNO Q optical byte diagnostic | Complete and published | Commit `80ba103`; exact `00 FF AA 55` received twice with matching SHA-256 and valid stop bit |
 | UNO Q optical image receiver | Complete and published | Commit `506eee9`; two 80-byte physical image transfers passed exact-byte, stop-bit, 64-by-64 PNG, 16-layer Adreno, strict-no-fallback, App Lab UI, and zero-console-error gates |
@@ -711,8 +725,10 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | EnCodec recurrent decoder cannot run in the Vulkan suffix | Keep codebooks and complete-clip recurrent layers 0-4 on CPU; label the result CPU/Adreno hybrid and never imply full-GPU/NPU audio |
 | Earlier UNO Q audio split returned invalid output | Split 2 is permanently rejected; select the earliest later candidate only after finite-output, parity, support, and stability gates; split 5 passed |
 | UNO Q audio memory/latency grows with duration | First release is capped at five seconds/940 bytes; static 1-5 second prefixes share one weight file and all requests use the accelerator lock/cooldown |
-| USB stream loses boundaries or reconnects mid-result | `LWRX` length plus CRC32 framing rejects corruption and resynchronizes on magic |
-| Phone receives an unsafe image allocation | Reject payloads above 8 MiB and decoded dimensions above 16 megapixels |
+| USB stream loses boundaries or reconnects mid-result | `LWRX/2` bounds plus CRC32 reject corruption and resynchronize on magic; completed media remains in a durable UNO Q outbox until delivery succeeds |
+| Phone receives an unsafe allocation | Reject metadata above 256 KiB, decoded media above 16 MiB, and decoded images above 16 megapixels before rendering |
+| App Lab container cannot access gadget CDC by default | The generated service cgroup rejected major 505 even with the device visible; a checked Compose override maps only `/dev/ttyGS0` and the installer verifies read/write access after restart |
+| Phone may not sustain UNO Q power | Direct S25 behavior remains a hardware gate; use a standards-compliant USB-C OTG/PD powered hub while preserving S25 host and UNO Q device roles if needed |
 | Multiple ADB devices are connected | Automatically select the only UNO Q running the tracked transmitter marker; fail on ambiguity and retain the serial override |
 | App Lab allows only one active application | Installer does not stop anything by default; the explicit `-StopRunningApp` option performs the reversible stop before starting `lightweave_transmitter` |
 | USB inbox is interrupted or stale | Publish payload/metadata atomically, publish the descriptor last, verify SHA-256/length/request ID, ignore partial files, and return per-request result files |
@@ -733,12 +749,12 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
   narrowed split?
 - Should future work add QNN context caching to reduce the audio tail's session
   preparation time?
-- Will Android match the observed UNO Q composite device as CDC/ACM through
-  `usb-serial-for-android`, or will a custom probe/device interface be needed?
+- Will the S25 enumerate the observed UNO Q composite CDC/ACM interface through
+  the standard or included explicit `2341:0078` probe?
 - Can the S25 reliably power the UNO Q during sustained receive, or is a
   standards-compliant powered USB-C hub/PD arrangement required?
-- What sustained USB throughput is reliable for decoded PNG/JPEG results,
-  before the later audio transport is designed?
+- What sustained USB throughput and reconnect behavior does the S25 show for
+  the largest decoded PNG and five-second PCM WAV result?
 - Can a custom Android ONNX Runtime/QNN AAR run the existing fixed-shape QDQ
   image decoder on Galaxy S25 HTP with no fallback, zero CPU graph nodes, and
   at least 35 dB parity against the Windows CPU reference?
@@ -809,6 +825,8 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | D-050 | 2026-08-06 | Present measured process time/memory, accelerator profile events, audited graph layers, bridge calls, and optical-bit counts instead of estimating FLOPs, power, or energy. | These quantities are available and defensible from the current runtimes; layer/event counts are explicitly not operation or energy estimates. |
 | D-051 | 2026-08-06 | Add persistent light/dark modes while preserving the plain monochrome visual system. | Uses local assets, browser preference on first visit, and local storage thereafter; runtime remains offline. |
 | D-052 | 2026-08-06 | Track an evidence-based submission checklist and classify the repository as ready for open-source distribution, not commercially certified. | Reproducible source installation, verified hardware behavior, tests, and licenses satisfy the open-source-platform path; no signed/store package, authentication, or production clock recovery is claimed. Team roster and form completion remain owner actions. |
+| D-053 | 2026-08-06 | Replace the old Android prototype from scratch and make Galaxy S25 Ultra + receiver UNO Q the final no-laptop receiver/display. | Owner explicitly retired the prior Android work and clarified that the phone must replace the receiver WebUI, including Listen/Cancel plus text, image, audio, and evidence. |
+| D-054 | 2026-08-06 | Preserve all reconstruction on UNO Q and add only a durable bidirectional USB presentation/control channel. | `LWCT/1` and `LWRX/2` sit after the unchanged optical/decode path; the phone runs no AI, the transmitter is untouched, and decoded results survive temporary phone disconnects. |
 
 ## Public references
 
@@ -877,3 +895,5 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-06 | Published the integrated text implementation as commit `62c540d`; GitHub Actions run `31147024146` passed the Windows lint/unit gate. |
 | 2026-08-06 | Added persistent light/dark UI controls, defensible Windows/UNO Q/STM32 hardware evidence, QNN provider-event counts, and an explicit hackathon submission audit with owner-only gaps; reinstalled both production apps and physically verified `Telemetry OK` with 194 optical bits, 15 bridge calls, valid CRC/stop bit, and correct CPU-only text labeling. |
 | 2026-08-06 | Committed the theme, hardware telemetry, board evidence, tests, and submission-readiness audit as `98481a8`; 124 portable tests and repository lint passed before publication. |
+| 2026-08-06 | Retired the previous Android prototype, selected a final no-laptop Galaxy S25 Ultra + receiver UNO Q topology, and created the `lightweave-pre-android-rebuild` backup tag at the last published working receiver head. |
+| 2026-08-06 | Rebuilt LightWeave Mobile for bidirectional USB Listen/Cancel/Status and decoded text/PNG/WAV/evidence, added the receiver's durable `LWRX/2` outbox and narrow `/dev/ttyGS0` App Lab mapping, passed 137 Python tests plus Android build/lint/7 tests, and physically verified status, listen/cancel, and real reconstructed-PNG delivery through the UNO Q USB gadget. Direct S25 validation remains pending. |

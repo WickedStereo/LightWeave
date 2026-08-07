@@ -262,24 +262,29 @@ sample count, an Adreno device, and strict no-fallback evidence for the image
 graph or audio suffix. The diagnostic, original `image_receiver`, and installed
 base decoder remain separate and unchanged.
 
-## Android text/image receiver
+## Standalone Galaxy receiver/display
 
-The [`android/`](android/) Android Studio project prepares the phone side of a
-direct UNO Q-to-Galaxy S25 Ultra USB-C link. It treats the UNO Q as the future
-reconstruction host and the phone as a presentation client. The current app:
+The fresh [`android/`](android/) Android Studio project replaces the earlier
+prototype and makes the final receiver-side display **Galaxy S25 Ultra + UNO Q
+only**. A laptop is needed for one-time installation and development, but is
+not present at runtime. The phone controls the production receiver and the UNO
+Q retains all optical validation and reconstruction work. The app:
 
 - matches the observed UNO Q USB identity `2341:0078`;
 - reads CDC/ACM through pinned `usb-serial-for-android` 3.10.0;
-- parses length- and CRC-protected `LWRX` frames;
-- displays UTF-8 text and PNG/JPEG images; and
-- provides hardware-free text/image demos through the production parser.
+- sends CRC-protected **Listen**, **Cancel**, and **Status** controls;
+- parses metadata-rich, CRC-protected `LWRX/2` result frames;
+- displays/saves text and PNG, plays/saves WAV audio, and shows the same
+  optical, CPU, Adreno, STM32, timing, and model evidence as the receiver page;
+- provides a plain persistent light/dark UI; and
+- requests neither Internet nor broad storage permission.
 
-The debug APK, 9 focused unit tests, and Android lint pass locally. UNO Q
-reconstruction now passes separately, while phone enumeration, cable power,
-USB delivery, and sustained throughput have not been exercised and are not
-claimed. The Android app requests neither Internet nor broad storage
-permission. See [android/README.md](android/README.md) for Android Studio,
-wireless-debugging, build, and sender-protocol details.
+The receiver service now exposes `/dev/ttyGS0` through a narrow App Lab Compose
+override, retains completed outputs in a durable phone outbox, and has passed
+duplex control/status plus a real reconstructed-PNG delivery test through the
+UNO Q USB gadget. Direct Galaxy enumeration and sustained phone power remain
+the final physical gate. See [android/README.md](android/README.md) for setup,
+standalone usage, powered-hub guidance, and both USB protocols.
 
 ## UNO Q accelerated media receiver
 
@@ -312,9 +317,9 @@ API details.
 
 ## Scope and records
 
-Analog redesign, transition-based clock recovery, faster modulation, physical
-USB-to-phone validation, Galaxy audio playback, and Cloud AI remain outside the
-verified milestone. The tracked UNO Q pair now automatically carries and
+Analog redesign, transition-based clock recovery, faster modulation, direct
+Galaxy-to-UNO-Q physical validation, and Cloud AI remain outside the verified
+milestone. The tracked UNO Q pair now automatically carries and
 reconstructs image and one-second audio fixtures through `LWF1`; the supported
 five-second audio decoder was not subjected to the intentionally long optical
 stress transfer.

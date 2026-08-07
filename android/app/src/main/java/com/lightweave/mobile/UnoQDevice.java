@@ -1,14 +1,12 @@
-package com.lightweave.receiver;
+package com.lightweave.mobile;
 
 import android.hardware.usb.UsbDevice;
 
-import java.util.Locale;
-
-public final class UnoQIdentity {
+public final class UnoQDevice {
     public static final int VENDOR_ID = 0x2341;
     public static final int PRODUCT_ID = 0x0078;
 
-    private UnoQIdentity() {}
+    private UnoQDevice() {}
 
     public static boolean matches(int vendorId, int productId) {
         return vendorId == VENDOR_ID && productId == PRODUCT_ID;
@@ -18,16 +16,14 @@ public final class UnoQIdentity {
         return device != null && matches(device.getVendorId(), device.getProductId());
     }
 
-    public static String displayName(UsbDevice device) {
+    public static String describe(UsbDevice device) {
         if (device == null) {
-            return "UNO Q 2341:0078 not attached";
+            return "Device: not attached";
         }
         return String.format(
-                Locale.ROOT,
-                "Arduino UNO Q · %04X:%04X · %d interface%s",
+                "Device: UNO Q %04x:%04x / %s",
                 device.getVendorId(),
                 device.getProductId(),
-                device.getInterfaceCount(),
-                device.getInterfaceCount() == 1 ? "" : "s");
+                device.getDeviceName());
     }
 }

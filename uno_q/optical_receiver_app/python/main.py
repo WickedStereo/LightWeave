@@ -22,13 +22,23 @@ from lightweave_optical_receiver import (
     collect_received_frame,
 )
 from lightweave_uno import decode_audio_payload, decode_payload
+from phone_usb import (
+    CONTENT_TYPES,
+    PhoneControlReader,
+    PhoneUsbError,
+    PhoneUsbOutbox,
+    PhoneUsbUnavailable,
+)
 
 ui = WebUI()
 store = ReceiverStore(app_root())
+phone_control = PhoneControlReader()
+phone_outbox = PhoneUsbOutbox(app_root())
 listen_queue: queue.Queue[ReceiveRequest] = queue.Queue()
 frame_finished_event = threading.Event()
 cancel_event = threading.Event()
 pending_request: ReceiveRequest | None = None
+last_phone_delivery_attempt = 0.0
 
 
 def hardware_usage(frame: Any, metrics: dict[str, Any]) -> dict[str, Any]:
@@ -98,6 +108,18 @@ def hardware_usage(frame: Any, metrics: dict[str, Any]) -> dict[str, Any]:
     return common
 
 
+def phone_status(value: dict[str, Any]) -> None:
+    """Best-effort state delivery; decoded results remain durably queued."""
+
+    try:
+        receipt = phone_outbox.send_status(value)
+        ui.send_message("phone_status", receipt)
+    except PhoneUsbUnavailable:
+        return
+    except PhoneUsbError as exc:
+        ui.send_message("phone_status", {"status": "error", "error": str(exc)})
+
+
 def send_status(request: ReceiveRequest | None, status: str, client=None) -> None:
     value = {
         "status": status,
@@ -108,10 +130,12 @@ def send_status(request: ReceiveRequest | None, status: str, client=None) -> Non
     if request is not None:
         value.update(request_id=request.request_id, source=request.source)
     ui.send_message("receiver_status", value, client)
+    phone_status(value)
 
 
 def send_error(message: str, client=None) -> None:
     ui.send_message("receiver_error", {"error": message}, client)
+    phone_status({"status": "error", "error": message})
 
 
 def frame_finished_notification() -> None:
@@ -137,6 +161,51 @@ def cancel_from_ui(client, _data) -> None:
 
 def get_initial_state(client, _data) -> None:
     send_status(pending_request, "listening" if pending_request else "idle", client)
+
+
+def handle_phone_commands() -> None:
+    for command in phone_control.poll():
+        print(f"Phone USB control: {command}", flush=True)
+        if command == "listen":
+            if pending_request is not None or not listen_queue.empty():
+                phone_status(
+                    {
+                        "status": "busy",
+                        "error": "The receiver is already listening for a transfer.",
+                    }
+                )
+                continue
+            request = build_request(str(uuid.uuid4()), source="phone-usb")
+            listen_queue.put(request)
+            send_status(request, "arming")
+        elif command == "cancel":
+            if pending_request is None and listen_queue.empty():
+                send_status(None, "idle")
+            else:
+                cancel_event.set()
+                send_status(pending_request, "cancelling")
+        else:
+            send_status(
+                pending_request,
+                "listening" if pending_request is not None else "idle",
+            )
+
+
+def deliver_phone_result() -> None:
+    global last_phone_delivery_attempt
+    now = time.monotonic()
+    if now - last_phone_delivery_attempt < 1.0:
+        return
+    last_phone_delivery_attempt = now
+    try:
+        receipt = phone_outbox.deliver_once()
+    except PhoneUsbUnavailable:
+        return
+    except PhoneUsbError as exc:
+        ui.send_message("phone_status", {"status": "error", "error": str(exc)})
+        return
+    if receipt is not None:
+        ui.send_message("phone_status", receipt)
 
 
 def next_request() -> ReceiveRequest | None:
@@ -179,6 +248,22 @@ def process_completed_request(request: ReceiveRequest) -> None:
         output_extension=extension,
         metrics=metrics,
     )
+    phone_metadata = dict(result)
+    phone_metadata.update(
+        content_type=CONTENT_TYPES[frame.header.profile.media_type],
+        output_filename=f"lightweave-{request.request_id}.{extension}",
+        downstream_protocol="LWRX/2",
+    )
+    result["phone_usb"] = phone_outbox.enqueue(
+        request.request_id,
+        frame.header.profile.media_type,
+        phone_metadata,
+        media,
+    )
+    store.write_atomic_json(
+        store.results / f"{request.request_id}.json",
+        result,
+    )
     response = dict(result)
     if base64_field is not None:
         response[base64_field] = base64.b64encode(media).decode("ascii")
@@ -197,6 +282,8 @@ def clear_pending() -> None:
 def loop() -> None:
     global pending_request
     try:
+        handle_phone_commands()
+        deliver_phone_result()
         if pending_request is None:
             if cancel_event.is_set():
                 with suppress(queue.Empty):

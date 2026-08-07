@@ -37,6 +37,14 @@ stages, Adreno 702 stages/audited layer counts, and peak decoder memory. Layer
 counts are graph evidence, not FLOP or power estimates. Received raw payloads
 and outputs are written atomically under `data/results`.
 
+The same unchanged decode results are also queued for the standalone Galaxy
+application. A narrow App Lab Compose override exposes only `/dev/ttyGS0` to
+the receiver service. The phone sends fixed `LWCT/1` Listen/Cancel/Status
+commands and receives CRC-protected `LWRX/2` status, text, PNG, and WAV frames.
+Results remain in `data/phone-outbox` until USB delivery succeeds. This is a
+downstream presentation channel; it does not change `LWF1`, the optical bytes,
+the STM32 receiver sketch, or the transmitter.
+
 The tracked project contains no generated models or vendor libraries. Install
 the base native receiver first, then deploy this App Lab application:
 
@@ -46,6 +54,8 @@ the base native receiver first, then deploy this App Lab application:
 .\scripts\install_uno_q_optical_receiver.ps1 -DeviceSerial <RX_SERIAL> -StopRunningApp
 ```
 
-After installation, open the application from Arduino App Lab, press **Listen
-for transfer**, and then use **Send to Arduino** in the Windows dashboard.
-Runtime operation is local and offline.
+After installation, either use the App Lab page or connect the Galaxy and tap
+**Listen for transfer** in LightWeave Mobile. The final receiver/display runtime
+is UNO Q plus phone and is local/offline; a laptop is needed only for setup and
+development. If App Lab is manually rebuilt later, rerun the receiver installer
+so its checked USB-device override is reapplied.

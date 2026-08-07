@@ -1,0 +1,4 @@
+services:
+  main:
+    devices:
+      - /dev/ttyGS0:/dev/ttyGS0:rw

@@ -30,6 +30,7 @@ $targetApp = "/home/arduino/ArduinoApps/lightweave_receiver"
 $targetDisplayName = "LightWeave Receiver"
 $requiredFiles = @(
     "app.yaml",
+    "usb-compose.override.yaml",
     "README.md",
     "optical_receiver.manifest.json",
     "assets/index.html",
@@ -37,6 +38,7 @@ $requiredFiles = @(
     "assets/style.css",
     "python/lightweave_optical_receiver.py",
     "python/main.py",
+    "python/phone_usb.py",
     "python/requirements.txt",
     "sketch/sketch.ino",
     "sketch/sketch.yaml"
@@ -91,6 +93,10 @@ $doctorText = $doctor -join "`n"
 if ($doctorText -notmatch 'ARCH=aarch64') { throw "Target is not Linux ARM64." }
 if ($doctorText -notmatch 'APP_CLI=Arduino App CLI version') {
     throw "Arduino App CLI is unavailable."
+}
+& $AdbPath -s $DeviceSerial shell "test -c /dev/ttyGS0"
+if ($LASTEXITCODE -ne 0) {
+    throw "Receiver UNO Q does not expose the expected /dev/ttyGS0 USB CDC gadget."
 }
 $freeMatch = [regex]::Match($doctorText, 'FREE_KB=(\d+)')
 if (-not $freeMatch.Success -or [int64]$freeMatch.Groups[1].Value -lt 131072) {
@@ -193,8 +199,9 @@ if ($LASTEXITCODE -ne 0) { throw "Could not upload the UNO Q third-party notice.
 
 $installCommand = @"
 set -eu
-mkdir -p '$targetApp/assets/libs' '$targetApp/python' '$targetApp/sketch' '$targetApp/data/inbox' '$targetApp/data/processing' '$targetApp/data/results'
+mkdir -p '$targetApp/assets/libs' '$targetApp/python' '$targetApp/sketch' '$targetApp/data/inbox' '$targetApp/data/processing' '$targetApp/data/results' '$targetApp/data/phone-outbox'
 install -m 0644 '$stage/source/app.yaml' '$targetApp/app.yaml'
+install -m 0644 '$stage/source/usb-compose.override.yaml' '$targetApp/usb-compose.override.yaml'
 install -m 0644 '$stage/source/README.md' '$targetApp/README.md'
 install -m 0644 '$stage/source/optical_receiver.manifest.json' '$targetApp/optical_receiver.manifest.json'
 install -m 0644 '$stage/source/THIRD_PARTY_NOTICES.md' '$targetApp/THIRD_PARTY_NOTICES.md'
@@ -203,6 +210,7 @@ install -m 0644 '$stage/source/assets/app.js' '$targetApp/assets/app.js'
 install -m 0644 '$stage/source/assets/style.css' '$targetApp/assets/style.css'
 install -m 0644 '$stage/source/python/lightweave_optical_receiver.py' '$targetApp/python/lightweave_optical_receiver.py'
 install -m 0644 '$stage/source/python/main.py' '$targetApp/python/main.py'
+install -m 0644 '$stage/source/python/phone_usb.py' '$targetApp/python/phone_usb.py'
 install -m 0644 '$stage/source/python/requirements.txt' '$targetApp/python/requirements.txt'
 install -m 0644 '$stage/source/python/lightweave_optical_frame.py' '$targetApp/python/lightweave_optical_frame.py'
 install -m 0644 '$stage/source/sketch/sketch.ino' '$targetApp/sketch/sketch.ino'
@@ -263,7 +271,23 @@ if (-not $NoStart) {
     }
     & $AdbPath -s $DeviceSerial shell "arduino-app-cli app restart '$targetApp'"
     if ($LASTEXITCODE -ne 0) { throw "App Lab could not start lightweave_receiver." }
+    $usbComposeCommand = @'
+set -eu
+cd '__TARGET_APP__/.cache'
+docker compose -f app-compose.yaml -f ../usb-compose.override.yaml up -d --force-recreate
+container=$(docker compose -f app-compose.yaml -f ../usb-compose.override.yaml ps -q main)
+test -n "$container"
+docker exec "$container" test -r /dev/ttyGS0 -a -w /dev/ttyGS0
+'@
+    $usbComposeCommand = $usbComposeCommand.Replace('__TARGET_APP__', $targetApp)
+    & $AdbPath -s $DeviceSerial shell $usbComposeCommand
+    if ($LASTEXITCODE -ne 0) {
+        throw "The receiver service could not access the UNO Q USB CDC gadget."
+    }
 }
 
 Write-Host "Reusable source hashes are unchanged."
+if (-not $NoStart) {
+    Write-Host "Phone USB endpoint: /dev/ttyGS0 is readable and writable in the receiver service."
+}
 Write-Host "LightWeave receiver installation completed."

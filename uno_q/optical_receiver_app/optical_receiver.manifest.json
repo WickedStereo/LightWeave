@@ -1,10 +1,20 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "application_id": "lightweave_receiver",
   "display_name": "LightWeave Receiver",
   "media_types": ["text", "image", "audio"],
   "source_runtime": "lightweave-uno",
   "wire_format": "LWF1",
+  "phone_usb": {
+    "device": "/dev/ttyGS0",
+    "result_protocol": "LWRX/2",
+    "control_protocol": "LWCT/1",
+    "roles": ["listen", "cancel", "status", "text", "image", "audio"],
+    "maximum_metadata_bytes": 262144,
+    "maximum_media_bytes": 16777216,
+    "durable_result_outbox": true,
+    "runtime_laptop_required": false
+  },
   "optical_contract": {
     "sensor_pin": "A0",
     "sensor_threshold": 800,

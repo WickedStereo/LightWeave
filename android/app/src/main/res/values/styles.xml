@@ -1,39 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.LightWeave" parent="android:style/Theme.Material.NoActionBar">
+    <style name="Theme.LightWeave.Light" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
-        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">@color/white</item>
+        <item name="android:colorAccent">@color/black</item>
+        <item name="android:navigationBarColor">@color/white</item>
+        <item name="android:statusBarColor">@color/white</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+    <style name="Theme.LightWeave.Dark" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowBackground">@color/black</item>
+        <item name="android:colorAccent">@color/white</item>
+        <item name="android:navigationBarColor">@color/black</item>
+        <item name="android:statusBarColor">@color/black</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:navigationBarColor">@color/night</item>
-        <item name="android:statusBarColor">@color/night</item>
-        <item name="android:windowBackground">@color/night</item>
-        <item name="android:colorAccent">@color/mint</item>
-    </style>
-
-    <style name="Text.LightWeave.Eyebrow" parent="">
-        <item name="android:textColor">@color/text_muted</item>
-        <item name="android:textSize">11sp</item>
-        <item name="android:textStyle">bold</item>
-        <item name="android:letterSpacing">0.12</item>
-    </style>
-
-    <style name="Text.LightWeave.Value" parent="">
-        <item name="android:textColor">@color/text_primary</item>
-        <item name="android:textSize">16sp</item>
-    </style>
-
-    <style name="Button.LightWeave.Primary" parent="android:style/Widget.Material.Button">
-        <item name="android:backgroundTint">@color/mint</item>
-        <item name="android:textColor">@color/button_text</item>
-        <item name="android:textAllCaps">false</item>
-        <item name="android:textStyle">bold</item>
-        <item name="android:minHeight">48dp</item>
-    </style>
-
-    <style name="Button.LightWeave.Secondary" parent="android:style/Widget.Material.Button">
-        <item name="android:backgroundTint">@color/night_border</item>
-        <item name="android:textColor">@color/text_primary</item>
-        <item name="android:textAllCaps">false</item>
-        <item name="android:minHeight">48dp</item>
     </style>
 </resources>
