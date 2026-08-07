@@ -686,7 +686,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | UNO Q native receiver | Complete locally | Native rANS, strict runner, CLI, rendered API/WebUI, manifest, SPDX SBOM, offline bundle, dry-run/idempotent installer, and 60-test repository suite pass |
 | UNO Q receiver publication | Complete | Source/evidence commit `8074645` and Android-preservation commit `fa19c64` published to `origin/main` |
 | UNO Q audio receiver | Complete and published | Commit `03b0bd7`; native unpack/codebook parity, earliest valid split 5, strict 39-layer Adreno suffix, 1/5-second parity, CLI/API/WebUI, offline bundle, installer, and offline smoke pass |
-| Android receiver UI and hardware path | Active final gate | No-laptop phone/UNO topology and text/image/audio app are implemented; validate direct S25 enumeration, power, rendering/playback, reconnect, and end-to-end optical transfer |
+| Android receiver UI and hardware path | Published; physical S25 gate remains | Commit `81c8888`; no-laptop phone/UNO topology, text/image/audio app, UNO Q USB controls/results, tests, and setup are on `origin/main` |
 | Windows-to-UNO Q transmitter flow | Complete and published | Commit `028f9d9`; dashboard image/audio Send actions, USB/ADB sink, atomic App Lab inbox, variable-length STM32 loop, tracked clone source, installer, and real 104/124/188-byte board acceptance pass |
 | UNO Q optical byte diagnostic | Complete and published | Commit `80ba103`; exact `00 FF AA 55` received twice with matching SHA-256 and valid stop bit |
 | UNO Q optical image receiver | Complete and published | Commit `506eee9`; two 80-byte physical image transfers passed exact-byte, stop-bit, 64-by-64 PNG, 16-layer Adreno, strict-no-fallback, App Lab UI, and zero-console-error gates |
@@ -698,7 +698,7 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | Second Snapdragon PC | Pending external device | Transfer the same `.lwv` plus generated artifacts and verify |
 | AI Hub/QAIRT Visualizer | Pending access/install | Compare only when account/SDK are available |
 | Arduino/optical adapter | Image/audio implementation complete | Default `LWF1`, explicit `raw-v0` diagnostic, automatic routing, strict image Adreno and truthful audio hybrid verified physically |
-| GitHub push | Complete | Implementation `c8600c7` and publication record `db6cf62` were pushed directly to `origin/main` without force-pushing |
+| GitHub push | Complete | Standalone Galaxy receiver commit `81c8888` and pre-rebuild tag `lightweave-pre-android-rebuild` were pushed without force |
 
 ## Risks and mitigations
 
@@ -897,3 +897,4 @@ Generated acceptance and offline-smoke reports remain ignored and reproducible.
 | 2026-08-06 | Committed the theme, hardware telemetry, board evidence, tests, and submission-readiness audit as `98481a8`; 124 portable tests and repository lint passed before publication. |
 | 2026-08-06 | Retired the previous Android prototype, selected a final no-laptop Galaxy S25 Ultra + receiver UNO Q topology, and created the `lightweave-pre-android-rebuild` backup tag at the last published working receiver head. |
 | 2026-08-06 | Rebuilt LightWeave Mobile for bidirectional USB Listen/Cancel/Status and decoded text/PNG/WAV/evidence, added the receiver's durable `LWRX/2` outbox and narrow `/dev/ttyGS0` App Lab mapping, passed 137 Python tests plus Android build/lint/7 tests, and physically verified status, listen/cancel, and real reconstructed-PNG delivery through the UNO Q USB gadget. Direct S25 validation remains pending. |
+| 2026-08-06 | Published the standalone Galaxy receiver implementation as commit `81c8888` and pushed the annotated `lightweave-pre-android-rebuild` backup tag; transmitter source and logic remained unchanged. |
