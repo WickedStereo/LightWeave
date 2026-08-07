@@ -328,6 +328,7 @@ def test_adb_sink_pushes_exact_binary_payload(tmp_path: Path) -> None:
         adb_path=adb,
         runner=runner,
         sleep=lambda _: None,
+        app_variant="standard",
     )
     receipt = sink.send(payload)
     assert runner.uploaded == payload
@@ -347,6 +348,7 @@ def test_adb_sink_rejects_missing_device(tmp_path: Path) -> None:
         preset_code="I64-Q1-B128",
         adb_path=adb,
         runner=runner,
+        app_variant="standard",
     )
     with pytest.raises(UnoQTransportError, match="uniquely identify"):
         sink.status()
@@ -363,6 +365,7 @@ def test_adb_sink_selects_running_transmitter_from_two_uno_q_boards(
         preset_code="I64-Q1-B128",
         adb_path=adb,
         runner=runner,
+        app_variant="standard",
     )
 
     status = sink.status()
@@ -390,6 +393,22 @@ def test_adb_sink_targets_parallel_app_variant(tmp_path: Path) -> None:
     commands = [" ".join(command) for command in runner.commands]
     assert any("lightweave_parallel_transmitter" in command for command in commands)
     assert any("parallel_transmitter.manifest.json" in command for command in commands)
+
+
+def test_adb_sink_defaults_to_parallel_app_variant(tmp_path: Path) -> None:
+    adb = tmp_path / "adb.exe"
+    adb.write_bytes(b"stub")
+    sink = UnoQAdbSink(
+        media_type="text",
+        preset_code="T1-ASCII-B100",
+        adb_path=adb,
+        runner=ParallelAdb(b"payload"),
+    )
+
+    status = sink.status()
+
+    assert status["ready"] is True
+    assert status["app_variant"] == "parallel"
 
 
 def test_adb_sink_reads_parallel_variant_from_environment(

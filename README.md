@@ -294,7 +294,6 @@ then install the separate clones:
 .\scripts\install_uno_q_parallel_receiver.ps1 `
   -DeviceSerial 371371094 -StopRunningApp
 
-$env:LIGHTWEAVE_UNO_Q_TRANSMITTER_APP = "parallel"
 $env:LIGHTWEAVE_UNO_Q_SERIAL = "123900964"
 .\.venv-x64\Scripts\lightweave.exe dashboard
 
@@ -313,8 +312,9 @@ three optical paths before media tests; a lane seeing another laser can corrupt
 symbols even though CRC prevents reconstruction of a bad frame.
 
 Open `http://127.0.0.1:8765/transmit` after starting the executable. The
-`LIGHTWEAVE_UNO_Q_TRANSMITTER_APP` selector is restricted to `standard` or
-`parallel`; omitting it preserves the original standard-app behavior. Because
+The dashboard now targets the parallel transmitter by default.
+`LIGHTWEAVE_UNO_Q_TRANSMITTER_APP` is restricted to `standard` or `parallel`;
+set it to `standard` only when intentionally using the original app. Because
 the cloned Python service is intentionally unchanged, its dashboard busy timer
 and displayed optical estimate remain the conservative single-lane values even
 though the three lasers physically finish sooner.

@@ -155,7 +155,6 @@ existing `LWF1` frame is striped over D5/D7/D9 and reassembled from A0/A2/A5.
 .\scripts\install_uno_q_parallel_transmitter.ps1 -DeviceSerial 123900964 -StopRunningApp
 .\scripts\install_uno_q_parallel_receiver.ps1 -DeviceSerial 371371094 -StopRunningApp
 
-$env:LIGHTWEAVE_UNO_Q_TRANSMITTER_APP = "parallel"
 $env:LIGHTWEAVE_UNO_Q_SERIAL = "123900964"
 .\.venv-x64\Scripts\lightweave.exe dashboard
 
@@ -176,6 +175,10 @@ The parallel receiver can also be selected as the reversible App Lab boot
 default before moving its cable to the S25. That path displayed exact
 `PHONE 3-LANE` through the unchanged LightWeave Mobile app after a 1.65-second
 parallel optical send.
+
+The Windows dashboard targets the parallel transmitter by default. Set
+`LIGHTWEAVE_UNO_Q_TRANSMITTER_APP=standard` only to use the preserved
+single-laser application.
 
 ## Runtime architecture
 

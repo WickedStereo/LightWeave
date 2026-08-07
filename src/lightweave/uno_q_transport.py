@@ -171,7 +171,7 @@ class UnoQAdbSink:
         variant = (
             app_variant
             or os.environ.get("LIGHTWEAVE_UNO_Q_TRANSMITTER_APP")
-            or "standard"
+            or "parallel"
         ).strip().lower()
         if variant not in TRANSMITTER_TARGETS:
             raise UnoQTransportError(
