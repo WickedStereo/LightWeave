@@ -3,6 +3,12 @@
 /internal/
 /private/
 
+# Internal working documents kept out of the public repository
+/PROJECT_CONTEXT.md
+/AGENTS.md
+/docs/SUBMISSION_CHECKLIST.md
+/presentation.html
+
 # Secrets and machine-local configuration
 .env
 .env.*

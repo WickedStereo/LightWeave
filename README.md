@@ -23,9 +23,11 @@ Three data representations coexist:
 
 ## Team
 
-The final public names and email addresses are intentionally not guessed from
-Git metadata. The repository owner must replace this note with the complete
-team roster before submitting the GitHub link.
+| Name | Email |
+| --- | --- |
+| Anish Miryala | <amiryala@qti.qualcomm.com> |
+| Rakshithraj Pulluri | <rpulluri@qti.qualcomm.com> |
+| Lalana Palwaye | <lpalwaye@qti.qualcomm.com> |
 
 The image path is fully NPU-backed. CompressAI creates an entropy-coded image
 payload, the receiver restores the latent tensor on CPU, and the complete
@@ -114,7 +116,8 @@ generates no-AI text, image, and audio payloads and downloads the exact raw
 their out-of-band settings codes, and `/loopback` preserves
 the `.lwv` development workbench. The monochrome text-first UI defaults to the
 balanced 128 x 128 profile, includes tiny and quality alternatives plus three
-local test patterns, and shows transfer estimates, quality/latency metrics,
+local test patterns, and shows separately labeled one-channel and three-channel
+optical time estimates, quality/latency metrics,
 playable media, QNN device selection, and strict provider evidence.
 Every Windows and production UNO Q page includes a persistent light/dark mode
 control that also respects the browser's initial system preference.
@@ -262,6 +265,69 @@ sample count, an Adreno device, and strict no-fallback evidence for the image
 graph or audio suffix. The diagnostic, original `image_receiver`, and installed
 base decoder remain separate and unchanged.
 
+### Optional three-lane optical sketches
+
+For the three-laser workshop setup, the repository also tracks separate
+**LightWeave Parallel Transmitter** and **LightWeave Parallel Receiver** App Lab
+clones. The standard apps remain installed and their source hashes are checked
+before and after every parallel-app installation. The clones reuse the existing
+Python services, codecs, receiver WebUI, phone transport, and accelerated media
+reconstruction unchanged; only their STM32 sketches implement the parallel
+wire behavior.
+
+- Transmitter lanes: D5, D7, and D9.
+- Receiver lanes: A0, A2, and A5, each with threshold 800.
+- Complete `LWF1` frame bytes are striped round-robin across the three lanes.
+- All lanes retain the common high start bit, 25-ms MSB-first data timing, and
+  common low stop bit.
+- The receiver restores the original frame before applying the existing
+  profile, length, CRC-16, text/audio, and stop-bit checks.
+
+Install the standard pair first, align each laser to only its matching sensor,
+then install the separate clones:
+
+```powershell
+.\scripts\install_uno_q_parallel_transmitter.ps1 `
+  -DeviceSerial 123900964 -DryRun
+.\scripts\install_uno_q_parallel_receiver.ps1 `
+  -DeviceSerial 371371094 -DryRun
+
+.\scripts\install_uno_q_parallel_transmitter.ps1 `
+  -DeviceSerial 123900964 -StopRunningApp
+.\scripts\install_uno_q_parallel_receiver.ps1 `
+  -DeviceSerial 371371094 -StopRunningApp
+
+$env:LIGHTWEAVE_UNO_Q_SERIAL = "123900964"
+.\.venv-x64\Scripts\lightweave.exe dashboard
+
+.\.venv-x64\Scripts\python.exe scripts\verify_uno_q_parallel_text.py `
+  --text "3-LANE" `
+  --transmitter-serial 123900964 `
+  --receiver-serial 371371094
+```
+
+App Lab runs only one application per board, so starting a parallel clone stops
+the active standard app but does not delete or overwrite it. The physical gate
+received exact `3-LANE` bytes in six parallel byte slots: 1.25 seconds versus
+3.65 seconds for the same 18-byte frame on one lane. D5/A0 also passed a
+60-second alignment hold with all 60 readings above threshold. Isolate the
+three optical paths before media tests; a lane seeing another laser can corrupt
+symbols even though CRC prevents reconstruction of a bad frame.
+
+Open `http://127.0.0.1:8765/transmit` after starting the executable. The
+The dashboard now targets the parallel transmitter by default.
+`LIGHTWEAVE_UNO_Q_TRANSMITTER_APP` is restricted to `standard` or `parallel`;
+set it to `standard` only when intentionally using the original app. Because
+the cloned Python service is intentionally unchanged, its dashboard busy timer
+and displayed optical estimate remain the conservative single-lane values even
+though the three lasers physically finish sooner.
+
+For the standalone display gate, the parallel receiver was selected as the
+board's reversible boot default and connected directly to the S25. The existing
+LightWeave Mobile Listen control armed it, and exact `PHONE 3-LANE` appeared in
+the unchanged Android app after a 12-byte payload/24-byte frame crossed eight
+parallel slots in 1.65 seconds.
+
 ## Standalone Galaxy receiver/display
 
 The fresh [`android/`](android/) Android Studio project replaces the earlier
@@ -333,15 +399,11 @@ reconstructs image and one-second audio fixtures through `LWF1`; the supported
 five-second audio decoder was not subjected to the intentionally long optical
 stress transfer.
 
-- [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) is the living source of truth.
 - [docs/QUALCOMM_DEVELOPER_EXPERIENCE.md](docs/QUALCOMM_DEVELOPER_EXPERIENCE.md)
   records Qualcomm tools, evidence, friction, and improvement suggestions.
 - [data/demo_manifest.json](data/demo_manifest.json) defines the public image
   acceptance set and oversize stress case.
 - [models/manifest.json](models/manifest.json) pins model sources, hashes,
   profiles, shapes, and expected generated artifacts.
-- [docs/SUBMISSION_CHECKLIST.md](docs/SUBMISSION_CHECKLIST.md) audits the
-  repository against the hackathon delivery requirements and identifies the
-  remaining owner-only actions.
 
 Licensed under the [MIT License](LICENSE).

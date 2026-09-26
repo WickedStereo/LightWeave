@@ -565,6 +565,62 @@ private endpoints, and confidential material must never appear here.
 | Workaround | Inject a shared Router monitor transport into the receiver control reader and durable outbox, poll `mon/read`, require exact byte counts from `mon/write`, fail closed on unavailable/malformed RPC results, delete the obsolete Compose override, and verify the enabled services plus live monitor connection during installation. Preserve `LWRX/2` CRC and outbox behavior above this transport. |
 | Suggested improvement | Document the Router monitor API as the supported UNO Q gadget-serial path for App Lab, expose host-open/DTR state separately from the system `socat` connection, provide an official binary Android USB sample, and add an App CLI Doctor check that correlates gadget, serial service, Router monitor, and application readiness. |
 
+### DX-038 - Three-lane optical sketches need observable per-lane calibration
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-07; preserve the proven LightWeave software stack while reducing optical elapsed time with three independent STM32 lanes |
+| Environment | Transmitter UNO Q `123900964`/UNOQ-1 and receiver UNO Q `371371094`/unoq2; Qualcomm QRB2210 Debian ARM64 hosts plus STM32U585 MCUs; Arduino App CLI 0.12.1; Arduino Zephyr 0.90.0; RouterBridge 0.4.3; Windows 11 x64 host over USB/ADB |
+| Tool/source | Separate App Lab clones, `arduino-app-cli`, OpenOCD, RouterBridge RPC, live STM32 ADC diagnostics, and unchanged LightWeave `LWF1` framing |
+| Intended workflow | Change only the cloned STM32 sketches: buffer the complete payload, stripe consecutive `LWF1` frame bytes over D5/D7/D9, reassemble from A0/A2/A5, and expose the standard Bridge contract so Python, codecs, reconstruction, UI, and phone transport remain unchanged |
+| Actual result and evidence | Both clones compiled and flashed. The final diagnostic transmitter used 90,440 bytes flash and 36,698 bytes RAM; the receiver used 96,288 bytes flash and 36,334 bytes RAM. Initial reception produced zero bytes because A0 was below threshold and then showed optical crosstalk from D7/D9. New sketch-only test methods exposed raw lane ADC values and laser masks. After physical isolation, D5/D7/D9 produced exact high masks 1/2/4, all three produced mask 7, and a 60-second D5/A0 hold recorded 60/60 values above threshold 800 (minimum 1,015, maximum 1,023, mean 1,022.7). A real six-byte text payload `3-LANE` was reconstructed exactly as hex `332D4C414E45`; receiver/computed CRC values both equaled 50,021, the stop bit was valid, and no error was reported. Its 18-byte frame used six parallel byte slots and 1.25 seconds versus 3.65 seconds for the same frame on one lane. Installer hash gates confirmed the standard single-lane applications were unchanged. |
+| Usefulness | App Lab and RouterBridge make it practical to keep Qualcomm Linux orchestration and reconstruction untouched while iterating independently on the STM32 physical layer. Live per-lane ADC and mask evidence turned an apparent protocol failure into a measurable alignment/isolation issue. QRB2210, GPU, and NPU do not perform the wire timing; the STM32 owns framing, GPIO, sampling, and reassembly. |
+| Friction and owner | App Lab allows one running app per board, each sketch restart recompiles/provisions for about 97 seconds, and the default tools expose no per-lane ADC health. A compile-time threshold alone obscures whether failure is weak alignment, crosstalk, lane swapping, or protocol corruption. These are Arduino App Lab/embedded observability and physical-demo setup concerns, not Qualcomm inference limitations. |
+| Workaround | Keep the production single-lane apps installed, use separate parallel clones, provide explicit laser-mask and sensor-reading Bridge diagnostics, require isolated masks 1/2/4 before transmission, retain threshold 800 and CRC rejection, and run a short exact text frame before attempting media. |
+| Suggested improvement | App Lab should provide a low-latency pin/ADC diagnostics panel, retain compile caches across sketch-only clone updates, display the active/default app clearly, and offer a standard multi-channel timing/capture example with synchronized GPIO output and ADC threshold visualization. |
+
+### DX-039 - The unchanged Galaxy presentation path accepts the parallel clone
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-07; verify that changing only the two STM32 optical sketches still delivers decoded data to the standalone Galaxy S25 application |
+| Environment | Transmitter UNO Q `123900964` over Windows USB/ADB; receiver UNO Q `371371094` powered directly by the Galaxy S25 Ultra host path; Qualcomm QRB2210 Debian ARM64 plus STM32U585; LightWeave Mobile 1.0.0/code 2 on Android 15; boot-managed Arduino Router monitor |
+| Tool/source | `arduino-app-cli properties set default`, parallel App Lab receiver clone, unchanged receiver Python/Router `mon/read`/`mon/write` transport, unchanged `LWCT/1`/`LWRX/2`, and owner-observed LightWeave Mobile UI |
+| Intended workflow | Power-cycle the receiver during the laptop-to-phone cable move, let the parallel clone boot automatically, arm it from the existing phone Listen control, reconstruct/route text through the existing Linux service, and display the result without Android or codec changes |
+| Actual result and evidence | The receiver default was changed reversibly from `/home/arduino/ArduinoApps/lightweave_receiver` to `/home/arduino/ArduinoApps/lightweave_parallel_receiver`; App CLI reported the parallel clone running and `default: true`. With the receiver connected directly to the S25, the phone reported listening. The transmitter buffered and launched exact ASCII `PHONE 3-LANE`: 12 payload bytes, 24 total LWF1 bytes, eight parallel byte slots, and 1.65 seconds. The owner then confirmed the exact text appeared in LightWeave Mobile. This builds on direct Bridge evidence for matching CRC and stop-bit behavior from the immediately preceding `3-LANE`/`HELLO` tests; no Android, Python, model, GPU, or NPU source changed for the phone test. |
+| Usefulness | Confirms the Qualcomm Linux host and boot-safe Router transport remain stable abstractions above a different STM32 physical implementation. The QRB2210 continues orchestration/persistence while the phone remains presentation-only; the optical speedup does not require a second mobile build. |
+| Friction and owner | App Lab's one-active-app rule and separate default-app property mean a running parallel clone can silently revert to the standard clone after a cable-induced reboot unless default identity is checked explicitly. This is Arduino lifecycle observability friction rather than a Qualcomm compute limitation. |
+| Workaround | Set and verify the intended clone as default before moving the receiver cable, keep the standard app installed, and restore it with `arduino-app-cli properties set default /home/arduino/ArduinoApps/lightweave_receiver` when returning to the single-lane setup. |
+| Suggested improvement | App Lab should show RUNNING and BOOT DEFAULT as distinct persistent badges, offer an atomic “start and make default” action with rollback, and surface the active sketch pin contract so multi-app hardware configurations are harder to confuse. |
+
+### DX-040 - One Windows executable can select the active App Lab transmitter clone
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-07; run the three-lane transmitter from the same Windows dashboard executable used by the standard app |
+| Environment | Snapdragon X Elite Windows 11 x64 host; LightWeave x64 Python environment; ADB platform-tools; transmitter UNO Q `123900964` with **LightWeave Parallel Transmitter** running |
+| Tool/source | Existing `lightweave.exe dashboard`, `UnoQAdbSink`, Arduino App CLI JSON status, tracked standard/parallel manifest markers, and live USB/ADB probe |
+| Intended workflow | Avoid a second Windows product while safely targeting either installed transmitter clone by name/path/manifest |
+| Actual result and evidence | A constrained `LIGHTWEAVE_UNO_Q_TRANSMITTER_APP` selector accepts only `standard` or `parallel` and maps the parallel value to `/home/arduino/ArduinoApps/lightweave_parallel_transmitter`, display name **LightWeave Parallel Transmitter**, and its dedicated manifest. With serial `123900964`, the real dashboard status API returned HTTP 200, connected/ready, app status running, and `app_variant: parallel`. The owner then selected parallel as the laptop default; `standard` is the explicit rollback. Focused dashboard/transmitter tests passed. The App Lab Python worker remains unchanged, so its reported busy duration is intentionally conservative. |
+| Usefulness | Preserves one Windows installation and dashboard for text/image/audio generation while keeping clone selection explicit and preventing arbitrary remote paths. This is host orchestration only; it does not change QNN, models, payloads, or STM32 framing. |
+| Friction and owner | App Lab app identity is split among filesystem path, display name, manifest, running state, and default state. A hard-coded host adapter works for one clone but becomes invisible when an equally valid parallel clone is active. This is Arduino lifecycle/discovery friction. |
+| Workaround | Map a small allow-list of known tracked app identities, verify its manifest plus running display name through App CLI, retain serial override for multiple boards, and expose the selected variant in status evidence. |
+| Suggested improvement | App CLI should expose a stable machine-readable application capability/role identifier independent of display name and path, allowing host tools to discover “LightWeave transmitter” implementations without duplicating identity rules. |
+
+### DX-041 - Parallel optical timing needs topology-aware presentation
+
+| Field | Observation |
+| --- | --- |
+| Date and objective | 2026-08-07; prevent the Windows dashboard from presenting a single-laser duration as the three-laser transmitter's duration |
+| Environment | Snapdragon X Elite Windows 11 dashboard; default **LightWeave Parallel Transmitter** on UNO Q; D5/D7/D9 round-robin LWF1 byte striping at 25 ms per bit |
+| Tool/source | Existing browser UI, LWF1 12-byte frame contract, and the physically accepted three-lane slot assignment |
+| Intended workflow | Preserve useful timing guidance while making the active physical topology explicit |
+| Actual result and evidence | Generated text/image/audio metrics, confirmation text, and launch evidence now display both estimates. One channel uses every framed byte; three channels use `ceil(frame bytes / 3)` simultaneous byte slots. Both include eight bit periods per slot plus the shared start and stop bit. A live two-byte text payload rendered 2.85 seconds for one channel and 1.05 seconds for three channels, and the same values appeared in the guarded send confirmation while the parallel adapter remained ready. The generic busy badge no longer displays the cloned worker's conservative single-channel countdown. Backend timing evidence remains unchanged for compatibility. |
+| Usefulness | Makes the parallel speedup understandable without overstating measured throughput and keeps the original one-channel value available for comparison or rollback. |
+| Friction and owner | The App Lab worker inherited its original one-channel busy model because the owner intentionally limited the parallel milestone to sketch changes. UI consumers therefore cannot treat that field as topology-aware completion evidence. |
+| Workaround | Derive both labeled estimates from the immutable frame size and known sketch topology, while continuing to call send success “launch accepted” rather than physical completion. |
+| Suggested improvement | Host/device protocols should report a stable physical-link topology and a completion event so dashboards can show measured completion instead of reconstructing estimates from implementation details. |
+
 ## Change log
 
 | Date | Change |
@@ -613,3 +669,9 @@ private endpoints, and confidential material must never appear here.
 | 2026-08-07 | Verified that the live production receiver is the persisted App Lab DEFAULT app and that the boot daemon is enabled; documented the one-time verification/recovery command and clarified that Docker restart policy is not the startup authority. |
 | 2026-08-07 | Directly proved S25 USB-host enumeration and LightWeave CDC/control writes, then isolated the missing response to App Lab default boot dropping the custom `/dev/ttyGS0` device grant; recorded the exact empty allow-list and `EPERM` evidence. |
 | 2026-08-07 | Replaced direct container gadget access with the boot-managed Arduino Router monitor, removed the unsupported Compose override, passed direct S25 Status/Listen/Cancel, and rendered an exact nine-byte optical text result with matching CRC/hash/stop-bit evidence and no receiver laptop. |
+| 2026-08-07 | Exercised separate three-lane STM32 sketch clones, used live per-lane ADC/mask diagnostics to resolve alignment and crosstalk, passed a 60-second threshold hold plus isolated masks 1/2/4/7, and received exact `3-LANE` LWF1 bytes with matching CRC and valid stop bit in 1.25 seconds while preserving standard app hashes. |
+| 2026-08-07 | Published the three-lane App Lab sketches, hash-preserving clone installers, exact-text verifier, tests, setup instructions, and evidence as commit `2e50e0a`. |
+| 2026-08-07 | Made the parallel receiver the reversible boot default, moved it to the direct S25 host path, and confirmed owner-observed `PHONE 3-LANE` display through the unchanged Android/Router service after a 1.65-second optical send. |
+| 2026-08-07 | Added and live-tested the existing Windows executable's constrained standard/parallel App Lab selector; the real dashboard status API identified the running parallel transmitter as ready without changing its Python worker or media pipeline. |
+| 2026-08-07 | Changed the dashboard's default App Lab transmitter identity to the three-lane parallel clone, restarted its existing default App Lab service, and verified ready/running status without an environment selector while preserving the original through explicit `standard`. |
+| 2026-08-07 | Replaced the ambiguous single optical duration in the dashboard with explicitly labeled one-channel and three-channel estimates derived from LWF1 frame bytes and parallel byte slots. |

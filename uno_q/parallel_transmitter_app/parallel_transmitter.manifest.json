@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "app_id": "lightweave_parallel_transmitter",
+  "display_name": "LightWeave Parallel Transmitter",
+  "source_app": "lightweave_transmitter",
+  "maximum_payload_bytes": 2048,
+  "wire_format": "LWF1-byte-stripe-3",
+  "lane_count": 3,
+  "laser_pins": [5, 7, 9],
+  "lane_assignment": "wire_frame_byte_index_modulo_3",
+  "bit_duration_ms": 25,
+  "bit_order": "msb-first",
+  "start_bit": 1,
+  "stop_bit": 0,
+  "raw_v0_supported": false,
+  "payload_bin_unchanged": true,
+  "lwf1_unchanged_after_reassembly": true
+}

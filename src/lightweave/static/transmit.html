@@ -75,7 +75,7 @@
           <div class="card-heading">
             <span class="media-tag">IMAGE / COMPRESSAI Q1</span>
             <h2>Image payload</h2>
-            <p>Choose the byte budget. Larger profiles preserve more detail but take longer over a 1-2 kbps link.</p>
+            <p>Choose the byte budget. Larger profiles preserve more detail and require more optical slots.</p>
           </div>
           <form id="image-transmit-form" class="stack-form">
             <label for="image-preset">Size profile
@@ -84,7 +84,7 @@
                 <option value="I128-Q1-B768" selected>128 x 128 / max 768 B / balanced</option>
                 <option value="I256-Q1-B2048">256 x 256 / max 2,048 B / quality</option>
               </select>
-              <span class="field-note" id="image-preset-note">Worst case: 6.144 s at 1 kbps or 3.072 s at 2 kbps.</span>
+              <span class="field-note" id="image-preset-note">Maximum framed optical time: 156.05 s / 1 channel; 52.05 s / 3 channels.</span>
             </label>
             <label class="drop-zone" for="image-input">
               <strong>Select an image</strong>
@@ -167,6 +167,6 @@
         </section>
       </div>
     </main>
-    <script src="/static/transmit.js" defer></script>
+    <script src="/static/transmit.js?v=three-channel-timing" defer></script>
   </body>
 </html>
